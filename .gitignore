@@ -1,0 +1,64 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+pip-wheel-metadata/
+*.log
+venv/
+env/
+ENV/
+.venv/
+.pytest_cache/
+.coverage
+.tox/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# === JavaScript / Node.js ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+*.tsbuildinfo
+
+# === Frontend build tools ===
+dist/
+build/
+out/
+public/
+coverage/
+.esbuild/
+.vite/
+.rollup.cache/
+.next/
+.svelte-kit/
+.storybook/
+.temp/
+.cache/
+webpack-stats.json
+
+# === Other ===
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
+
+# === Secrets ===
+.env
+.env.local
+.env.*
