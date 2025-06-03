@@ -1,16 +1,5 @@
-import {
-  createBrowserRouter,
-  RouterProvider,
-  type RouteObject,
-} from "react-router-dom";
-import Home from "./components/home";
-
-export const routes: RouteObject[] = [
-  {
-    path: "/",
-    element: <Home />,
-  },
-];
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { routes } from "./routes";
 
 const router = createBrowserRouter(routes);
 
