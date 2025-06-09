@@ -2,7 +2,9 @@ import React from "react";
 
 export default function Auth() {
   function handleLogin() {
-    window.location.href = `http://localhost:8000/accounts/github/login/`;
+    window.location.href = `${
+      import.meta.env.VITE_API_URL
+    }/accounts/github/login/`;
   }
 
   return (
