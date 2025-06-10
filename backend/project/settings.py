@@ -92,7 +92,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 ROOT_URLCONF = "project.urls"
 
-LOGIN_REDIRECT_URL = 'http://localhost:5173/dashboard'
+LOGIN_REDIRECT_URL = 'http://localhost:5173/auth/callback'
 LOGOUT_REDIRECT_URL = 'http://localhost:5173/'
 
 TEMPLATES = [
