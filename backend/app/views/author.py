@@ -4,8 +4,9 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
-from app.models import Author
+from app.models import Author,Entry
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
+from app.serializers.entry import EntrySerializer
 
 
 class IsAdminOrReadOnly(permissions.BasePermission):
@@ -153,3 +154,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 "remote_authors": remote_authors,
             }
         )
+    
+
+    @action(detail=True, methods=["get"], url_path="entries")
+    def public_entries(self, request, pk=None):
+        """List all public entries by the author"""
+        author = self.get_object()
+        entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC).order_by("-created_at")
+        serializer = EntrySerializer(entries, many=True)
+        return Response(serializer.data)    
