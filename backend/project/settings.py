@@ -44,10 +44,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
-    "allauth.socialaccount.providers.github",
+    # "allauth",
+    # "allauth.account",
+    # "allauth.socialaccount",
+    # "allauth.socialaccount.providers.github",
 ]
 
 MIDDLEWARE = [
@@ -59,40 +59,40 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
+    # "allauth.account.middleware.AccountMiddleware",
 ]
 
-AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
-]
+# AUTHENTICATION_BACKENDS = [
+#     "django.contrib.auth.backends.ModelBackend",
+# ]
 
-SITE_ID = 1
+# SITE_ID = 1
 
-# Add these settings to skip Django's auth UI
-ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
-SOCIALACCOUNT_LOGIN_ON_GET = True
-ACCOUNT_LOGOUT_ON_GET = True  # Skip logout confirmation
-SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts
+# # Add these settings to skip Django's auth UI
+# ACCOUNT_EMAIL_VERIFICATION = "none"
+# ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+# SOCIALACCOUNT_LOGIN_ON_GET = True
+# ACCOUNT_LOGOUT_ON_GET = True  # Skip logout confirmation
+# SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts
 
-SOCIALACCOUNT_PROVIDERS = {
-    "github": {
-        "SCOPE": [
-            "user:email",
-        ],
-        "APP": {
-            "client_id": os.getenv("GITHUB_CLIENT_ID"),
-            "secret": os.getenv("GITHUB_CLIENT_SECRET"),
-            "key": "",
-        },
-    }
-}
+# SOCIALACCOUNT_PROVIDERS = {
+#     "github": {
+#         "SCOPE": [
+#             "user:email",
+#         ],
+#         "APP": {
+#             "client_id": os.getenv("GITHUB_CLIENT_ID"),
+#             "secret": os.getenv("GITHUB_CLIENT_SECRET"),
+#             "key": "",
+#         },
+#     }
+# }
 
 
 ROOT_URLCONF = "project.urls"
 
-LOGIN_REDIRECT_URL = "http://localhost:5173/auth/callback"
-LOGOUT_REDIRECT_URL = "http://localhost:5173/"
+# LOGIN_REDIRECT_URL = "http://localhost:5173/auth/callback"
+# LOGOUT_REDIRECT_URL = "http://localhost:5173/"
 
 TEMPLATES = [
     {

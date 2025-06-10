@@ -15,10 +15,6 @@ export const routes: RouteObject[] = [
   },
   {
     path: "/home",
-    element: (
-      <Protected>
-        <Home />
-      </Protected>
-    ),
+    element: <Home />,
   },
 ];
