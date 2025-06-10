@@ -1,0 +1,20 @@
+# Import all views to make them available when importing from app.views
+from .author import AuthorViewSet, IsAdminOrReadOnly
+from .base import *  # Import existing views
+
+# from .entry import EntryViewSet
+# from .comment import CommentViewSet
+# from .like import LikeViewSet
+# from .follow import FollowViewSet
+# from .inbox import InboxViewSet
+
+# Add your views here as you create them
+__all__ = [
+    "AuthorViewSet",
+    "IsAdminOrReadOnly",
+    # 'EntryViewSet',
+    # 'CommentViewSet',
+    # 'LikeViewSet',
+    # 'FollowViewSet',
+    # 'InboxViewSet',
+]
