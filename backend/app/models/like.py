@@ -1,0 +1,80 @@
+from django.db import models
+from django.conf import settings
+import uuid
+
+from .author import Author
+from .entry import Entry
+from .comment import Comment
+
+
+class Like(models.Model):
+    """Likes on entries or comments"""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")
+
+    # Author who liked
+    author = models.ForeignKey(
+        Author, on_delete=models.CASCADE, related_name="likes", to_field="url"
+    )
+
+    # What was liked (entry or comment)
+    entry = models.ForeignKey(
+        Entry,
+        on_delete=models.CASCADE,
+        related_name="likes",
+        null=True,
+        blank=True,
+        to_field="url",
+    )
+    comment = models.ForeignKey(
+        Comment,
+        on_delete=models.CASCADE,
+        related_name="likes",
+        null=True,
+        blank=True,
+        to_field="url",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # Ensure one like per author per object
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(entry__isnull=False) | models.Q(comment__isnull=False),
+                name="like_has_target",
+            ),
+            models.CheckConstraint(
+                check=~(
+                    models.Q(entry__isnull=False) & models.Q(comment__isnull=False)
+                ),
+                name="like_single_target",
+            ),
+        ]
+        unique_together = [
+            ["author", "entry"],
+            ["author", "comment"],
+        ]
+        indexes = [
+            models.Index(fields=["entry", "created_at"]),
+            models.Index(fields=["comment", "created_at"]),
+            models.Index(fields=["author", "created_at"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["entry"]),
+            models.Index(fields=["comment"]),
+            models.Index(fields=["author"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.url:
+            if self.author.is_local:
+                if self.entry:
+                    self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/entries/{self.entry.id}/likes/{self.id}"
+                elif self.comment:
+                    self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/comments/{self.comment.id}/likes/{self.id}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        target = self.entry or self.comment
+        return f"Like by {self.author} on {target}"
