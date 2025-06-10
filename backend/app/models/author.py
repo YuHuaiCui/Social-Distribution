@@ -1,12 +1,14 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 import uuid
 
 from .node import Node
 
 
-class AuthorManager(models.Manager):
+class AuthorManager(UserManager):
     def local_authors(self):
         """Get all local authors"""
         return self.filter(node__isnull=True)
@@ -18,6 +20,18 @@ class AuthorManager(models.Manager):
     def approved_authors(self):
         """Get all approved authors"""
         return self.filter(is_approved=True)
+
+    def create_user(self, username, email=None, password=None, **kwargs):
+        """Create a user with required password"""
+        if not password:
+            raise ValueError("Password is required for all users")
+        return super().create_user(username, email, password, **kwargs)
+
+    def create_superuser(self, username, email=None, password=None, **kwargs):
+        """Create a superuser with required password"""
+        if not password:
+            raise ValueError("Password is required for all users")
+        return super().create_superuser(username, email, password, **kwargs)
 
 
 class Author(AbstractUser):
@@ -67,6 +81,22 @@ class Author(AbstractUser):
                 fields=["node", "is_approved"]
             ),  # Compound index for remote approved authors
         ]
+
+    def clean(self):
+        """Validate the model data"""
+        super().clean()
+
+        # Ensure password is not empty for new users
+        if not self.pk and not self.password:
+            raise ValidationError({"password": "Password is required for all authors."})
+
+        # Validate password strength if password is being set
+        if self.password and not self.password.startswith("pbkdf2_"):
+            # Only validate raw passwords, not already hashed ones
+            try:
+                validate_password(self.password, self)
+            except ValidationError as e:
+                raise ValidationError({"password": e.messages})
 
     def get_friends(self):
         """Get all friends of this author"""
@@ -134,6 +164,10 @@ class Author(AbstractUser):
         ).exists()
 
     def save(self, *args, **kwargs):
+        # Ensure password exists before saving
+        if not self.pk and not self.password:
+            raise ValueError("Password is required for all authors")
+
         # Auto-generate URL for local authors
         if not self.url and not self.node:
             # This will be set after save when we have the ID
@@ -142,7 +176,7 @@ class Author(AbstractUser):
 
         # Set URL after save for local authors
         if not self.url and not self.node:
-            self.url = f"{settings.SITE_URL}/api/authors/{self.id}"
+            self.url = f"{settings.SITE_URL}/api/authors/{self.id}/"
             super().save(update_fields=["url"])
 
     @property

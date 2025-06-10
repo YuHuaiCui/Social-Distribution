@@ -8,8 +8,16 @@ from app.models import Author, Node
 class AuthorSerializer(serializers.ModelSerializer):
     """Serializer for Author model with admin creation capabilities"""
 
-    password = serializers.CharField(write_only=True, required=True)
-    password_confirm = serializers.CharField(write_only=True, required=True)
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        help_text="Password is required for all users. SSO/LDAP authentication is not supported.",
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        required=True,
+        help_text="Must match the password field exactly.",
+    )
 
     class Meta:
         model = Author
@@ -62,6 +70,12 @@ class AuthorSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create a new author user"""
         password = validated_data.pop("password")
+
+        # Ensure password exists
+        if not password:
+            raise serializers.ValidationError(
+                {"password": "Password is required for all users."}
+            )
 
         # Create the author
         author = Author.objects.create_user(password=password, **validated_data)
