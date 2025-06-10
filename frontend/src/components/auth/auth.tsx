@@ -1,10 +1,16 @@
-import React from "react";
+import { useAuth } from "../context/AuthContext";
+import { Navigate } from "react-router-dom";
 
 export default function Auth() {
+  const { isAuthenticated } = useAuth();
   function handleLogin() {
     window.location.href = `${
       import.meta.env.VITE_API_URL
     }/accounts/github/login/`;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/home" replace />;
   }
 
   return (
