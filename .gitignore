@@ -22,6 +22,10 @@ ENV/
 .pyre/
 .pytype/
 
+# === Django ===
+**/migrations/*.py
+!**/migrations/__init__.py
+
 # === JavaScript / Node.js ===
 node_modules/
 npm-debug.log*
