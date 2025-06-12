@@ -27,17 +27,16 @@ export const routes: RouteObject[] = [
   {
     path: "/home",
     element: (
-      <Protected>
+
         <Home />
-      </Protected>
+
     ),
   },
   {
     path: "/home/authors/:authorId",
     element: (
-      <Protected>
+
         <AuthorProfileWrapper />
-      </Protected>
     ),
   },
   {
