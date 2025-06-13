@@ -35,6 +35,7 @@ function Profile() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   useEffect(() => {
     async function fetchProfile() {
       try {
@@ -84,18 +85,15 @@ function Profile() {
       [e.target.name]: e.target.value,
     });
   };
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    console.log("Selected file:", file);
     if (file) {
       setImageFile(file);
       // Create a preview URL for the uploaded image
       const reader = new FileReader();
       reader.onload = (event) => {
-        setFormData({
-          ...formData,
-          profilePicture: event.target?.result as string,
-        });
+        setImagePreview(event.target?.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -119,22 +117,42 @@ function Profile() {
         .split("; ")
         .find((row) => row.startsWith("csrftoken="))
         ?.split("=")[1];
+
+      let requestBody;
+      const headers: Record<string, string> = {
+        "X-CSRFToken": csrfToken || "", // Include CSRF token
+      };
+
+      // If we have an image file to upload, use FormData instead of JSON
+      if (imageFile) {
+        const formDataObj = new FormData();
+        formDataObj.append("display_name", formData.displayName);
+        formDataObj.append("github_username", formData.githubUsername);
+        formDataObj.append("bio", formData.bio);
+        formDataObj.append("email", formData.email);
+        formDataObj.append("profile_image_file", imageFile);
+
+        requestBody = formDataObj;
+        // Don't set Content-Type header for FormData, the browser will set it automatically
+      } else {
+        // If no file, use JSON as usual
+        headers["Content-Type"] = "application/json";
+        requestBody = JSON.stringify({
+          display_name: formData.displayName,
+          github_username: formData.githubUsername,
+          bio: formData.bio,
+          profile_image: formData.profilePicture,
+          email: formData.email,
+        });
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/authors/me/`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken || "", // Include CSRF token
-          },
+          headers: headers,
           credentials: "include", // This includes cookies in the request
-          body: JSON.stringify({
-            display_name: formData.displayName,
-            github_username: formData.githubUsername,
-            bio: formData.bio,
-            profile_image: formData.profilePicture,
-            email: formData.email,
-          }),
+          body: requestBody,
         }
       );
       if (!response.ok) {
@@ -174,7 +192,6 @@ function Profile() {
       }
 
       const updatedData: backendProfileData = await response.json();
-
       const updatedProfile: ProfileData = {
         displayName: updatedData.display_name || "",
         githubUsername: updatedData.github_username || "",
@@ -183,6 +200,9 @@ function Profile() {
         email: updatedData.email || "",
       };
       setProfile(updatedProfile);
+      setFormData(updatedProfile); // Update form data with new values
+      setImageFile(null); // Clear the image file after successful upload
+      setImagePreview(null); // Clear the image preview after successful upload
       setIsEditing(false);
       setIsLoading(false);
     } catch (err) {
@@ -247,12 +267,11 @@ function Profile() {
                   </svg>
                 </div>
               </div>
-
-              {/* Avatar Upload Section */}
+              {/* Avatar Upload Section */}{" "}
               <div className="flex justify-center mb-8">
                 <div className="relative group">
                   <Avatar
-                    imgSrc={formData.profilePicture || null}
+                    imgSrc={imagePreview || formData.profilePicture || null}
                     alt={formData.displayName}
                   />
                   <label
@@ -288,7 +307,6 @@ function Profile() {
                   />
                 </div>
               </div>
-
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -410,6 +428,7 @@ function Profile() {
                     onClick={() => {
                       setIsEditing(false);
                       setImageFile(null);
+                      setImagePreview(null);
                       if (profile) {
                         setFormData({
                           displayName: profile.displayName || "",
@@ -433,6 +452,7 @@ function Profile() {
               <div className="h-32 bg-gradient-to-r from-gray-900 to-black relative">
                 <div className="absolute -bottom-16 left-8">
                   <div className="relative group">
+                    {" "}
                     <Avatar
                       imgSrc={profile?.profilePicture}
                       alt={profile?.displayName}

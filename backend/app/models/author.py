@@ -42,12 +42,10 @@ class Author(AbstractUser):
 
     # Override username to store full URL for remote authors
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")
-
-    # Profile information
+    url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")    # Profile information
     display_name = models.CharField(max_length=255, blank=True)
     github_username = models.CharField(max_length=255, blank=True)
-    profile_image = models.URLField(blank=True)
+    profile_image = models.URLField(max_length=200, blank=True)
     bio = models.TextField(blank=True)
 
     # Node relationship - null for local authors
