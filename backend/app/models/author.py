@@ -96,7 +96,9 @@ class Author(AbstractUser):
             try:
                 validate_password(self.password, self)
             except ValidationError as e:
-                raise ValidationError({"password": e.messages})
+                raise ValidationError(
+                    {"password": list(e.messages)}
+                )
 
     def get_friends(self):
         """Get all friends of this author"""

@@ -17,9 +17,19 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
+from app.views import auth
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    # path("accounts/", include("allauth.urls")),
+    # Auth endpoints
+    path('api/auth/status/', auth.auth_status, name='auth-status'),
+    path('api/auth/github/callback/', auth.github_callback, name='github-callback'),
+    path('api/author/me/', auth.author_me, name='author-me'),
+    path('accounts/logout/', auth.logout_view, name='logout'),
+    
+    # Django AllAuth URLs - make sure this is included
+    path('accounts/', include('allauth.urls')),
+    
+    
     path("", include("app.urls")),
 ]

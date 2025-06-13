@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import Loader from "../loader/Loader";
+import Loader from "../Loader/Loader";
 import Avatar from "../Avatar/Avatar";
+import { useAuth } from "../Context/AuthContext";
 
 type ProfileData = {
   displayName: string;
@@ -21,6 +22,7 @@ type backendProfileData = {
 
 function Profile() {
   const { userId } = useParams<{ userId: string }>();
+  const { user, isAuthenticated } = useAuth();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +35,14 @@ function Profile() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
-
   useEffect(() => {
     async function fetchProfile() {
       try {
         const response = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/authors/${"c9b4ac32-715b-447c-8ce8-3245d5b750f0"}/`
+          `${import.meta.env.VITE_API_URL}/api/authors/me/`,
+          {
+            credentials: "include",
+          }
         );
         if (!response.ok) {
           throw new Error("Failed to fetch profile");
@@ -62,14 +64,17 @@ function Profile() {
           email: data.email || "",
         });
       } catch (err) {
-        setError(err.message);
+        setError((err as Error).message);
       } finally {
         setIsLoading(false);
       }
     }
 
-    fetchProfile();
-  }, [userId]);
+    // Only fetch profile if user is authenticated
+    if (isAuthenticated) {
+      fetchProfile();
+    }
+  }, [userId, user?.id, isAuthenticated]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -95,21 +100,34 @@ function Profile() {
       reader.readAsDataURL(file);
     }
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.email && !emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address");
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      // Get CSRF token from cookie if it exists
+      const csrfToken = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("csrftoken="))
+        ?.split("=")[1];
       const response = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
-        }/api/authors/${"c9b4ac32-715b-447c-8ce8-3245d5b750f0"}/`,
+        `${import.meta.env.VITE_API_URL}/api/authors/me/`,
         {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken || "", // Include CSRF token
           },
+          credentials: "include", // This includes cookies in the request
           body: JSON.stringify({
             display_name: formData.displayName,
             github_username: formData.githubUsername,
@@ -119,21 +137,59 @@ function Profile() {
           }),
         }
       );
-
       if (!response.ok) {
-        throw new Error("Failed to update profile");
+        const errorBody = await response.text();
+        try {
+          const errorJson = JSON.parse(errorBody);
+
+          // Handle email-specific errors
+          if (errorJson.email) {
+            throw new Error(`Email error: ${errorJson.email.join(", ")}`);
+          }
+
+          // Handle general errors with better formatting
+          if (typeof errorJson === "object") {
+            const errorMessages = Object.entries(errorJson)
+              .map(([key, value]) => {
+                const valueStr = Array.isArray(value)
+                  ? value.join(", ")
+                  : String(value);
+                return `${key}: ${valueStr}`;
+              })
+              .join("; ");
+            throw new Error(`Failed to update profile: ${errorMessages}`);
+          }
+
+          throw new Error(
+            `Failed to update profile: ${JSON.stringify(errorJson)}`
+          );
+        } catch (e) {
+          if (e instanceof Error) {
+            throw e; // Rethrow our custom error
+          }
+          throw new Error(
+            `Failed to update profile: ${response.status} ${response.statusText}`
+          );
+        }
       }
 
-      const updatedProfile: ProfileData = await response.json();
+      const updatedData: backendProfileData = await response.json();
+
+      const updatedProfile: ProfileData = {
+        displayName: updatedData.display_name || "",
+        githubUsername: updatedData.github_username || "",
+        bio: updatedData.bio || "",
+        profilePicture: updatedData.profile_image || "",
+        email: updatedData.email || "",
+      };
       setProfile(updatedProfile);
       setIsEditing(false);
       setIsLoading(false);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
       setIsLoading(false);
     }
   };
-
   if (isLoading && !profile) {
     return <Loader />;
   }
@@ -269,6 +325,31 @@ function Profile() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200 bg-white"
                       placeholder="Enter your GitHub username"
                     />
+                  </div>
+                </div>
+
+                <div>
+                  {" "}
+                  <label
+                    className="block text-sm font-semibold text-black mb-2"
+                    htmlFor="email"
+                  >
+                    Email
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200 bg-white"
+                      placeholder="Enter your email address"
+                      required
+                    />
+                    <div className="text-xs mt-1 text-gray-500">
+                      Email is used for account recovery and notifications
+                    </div>
                   </div>
                 </div>
 
