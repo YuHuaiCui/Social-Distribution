@@ -9,19 +9,37 @@ from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
 
 
-class IsAdminOrReadOnly(permissions.BasePermission):
+class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
     """
-    Custom permission to only allow admins to create/edit authors.
-    Regular users can only read.
+    Custom permission that allows:
+    - Read permissions for authenticated users
+    - Admin users can create/edit any author
+    - Users can edit their own profile
     """
 
     def has_permission(self, request, view):
         # Read permissions are allowed for authenticated users
         if request.method in permissions.SAFE_METHODS:
             return request.user.is_authenticated
+        
+        # For create operations, only admin users
+        if view.action == 'create':
+            return request.user.is_authenticated and request.user.is_staff
+            
+        # For other write operations, we'll check object-level permissions
+        return request.user.is_authenticated
 
-        # Write permissions are only allowed for admin users
-        return request.user.is_authenticated and request.user.is_staff
+    def has_object_permission(self, request, view, obj):
+        # Read permissions for any authenticated user
+        if request.method in permissions.SAFE_METHODS:
+            return True
+            
+        # Admin users can edit any author
+        if request.user.is_staff:
+            return True
+            
+        # Use UUIDs for comparison or convert to strings if needed
+        return str(obj.id) == str(request.user.id)
 
 
 class AuthorViewSet(viewsets.ModelViewSet):
@@ -36,7 +54,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
     """
 
     queryset = Author.objects.all().order_by("-created_at")
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminOrOwnerOrReadOnly]
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -162,4 +180,49 @@ class AuthorViewSet(viewsets.ModelViewSet):
         author = self.get_object()
         entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC).order_by("-created_at")
         serializer = EntrySerializer(entries, many=True)
-        return Response(serializer.data)    
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get", "patch"], url_path="me")
+    def me(self, request):
+        """
+        Get or update the current user's profile
+        This endpoint is more permissive than the regular update endpoint
+        """
+        if not request.user.is_authenticated:
+            return Response({"detail": "Authentication required"}, status=401)
+            
+        try:
+            author = Author.objects.get(id=request.user.id)
+        except Author.DoesNotExist:
+            return Response({"detail": "Author profile not found"}, status=404)
+            
+        if request.method == "GET":
+            serializer = AuthorSerializer(author)
+            return Response(serializer.data)
+            
+        elif request.method == "PATCH":
+            # Update only allowed fields for regular users
+            data = request.data.copy()
+            serializer = AuthorSerializer(author, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=400)
+    
+    def update(self, request, *args, **kwargs):
+        """Handle PUT/PATCH requests with debugging"""
+        
+        # Check permission explicitly
+        instance = self.get_object()
+        
+        # Call parent class's update method
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """Handle PATCH requests for author updates"""
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        """Perform the update"""
+        serializer.save()

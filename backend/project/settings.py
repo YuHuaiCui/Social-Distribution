@@ -11,8 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-import os
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
@@ -64,6 +64,7 @@ MIDDLEWARE = [
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend"
 ]
 
 SITE_ID = 1
@@ -74,6 +75,23 @@ ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 ACCOUNT_LOGOUT_ON_GET = True  # Skip logout confirmation
 SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts
+
+# Custom adapter for GitHub OAuth
+SOCIALACCOUNT_ADAPTER = 'app.adapters.CustomSocialAccountAdapter'
+
+# Ensure these session settings are correctly configured
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'  # Try 'None' if using HTTPS and cross-origin
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+
+# Make sure CSRF settings work with your frontend
+CSRF_COOKIE_SAMESITE = 'Lax'  # Match SESSION_COOKIE_SAMESITE
+CSRF_COOKIE_HTTPONLY = False  # Frontend JS needs to access the CSRF token
+CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
+CSRF_TRUSTED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173']  # Add your frontend domain
+CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
+CSRF_COOKIE_NAME = 'csrftoken'
 
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
@@ -91,7 +109,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 ROOT_URLCONF = "project.urls"
 
-LOGIN_REDIRECT_URL = "http://localhost:5173/auth/callback"
+LOGIN_REDIRECT_URL = 'http://localhost:5173/home'     
 LOGOUT_REDIRECT_URL = "http://localhost:5173/"
 
 TEMPLATES = [
@@ -153,7 +171,26 @@ USE_I18N = True
 
 USE_TZ = True
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS Configuration for authentication with credentials
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Your frontend URL
+    "http://127.0.0.1:5173",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 
 # Static files (CSS, JavaScript, Images)
@@ -182,9 +219,12 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",  # Helpful for debugging
     ],
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
     ],
 }
 
