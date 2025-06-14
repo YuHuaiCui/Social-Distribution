@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import Loader from "../Loader/Loader";
+import Loader from "../ui/Loader";
 import Avatar from "../Avatar/Avatar";
-import { useAuth } from "../Context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 type ProfileData = {
   displayName: string;

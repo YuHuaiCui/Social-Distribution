@@ -1,28 +1,44 @@
+import LoadingImage from "../ui/LoadingImage";
+
 interface AvatarProps {
   imgSrc?: string | null;
   alt?: string;
   size?: "sm" | "md" | "lg" | "xl";
+  className?: string;
 }
+
+const sizeClasses = {
+  sm: "w-8 h-8 text-sm",
+  md: "w-12 h-12 text-base",
+  lg: "w-24 h-24 text-lg",
+  xl: "w-32 h-32 text-xl",
+};
 
 export default function Avatar({
   imgSrc,
   alt = "User",
   size = "lg",
+  className = "",
 }: AvatarProps) {
-  const sizeClasses = {
-    sm: "w-8 h-8",
-    md: "w-12 h-12",
-    lg: "w-24 h-24",
-    xl: "w-32 h-32",
-  };
+  const sizeClass = sizeClasses[size];
+  const loaderSize = size === 'sm' ? 12 : size === 'md' ? 16 : size === 'lg' ? 24 : 32;
 
   if (imgSrc) {
     return (
-      <img
-        src={imgSrc}
-        alt={alt}
-        className={`${sizeClasses[size]} rounded-full object-cover border-4 border-white shadow-lg`}
-      />
+      <div className={`${sizeClass} rounded-full overflow-hidden neumorphism ${className}`}>
+        <LoadingImage
+          src={imgSrc}
+          alt={alt}
+          className="w-full h-full object-cover"
+          loaderSize={loaderSize}
+          aspectRatio="1/1"
+          fallback={
+            <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
+              {alt.charAt(0).toUpperCase()}
+            </div>
+          }
+        />
+      </div>
     );
   }
 
@@ -31,11 +47,12 @@ export default function Avatar({
     .split(" ")
     .map((name) => name[0])
     .join("")
-    .toUpperCase();
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full bg-black text-white flex items-center justify-center border-4 border-white shadow-lg font-bold`}
+      className={`${sizeClass} rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center neumorphism font-bold ${className}`}
     >
       {initials || "U"}
     </div>

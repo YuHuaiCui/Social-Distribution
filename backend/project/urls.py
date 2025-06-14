@@ -23,6 +23,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # Auth endpoints
     path('api/auth/status/', auth.auth_status, name='auth-status'),
+    path('api/auth/signup/', auth.signup, name='signup'),
+    path('api/auth/login/', auth.login_view, name='login'),
     path('api/auth/github/callback/', auth.github_callback, name='github-callback'),
     path('api/author/me/', auth.author_me, name='author-me'),
     path('accounts/logout/', auth.logout_view, name='logout'),

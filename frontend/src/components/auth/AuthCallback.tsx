@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../Context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function AuthCallback() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
     const completeAuthentication = async () => {
@@ -70,8 +69,6 @@ export default function AuthCallback() {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Authentication failed");
-      } finally {
-        setIsProcessing(false);
       }
     };
 

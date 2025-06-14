@@ -47,6 +47,8 @@ class Author(AbstractUser):
     github_username = models.CharField(max_length=255, blank=True)
     profile_image = models.URLField(max_length=200, blank=True)
     bio = models.TextField(blank=True)
+    location = models.CharField(max_length=255, blank=True)
+    website = models.URLField(max_length=200, blank=True)
 
     # Node relationship - null for local authors
     node = models.ForeignKey(

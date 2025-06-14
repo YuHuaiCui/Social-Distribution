@@ -1,12 +1,15 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import type { ReactNode } from "react";
+import type { Author } from "../../types/models";
+import { api } from "../../services/api";
 
 interface AuthContextType {
   isAuthenticated: boolean;
   login: () => void;
   logout: () => void;
   loading: boolean;
-  user: any | null;
+  user: Author | null;
+  updateUser: (user: Author) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -15,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   loading: true,
   user: null,
+  updateUser: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -24,7 +28,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<Author | null>(null);
   const [lastChecked, setLastChecked] = useState<number>(0);
 
   // Check if user is authenticated on mount and when lastChecked changes
@@ -33,21 +37,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       try {
         setLoading(true);
         // Check auth status with backend
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/auth/status/`,
-          {
-            credentials: "include",
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          setIsAuthenticated(data.isAuthenticated);
-          setUser(data.user || null);
-        } else {
-          setIsAuthenticated(false);
-          setUser(null);
-        }
+        const response = await api.getAuthStatus();
+        
+        setIsAuthenticated(response.isAuthenticated);
+        setUser(response.user || null);
       } catch (error) {
         setIsAuthenticated(false);
         setUser(null);
@@ -68,11 +61,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const logout = async () => {
     try {
       // Call backend logout endpoint
-      await fetch(`${import.meta.env.VITE_API_URL}/accounts/logout/`, {
-        method: "POST",
-        credentials: "include",
-      });
-
+      await api.logout();
+      
       setIsAuthenticated(false);
       setUser(null);
       // Update lastChecked to trigger the auth check effect
@@ -82,9 +72,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  const updateUser = (updatedUser: Author) => {
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, login, logout, loading, user }}
+      value={{ isAuthenticated, login, logout, loading, user, updateUser }}
     >
       {children}
     </AuthContext.Provider>
