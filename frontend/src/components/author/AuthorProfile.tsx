@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useAuth } from "../Context/AuthContext";
 
 type Entry = {
   id: string;
@@ -8,46 +9,40 @@ type Entry = {
   created_at: string;
 };
 
-const username = "melrita";
-const password = "melrita"; // your dev credentials
-const encodedCredentials = btoa(`${username}:${password}`);
-
-
-const AuthorProfile = ({ authorId }: { authorId: string }) => {
+const AuthorProfile = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-  const url = `${import.meta.env.VITE_API_URL}/api/authors/${authorId}/entries`;
-  console.log("Fetching entries from:", url);
+    const url = `${import.meta.env.VITE_API_URL}/api/authors/${
+      user.id
+    }/entries`;
+    console.log("Fetching entries from:", url);
 
-  fetch(url, {
-    headers: {
-      Authorization: `Basic ${encodedCredentials}`,
-      "Content-Type": "application/json",
-    },
-  })
-    .then((res) => {
-      console.log("Response status:", res.status);
-      return res.text(); // Use .text() first to see raw response
+    fetch(url, {
+      credentials: "include",
     })
-    .then((text) => {
-      console.log("Raw response body:", text);
-      try {
-        const data = JSON.parse(text);
-        console.log("Parsed data:", data);
-        setEntries(data);
-      } catch (e) {
-        console.error("JSON parse failed. Response wasn't valid JSON:", e);
-      }
-      setLoading(false);
-    })
-    .catch((err) => {
-      console.error("Failed to fetch entries:", err);
-      setLoading(false);
-    });
-}, [authorId]);
-
+      .then((res) => {
+        console.log("Response status:", res.status);
+        return res.text(); // Use .text() first to see raw response
+      })
+      .then((text) => {
+        console.log("Raw response body:", text);
+        try {
+          const data = JSON.parse(text);
+          console.log("Parsed data:", data);
+          setEntries(data);
+        } catch (e) {
+          console.error("JSON parse failed. Response wasn't valid JSON:", e);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch entries:", err);
+        setLoading(false);
+      });
+  }, [user]);
 
   if (loading) return <p>Loading public entries...</p>;
   if (!entries.length) return <p>No public entries found.</p>;
@@ -58,7 +53,9 @@ const AuthorProfile = ({ authorId }: { authorId: string }) => {
       {entries.map((entry) => (
         <div key={entry.id} className="border p-4 rounded shadow-sm">
           <h3 className="font-semibold">{entry.title}</h3>
-          <p className="text-sm text-gray-600">{new Date(entry.created_at).toLocaleString()}</p>
+          <p className="text-sm text-gray-600">
+            {new Date(entry.created_at).toLocaleString()}
+          </p>
           <div className="mt-2">
             {entry.content_type === "text/markdown" ? (
               <pre>{entry.content}</pre>

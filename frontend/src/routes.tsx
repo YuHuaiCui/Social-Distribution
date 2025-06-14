@@ -4,7 +4,7 @@ import Home from "./components/Home/Home";
 import Protected from "./components/Protected/Protected";
 import AuthCallback from "./components/Auth/AuthCallback";
 import Profile from "./components/Profile/Profile";
-import AuthorProfile from "./components/AuthorProfile/AuthorProfile";
+import AuthorProfile from "./components/author/AuthorProfile";
 
 export const routes: RouteObject[] = [
   {
@@ -12,21 +12,21 @@ export const routes: RouteObject[] = [
     element: <Auth />,
   },
   {
-  path: "/profile",
-  element: (
-    <Protected>
-      <Profile />
-    </Protected>
-  ),
-},
-{
-  path: "/home/authors/:authorId",
-  element: (
-    <Protected>
-      <AuthorProfile />
-    </Protected>
-  ),
-},
+    path: "/profile",
+    element: (
+      <Protected>
+        <Profile />
+      </Protected>
+    ),
+  },
+  {
+    path: "/home/authors/:authorId",
+    element: (
+      <Protected>
+        <AuthorProfile />
+      </Protected>
+    ),
+  },
 
   {
     path: "/auth/callback",
