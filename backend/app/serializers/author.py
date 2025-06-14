@@ -7,15 +7,15 @@ from app.models import Author, Node
 
 class AuthorSerializer(serializers.ModelSerializer):
     """Serializer for Author model with admin creation capabilities"""
-
+    
     password = serializers.CharField(
         write_only=True,
-        required=True,
+        required=False,  # Not required for partial updates
         help_text="Password is required for all users. SSO/LDAP authentication is not supported.",
     )
     password_confirm = serializers.CharField(
         write_only=True,
-        required=True,
+        required=False,  # Not required for partial updates
         help_text="Must match the password field exactly.",
     )
 
@@ -44,8 +44,7 @@ class AuthorSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "url", "created_at", "updated_at"]
         extra_kwargs = {
-            "email": {"required": True},
-            "username": {"required": True},
+            "email": {"required": True},            "username": {"required": True},
         }
 
     def validate(self, attrs):
@@ -53,17 +52,19 @@ class AuthorSerializer(serializers.ModelSerializer):
         password = attrs.get("password")
         password_confirm = attrs.pop("password_confirm", None)
 
-        if password != password_confirm:
-            raise serializers.ValidationError(
-                {"password_confirm": "Password fields must match."}
-            )
+        # Only validate passwords if they are provided
+        if password is not None or password_confirm is not None:
+            if password != password_confirm:
+                raise serializers.ValidationError(
+                    {"password_confirm": "Password fields must match."}
+                )
 
-        # Validate password strength
-        if password:
-            try:
-                validate_password(password)
-            except ValidationError as e:
-                raise serializers.ValidationError({"password": list(e.messages)})
+            # Validate password strength
+            if password:
+                try:
+                    validate_password(password)
+                except ValidationError as e:
+                    raise serializers.ValidationError({"password": list(e.messages)})
 
         return attrs
 

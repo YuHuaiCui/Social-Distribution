@@ -1,19 +1,10 @@
-import { type RouteObject, useParams } from "react-router-dom";
-import Auth from "./components/auth/Auth";
-import Home from "./components/home/Home";
-import Protected from "./components/protected/Protected";
-import AuthCallback from "./components/auth/AuthCallback";
-import AuthorProfile from "./components/author/AuthorProfile";
-
-// Wrapper component to extract authorId from params and pass as prop
-function AuthorProfileWrapper() {
-  const { authorId } = useParams<{ authorId: string }>();
-  console.log("AuthorProfileWrapper -> authorId:", authorId); // ✅ this should print
-
-  if (!authorId) return <div>Invalid author</div>;
-  return <AuthorProfile authorId={authorId} />;
-}
-
+import { type RouteObject } from "react-router-dom";
+import Auth from "./components/Auth/Auth";
+import Home from "./components/Home/Home";
+import Protected from "./components/Protected/Protected";
+import AuthCallback from "./components/Auth/AuthCallback";
+import Profile from "./components/Profile/Profile";
+import AuthorProfile from "./components/AuthorProfile/AuthorProfile";
 
 export const routes: RouteObject[] = [
   {
@@ -21,22 +12,32 @@ export const routes: RouteObject[] = [
     element: <Auth />,
   },
   {
+  path: "/profile",
+  element: (
+    <Protected>
+      <Profile />
+    </Protected>
+  ),
+},
+{
+  path: "/home/authors/:authorId",
+  element: (
+    <Protected>
+      <AuthorProfile />
+    </Protected>
+  ),
+},
+
+  {
     path: "/auth/callback",
     element: <AuthCallback />,
   },
   {
     path: "/home",
     element: (
-
+      <Protected>
         <Home />
-
-    ),
-  },
-  {
-    path: "/home/authors/:authorId",
-    element: (
-
-        <AuthorProfileWrapper />
+      </Protected>
     ),
   },
   {
