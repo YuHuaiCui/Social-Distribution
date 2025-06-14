@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "../Context/AuthContext";
+import { useParams } from "react-router-dom";
 
 type Entry = {
   id: string;
@@ -12,12 +12,12 @@ type Entry = {
 const AuthorProfile = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { authorId } = useParams<{ authorId: string }>();
 
   useEffect(() => {
-    const url = `${import.meta.env.VITE_API_URL}/api/authors/${
-      user.id
-    }/entries`;
+    const url = `${
+      import.meta.env.VITE_API_URL
+    }/api/authors/${authorId}/entries`;
     console.log("Fetching entries from:", url);
 
     fetch(url, {
@@ -42,7 +42,7 @@ const AuthorProfile = () => {
         console.error("Failed to fetch entries:", err);
         setLoading(false);
       });
-  }, [user]);
+  }, [authorId]);
 
   if (loading) return <p>Loading public entries...</p>;
   if (!entries.length) return <p>No public entries found.</p>;
