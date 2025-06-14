@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Github, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, Github } from 'lucide-react';
 import { api } from '../services/api';
+import { useToast } from '../components/context/ToastContext';
 import BackgroundEffects from '../components/ui/BackgroundEffects';
 import Button from '../components/ui/Button';
 import AnimatedButton from '../components/ui/AnimatedButton';
@@ -12,9 +13,8 @@ import Card from '../components/ui/Card';
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -23,30 +23,75 @@ export const SignupPage: React.FC = () => {
     display_name: '',
     github_username: '',
   });
+  const [errors, setErrors] = useState({
+    username: '',
+    email: '',
+    password: '',
+    password_confirm: '',
+    display_name: '',
+  });
+
+  const validateForm = () => {
+    const newErrors = {
+      username: '',
+      email: '',
+      password: '',
+      password_confirm: '',
+      display_name: '',
+    };
+
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+
+    if (!formData.password_confirm) {
+      newErrors.password_confirm = 'Please confirm your password';
+    } else if (formData.password !== formData.password_confirm) {
+      newErrors.password_confirm = 'Passwords do not match';
+    }
+
+    if (!formData.display_name.trim()) {
+      newErrors.display_name = 'Display name is required';
+    }
+
+    setErrors(newErrors);
+    return !Object.values(newErrors).some(error => error !== '');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    // Basic validation
-    if (formData.password !== formData.password_confirm) {
-      setError('Passwords do not match');
-      setIsLoading(false);
+    
+    if (!validateForm()) {
+      showError('Please fix the form errors');
       return;
     }
+
+    setIsLoading(true);
 
     try {
       // Don't send password_confirm to backend
       const { password_confirm, ...signupData } = formData;
       await api.signup(signupData);
-      setSuccess(true);
-      // Wait a bit to show success message
+      showSuccess('Account created successfully! Redirecting to login...');
       setTimeout(() => {
         navigate('/');
       }, 2000);
     } catch (err: any) {
-      setError(err.message || 'Signup failed. Please try again.');
+      showError(err.message || 'Signup failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -80,89 +125,127 @@ export const SignupPage: React.FC = () => {
             transition={{ delay: 0.1 }}
           >
             <Card variant="prominent" className="p-8">
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center text-red-500"
-                >
-                  <AlertCircle className="mr-2" size={20} />
-                  <span className="text-sm">{error}</span>
-                </motion.div>
-              )}
-
-              {success && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center text-green-500"
-                >
-                  <CheckCircle className="mr-2" size={20} />
-                  <span className="text-sm">Account created! Redirecting to login...</span>
-                </motion.div>
-              )}
-
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-1 mb-1.5">
+                      Username <span className="field-required"></span>
+                    </label>
+                    <Input
+                      type="text"
+                      icon={<User size={18} />}
+                      placeholder="Choose a username"
+                      value={formData.username}
+                      onChange={(e) => {
+                        setFormData({ ...formData, username: e.target.value });
+                        if (errors.username) setErrors({ ...errors, username: '' });
+                      }}
+                      className={errors.username ? 'field-error' : ''}
+                      required
+                    />
+                    {errors.username && (
+                      <p className="mt-1 text-xs text-primary-pink">{errors.username}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-1 mb-1.5">
+                      Display Name <span className="field-required"></span>
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Your display name"
+                      value={formData.display_name}
+                      onChange={(e) => {
+                        setFormData({ ...formData, display_name: e.target.value });
+                        if (errors.display_name) setErrors({ ...errors, display_name: '' });
+                      }}
+                      className={errors.display_name ? 'field-error' : ''}
+                      required
+                    />
+                    {errors.display_name && (
+                      <p className="mt-1 text-xs text-primary-pink">{errors.display_name}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">
+                    Email <span className="field-required"></span>
+                  </label>
                   <Input
-                    label="Username"
-                    type="text"
-                    icon={<User size={18} />}
-                    placeholder="Choose a username"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    type="email"
+                    icon={<Mail size={18} />}
+                    placeholder="Enter your email"
+                    value={formData.email}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      if (errors.email) setErrors({ ...errors, email: '' });
+                    }}
+                    className={errors.email ? 'field-error' : ''}
                     required
                   />
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-primary-pink">{errors.email}</p>
+                  )}
+                </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">
+                    GitHub Username (optional)
+                  </label>
                   <Input
-                    label="Display Name"
                     type="text"
-                    placeholder="Your display name"
-                    value={formData.display_name}
-                    onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                    icon={<Github size={18} />}
+                    placeholder="Your GitHub username"
+                    value={formData.github_username}
+                    onChange={(e) => setFormData({ ...formData, github_username: e.target.value })}
                   />
                 </div>
 
-                <Input
-                  label="Email"
-                  type="email"
-                  icon={<Mail size={18} />}
-                  placeholder="Enter your email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">
+                    Password <span className="field-required"></span>
+                  </label>
+                  <Input
+                    type="password"
+                    icon={<Lock size={18} />}
+                    placeholder="Create a password"
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({ ...formData, password: e.target.value });
+                      if (errors.password) setErrors({ ...errors, password: '' });
+                    }}
+                    className={errors.password ? 'field-error' : ''}
+                    autoComplete="new-password"
+                    required
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-primary-pink">{errors.password}</p>
+                  )}
+                </div>
 
-                <Input
-                  label="GitHub Username (optional)"
-                  type="text"
-                  icon={<Github size={18} />}
-                  placeholder="Your GitHub username"
-                  value={formData.github_username}
-                  onChange={(e) => setFormData({ ...formData, github_username: e.target.value })}
-                />
-
-                <Input
-                  label="Password"
-                  type="password"
-                  icon={<Lock size={18} />}
-                  placeholder="Create a password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  autoComplete="new-password"
-                  required
-                />
-
-                <Input
-                  label="Confirm Password"
-                  type="password"
-                  icon={<Lock size={18} />}
-                  placeholder="Confirm your password"
-                  value={formData.password_confirm}
-                  onChange={(e) => setFormData({ ...formData, password_confirm: e.target.value })}
-                  autoComplete="new-password"
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">
+                    Confirm Password <span className="field-required"></span>
+                  </label>
+                  <Input
+                    type="password"
+                    icon={<Lock size={18} />}
+                    placeholder="Confirm your password"
+                    value={formData.password_confirm}
+                    onChange={(e) => {
+                      setFormData({ ...formData, password_confirm: e.target.value });
+                      if (errors.password_confirm) setErrors({ ...errors, password_confirm: '' });
+                    }}
+                    className={errors.password_confirm ? 'field-error' : ''}
+                    autoComplete="new-password"
+                    required
+                  />
+                  {errors.password_confirm && (
+                    <p className="mt-1 text-xs text-primary-pink">{errors.password_confirm}</p>
+                  )}
+                </div>
 
                 <div className="text-sm text-text-2">
                   <p className="mb-2">Password must contain:</p>
@@ -179,7 +262,7 @@ export const SignupPage: React.FC = () => {
                   size="lg"
                   loading={isLoading}
                   className="w-full"
-                  disabled={success}
+                  disabled={isLoading}
                 >
                   Create Account
                 </AnimatedButton>

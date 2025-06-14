@@ -119,7 +119,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="fixed inset-0 bg-black/50 z-50"
+            className="fixed inset-0 bg-black/50 z-modal-backdrop"
           />
           
           {/* Modal */}
@@ -127,7 +127,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-50 overflow-hidden flex flex-col"
+            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-modal overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-1">

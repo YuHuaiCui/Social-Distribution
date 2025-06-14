@@ -7,30 +7,26 @@ import { useTheme } from '../../lib/theme';
 import LoadingImage from '../ui/LoadingImage';
 import Button from '../ui/Button';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onSearchClick?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Remove inline search state as we'll use the modal
 
   const handleLogout = async () => {
     await logout();
     navigate('/');
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-      setShowSearch(false);
-      setSearchQuery('');
-    }
-  };
+  // Search is handled by the modal now
 
   return (
-    <header className="sticky top-0 z-40 glass-card-prominent border-b border-glass-prominent">
+    <header className="sticky top-0 z-dropdown glass-card-prominent border-b border-glass-prominent">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Brand */}
@@ -73,7 +69,7 @@ export const Header: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowSearch(!showSearch)}
+              onClick={onSearchClick}
               className="p-2"
               aria-label="Search"
             >
@@ -184,33 +180,7 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
-        <AnimatePresence>
-          {showSearch && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <form onSubmit={handleSearch} className="py-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search posts, authors, or tags..."
-                    className="flex-1 px-4 py-2 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                    autoFocus
-                  />
-                  <Button type="submit" variant="primary" size="md">
-                    Search
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Search is now handled by SearchModal */}
       </div>
     </header>
   );

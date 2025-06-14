@@ -319,7 +319,7 @@ export const InboxPage: React.FC = () => {
                 <Card
                   variant={item.is_read ? 'subtle' : 'main'}
                   hoverable
-                  className={`${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''}`}
+                  className={`card-layout ${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''}`}
                 >
                   <div className="flex items-start space-x-4">
                     {/* Author Avatar */}
@@ -334,8 +334,8 @@ export const InboxPage: React.FC = () => {
                     </motion.div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <div className="flex items-start justify-between card-content">
                         <div className="flex-1 mr-4">
                           <p className="text-text-1">
                             <span className="font-semibold">
@@ -355,8 +355,18 @@ export const InboxPage: React.FC = () => {
                               {item.data.comment_text}
                             </p>
                           )}
+                        </div>
 
-                          <div className="flex items-center mt-2 space-x-3">
+                        {/* Type Icon */}
+                        <div className={`p-2 rounded-lg ${config.bgColor}`}>
+                          <Icon className={`w-5 h-5 ${config.color}`} />
+                        </div>
+                      </div>
+
+                      {/* Footer - Always at bottom */}
+                      <div className="card-footer mt-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
                             <span className="text-xs text-text-2 flex items-center">
                               <Clock className="w-3 h-3 mr-1" />
                               {formatTime(item.created_at)}
@@ -367,42 +377,37 @@ export const InboxPage: React.FC = () => {
                               </span>
                             )}
                           </div>
-                        </div>
-
-                        {/* Type Icon */}
-                        <div className={`p-2 rounded-lg ${config.bgColor}`}>
-                          <Icon className={`w-5 h-5 ${config.color}`} />
+                          
+                          {/* Actions for follow requests */}
+                          {item.type === 'follow_request' && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="flex space-x-2"
+                            >
+                              <AnimatedButton
+                                size="sm"
+                                variant="primary"
+                                onClick={() => handleFollowRequest(item.id, true)}
+                                disabled={isProcessing}
+                                loading={isProcessing}
+                                icon={<Check size={16} />}
+                              >
+                                Accept
+                              </AnimatedButton>
+                              <AnimatedButton
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleFollowRequest(item.id, false)}
+                                disabled={isProcessing}
+                                icon={<X size={16} />}
+                              >
+                                Decline
+                              </AnimatedButton>
+                            </motion.div>
+                          )}
                         </div>
                       </div>
-
-                      {/* Actions for follow requests */}
-                      {item.type === 'follow_request' && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="flex space-x-2 mt-3"
-                        >
-                          <AnimatedButton
-                            size="sm"
-                            variant="primary"
-                            onClick={() => handleFollowRequest(item.id, true)}
-                            disabled={isProcessing}
-                            loading={isProcessing}
-                            icon={<Check size={16} />}
-                          >
-                            Accept
-                          </AnimatedButton>
-                          <AnimatedButton
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleFollowRequest(item.id, false)}
-                            disabled={isProcessing}
-                            icon={<X size={16} />}
-                          >
-                            Decline
-                          </AnimatedButton>
-                        </motion.div>
-                      )}
                     </div>
                   </div>
                 </Card>

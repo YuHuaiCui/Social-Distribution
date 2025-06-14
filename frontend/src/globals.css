@@ -782,4 +782,156 @@
 
     --font-family-poppins: 'Poppins', sans-serif;
   }
+
+  /* Custom utilities */
+  .max-w-content {
+    max-width: 42rem; /* 672px - wider content area */
+  }
+  
+  .max-w-wide {
+    max-width: 56rem; /* 896px - extra wide */
+  }
+  
+  /* Z-index system */
+  .z-dropdown {
+    z-index: 100;
+  }
+  
+  .z-modal {
+    z-index: 200;
+  }
+  
+  .z-modal-backdrop {
+    z-index: 190;
+  }
+  
+  .z-toast {
+    z-index: 300;
+  }
+  
+  .z-tooltip {
+    z-index: 400;
+  }
+  
+  /* Form validation states */
+  .field-error {
+    border-color: var(--primary-pink) !important;
+    box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
+  }
+  
+  .field-success {
+    border-color: var(--primary-teal) !important;
+    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.1);
+  }
+  
+  .field-required::after {
+    content: '*';
+    color: var(--primary-pink);
+    margin-left: 0.25rem;
+  }
+  
+  /* Card improvements */
+  .card-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  
+  .card-content {
+    flex: 1;
+  }
+  
+  .card-footer {
+    margin-top: auto;
+  }
+
+  /* Search bar responsive width */
+  .search-bar-container {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+  
+  @media (min-width: 768px) {
+    .search-bar-container {
+      max-width: 32rem; /* 512px on desktop */
+    }
+  }
+  
+  /* Main content max width utilities */
+  .max-w-content-sm {
+    max-width: 42rem; /* 672px */
+  }
+  
+  .max-w-content {
+    max-width: 56rem; /* 896px */
+  }
+  
+  .max-w-content-lg {
+    max-width: 72rem; /* 1152px */
+  }
+  
+  .max-w-content-xl {
+    max-width: 90rem; /* 1440px */
+  }
+  
+  /* Layout with sidebars */
+  .layout-with-sidebars {
+    display: grid;
+    gap: 2rem;
+    padding: 1.5rem 1rem;
+  }
+  
+  @media (min-width: 768px) {
+    .layout-with-sidebars {
+      grid-template-columns: 16rem 1fr;
+      padding: 2rem 1.5rem;
+    }
+  }
+  
+  @media (min-width: 1280px) {
+    .layout-with-sidebars {
+      grid-template-columns: 18rem 1fr 20rem;
+      padding: 2rem;
+    }
+  }
+  
+  /* Search modal styles */
+  .search-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 250;
+  }
+  
+  .search-modal {
+    position: fixed;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 2rem);
+    max-width: 40rem;
+    background: rgba(var(--glass-rgb), var(--glass-alpha-high));
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border-prominent);
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.3);
+    z-index: 260;
+  }
+  
+  .search-modal-input {
+    width: 100%;
+    padding: 1.25rem 1.5rem;
+    font-size: 1.125rem;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-1);
+  }
+  
+  .search-results-dropdown {
+    max-height: 24rem;
+    overflow-y: auto;
+    border-top: 1px solid var(--border-1);
+  }
 }

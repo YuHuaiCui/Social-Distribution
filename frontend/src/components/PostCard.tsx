@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Bookmark } from 'lucide-react';
 import type { Entry, Author } from '../types/models';
 import { api } from '../services/api';
+import { useToast } from './context/ToastContext';
 import LoadingImage from './ui/LoadingImage';
 import Card from './ui/Card';
 import Button from './ui/Button';
@@ -22,6 +23,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   isLiked = false, 
   isSaved = false 
 }) => {
+  const { showSuccess, showError, showInfo } = useToast();
   const [liked, setLiked] = useState(isLiked);
   const [saved, setSaved] = useState(isSaved);
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
@@ -42,15 +44,17 @@ export const PostCard: React.FC<PostCardProps> = ({
     try {
       if (newLikedState) {
         await api.likeEntry(post.id);
+        showSuccess('Post liked!');
       } else {
         await api.unlikeEntry(post.id);
+        showInfo('Post unliked');
       }
       onLike?.(newLikedState);
     } catch (error) {
       // Revert on error
       setLiked(!newLikedState);
       setLikeCount(prev => !newLikedState ? prev + 1 : Math.max(0, prev - 1));
-      console.error('Error liking post:', error);
+      showError('Failed to update like status');
     }
   };
 
@@ -58,17 +62,22 @@ export const PostCard: React.FC<PostCardProps> = ({
     const newSavedState = !saved;
     setSaved(newSavedState);
     onSave?.(newSavedState);
+    
+    if (newSavedState) {
+      showSuccess('Post saved to your collection');
+    } else {
+      showInfo('Post removed from collection');
+    }
   };
 
   const handleShare = () => {
     const url = `${window.location.origin}/posts/${post.id}`;
     navigator.clipboard.writeText(url)
       .then(() => {
-        // TODO: Show toast notification
-        console.log('Post URL copied to clipboard!');
+        showSuccess('Post link copied to clipboard!');
       })
       .catch(err => {
-        console.error('Failed to copy URL:', err);
+        showError('Failed to copy link');
       });
   };
 
@@ -104,98 +113,100 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   return (
-    <Card variant="main" hoverable>
-      {/* Author info */}
-      <div className="flex items-center mb-4">
-        <Link 
-          to={`/authors/${author.id}`}
-          className="flex items-center"
-        >
-          <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
-            {author.profile_image ? (
-              <LoadingImage
-                src={author.profile_image}
-                alt={author.display_name}
-                className="w-full h-full"
-                loaderSize={14}
-                aspectRatio="1/1"
-                fallback={
-                  <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                    {author.display_name.charAt(0).toUpperCase()}
-                  </div>
-                }
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                {author.display_name.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <div>
-            <h3 className="font-medium text-text-1">{author.display_name}</h3>
-            <div className="flex items-center text-xs text-text-2">
-              <span>{timeAgo}</span>
-              {getVisibilityBadge() && (
-                <>
-                  <span className="mx-1">·</span>
-                  {getVisibilityBadge()}
-                </>
+    <Card variant="main" hoverable className="card-layout">
+      <div className="card-content">
+        {/* Author info */}
+        <div className="flex items-center mb-4">
+          <Link 
+            to={`/authors/${author.id}`}
+            className="flex items-center"
+          >
+            <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
+              {author.profile_image ? (
+                <LoadingImage
+                  src={author.profile_image}
+                  alt={author.display_name}
+                  className="w-full h-full"
+                  loaderSize={14}
+                  aspectRatio="1/1"
+                  fallback={
+                    <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
+                      {author.display_name.charAt(0).toUpperCase()}
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
+                  {author.display_name.charAt(0).toUpperCase()}
+                </div>
               )}
             </div>
-          </div>
+            <div>
+              <h3 className="font-medium text-text-1">{author.display_name}</h3>
+              <div className="flex items-center text-xs text-text-2">
+                <span>{timeAgo}</span>
+                {getVisibilityBadge() && (
+                  <>
+                    <span className="mx-1">·</span>
+                    {getVisibilityBadge()}
+                  </>
+                )}
+              </div>
+            </div>
+          </Link>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto p-1"
+            aria-label="Post options"
+          >
+            <MoreHorizontal size={18} />
+          </Button>
+        </div>
+        
+        {/* Post title */}
+        <Link to={`/posts/${post.id}`}>
+          <h2 className="text-xl font-semibold mb-2 text-text-1 hover:text-brand-500 transition-colors">
+            {post.title}
+          </h2>
         </Link>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-auto p-1"
-          aria-label="Post options"
-        >
-          <MoreHorizontal size={18} />
-        </Button>
-      </div>
-      
-      {/* Post title */}
-      <Link to={`/posts/${post.id}`}>
-        <h2 className="text-xl font-semibold mb-2 text-text-1 hover:text-brand-500 transition-colors">
-          {post.title}
-        </h2>
-      </Link>
-      
-      {/* Post content */}
-      <div className="mb-4">
-        {renderContent()}
-      </div>
-      
-      {/* Post image if it's an image type */}
-      {(post.content_type === 'image/png' || post.content_type === 'image/jpeg') && post.image && (
-        <div className="mb-4 rounded-lg overflow-hidden">
-          <LoadingImage
-            src={post.image}
-            alt="Post attachment"
-            className="w-full h-auto max-h-96 object-cover"
-            loaderSize={24}
-          />
+        {/* Post content */}
+        <div className="mb-4">
+          {renderContent()}
         </div>
-      )}
-      
-      {/* Categories */}
-      {post.categories && post.categories.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {post.categories.map((category, index) => (
-            <Link
-              key={index}
-              to={`/search?category=${encodeURIComponent(category)}`}
-              className="px-3 py-1 rounded-full bg-cat-lilac text-text-1 text-sm hover:opacity-80 transition-opacity"
-            >
-              #{category}
-            </Link>
-          ))}
-        </div>
-      )}
+        
+        {/* Post image if it's an image type */}
+        {(post.content_type === 'image/png' || post.content_type === 'image/jpeg') && post.image && (
+          <div className="mb-4 rounded-lg overflow-hidden">
+            <LoadingImage
+              src={post.image}
+              alt="Post attachment"
+              className="w-full h-auto max-h-96 object-cover"
+              loaderSize={24}
+            />
+          </div>
+        )}
+        
+        {/* Categories */}
+        {post.categories && post.categories.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {post.categories.map((category, index) => (
+              <Link
+                key={index}
+                to={`/search?category=${encodeURIComponent(category)}`}
+                className="px-3 py-1 rounded-full bg-cat-lilac text-text-1 text-sm hover:opacity-80 transition-opacity"
+              >
+                #{category}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
       
       {/* Post stats and interaction buttons */}
-      <div className="flex items-center justify-between border-t border-border-1 pt-3 mt-3">
+      <div className="card-footer flex items-center justify-between border-t border-border-1 pt-3">
         <div className="flex space-x-5">
           <Button
             variant="ghost"

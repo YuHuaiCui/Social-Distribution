@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Github, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Github } from 'lucide-react';
 import { useAuth } from '../components/context/AuthContext';
+import { useToast } from '../components/context/ToastContext';
 import { api } from '../services/api';
 import BackgroundEffects from '../components/ui/BackgroundEffects';
 import Button from '../components/ui/Button';
@@ -14,24 +15,54 @@ import Card from '../components/ui/Card';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   });
+  const [errors, setErrors] = useState({
+    username: '',
+    password: '',
+  });
+
+  const validateForm = () => {
+    const newErrors = {
+      username: '',
+      password: '',
+    };
+
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    setErrors(newErrors);
+    return !newErrors.username && !newErrors.password;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    
+    if (!validateForm()) {
+      showError('Please fix the form errors');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       await api.login(formData);
       login();
+      showSuccess('Welcome back! Redirecting...');
       navigate('/home');
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      showError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -65,38 +96,49 @@ export const LoginPage: React.FC = () => {
             transition={{ delay: 0.1 }}
           >
             <Card variant="prominent" className="p-8">
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center text-red-500"
-                >
-                  <AlertCircle className="mr-2" size={20} />
-                  <span className="text-sm">{error}</span>
-                </motion.div>
-              )}
-
               <form onSubmit={handleSubmit} className="space-y-5">
-                <Input
-                  label="Username"
-                  type="text"
-                  icon={<Mail size={18} />}
-                  placeholder="Enter your username"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">
+                    Username <span className="field-required"></span>
+                  </label>
+                  <Input
+                    type="text"
+                    icon={<Mail size={18} />}
+                    placeholder="Enter your username"
+                    value={formData.username}
+                    onChange={(e) => {
+                      setFormData({ ...formData, username: e.target.value });
+                      if (errors.username) setErrors({ ...errors, username: '' });
+                    }}
+                    className={errors.username ? 'field-error' : ''}
+                    required
+                  />
+                  {errors.username && (
+                    <p className="mt-1 text-xs text-primary-pink">{errors.username}</p>
+                  )}
+                </div>
 
-                <Input
-                  label="Password"
-                  type="password"
-                  icon={<Lock size={18} />}
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  autoComplete="current-password"
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">
+                    Password <span className="field-required"></span>
+                  </label>
+                  <Input
+                    type="password"
+                    icon={<Lock size={18} />}
+                    placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({ ...formData, password: e.target.value });
+                      if (errors.password) setErrors({ ...errors, password: '' });
+                    }}
+                    className={errors.password ? 'field-error' : ''}
+                    autoComplete="current-password"
+                    required
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-primary-pink">{errors.password}</p>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center cursor-pointer">
