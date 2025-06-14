@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import Loader from "../loader/Loader";
+import Loader from "../Loader/Loader";
 import Avatar from "../Avatar/Avatar";
 import { useAuth } from "../Context/AuthContext";
 
