@@ -46,7 +46,7 @@ export const MainLayout: React.FC = () => {
         style={{
           background: 'linear-gradient(135deg, var(--primary-yellow) 0%, var(--primary-pink) 25%, var(--primary-purple) 50%, var(--primary-teal) 75%, var(--primary-yellow) 100%)',
           backgroundSize: '400% 400%',
-          animation: 'gradient-animation 3s ease infinite',
+          animation: 'gradient-animation 8s ease infinite',
         }}
       >
         <Plus size={24} className="text-white" />

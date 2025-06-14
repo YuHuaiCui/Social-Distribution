@@ -444,7 +444,7 @@
     border: 1px solid rgba(0, 0, 0, 0.1);
     color: #24292e;
     transition: all 0.3s ease;
-    animation: gradient-flow 8s ease infinite;
+    animation: gradient-flow 12s ease infinite;
   }
 
   .btn-github::before {
@@ -492,7 +492,7 @@
     background-size: 400% 400%;
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #f0f6fc;
-    animation: gradient-flow 8s ease infinite;
+    animation: gradient-flow 12s ease infinite;
   }
 
   :root[data-theme='dark'] .btn-github:hover {
@@ -899,40 +899,40 @@
   .search-modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
     z-index: 250;
   }
   
-  .search-modal {
-    position: fixed;
-    top: 15%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 2rem);
-    max-width: 40rem;
+  /* Enhanced glass morphism for search focus */
+  .search-glass {
     background: rgba(var(--glass-rgb), var(--glass-alpha-high));
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border-prominent);
-    border-radius: 1rem;
-    box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.3);
-    z-index: 260;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(var(--glass-rgb), 0.3);
+    box-shadow: 
+      0 8px 32px 0 rgba(0, 0, 0, 0.2),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   }
   
-  .search-modal-input {
-    width: 100%;
-    padding: 1.25rem 1.5rem;
-    font-size: 1.125rem;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--text-1);
+  .search-input-glow {
+    position: relative;
   }
   
-  .search-results-dropdown {
-    max-height: 24rem;
-    overflow-y: auto;
-    border-top: 1px solid var(--border-1);
+  .search-input-glow::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, var(--primary-yellow), var(--primary-pink), var(--primary-purple));
+    border-radius: 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    filter: blur(8px);
+    z-index: -1;
+  }
+  
+  .search-input-glow:focus-within::before {
+    opacity: 0.3;
   }
   
   /* Sonner toast customization */
