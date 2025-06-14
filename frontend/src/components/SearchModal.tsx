@@ -315,8 +315,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                       <p className="text-sm text-[var(--text-2)] mt-1">Try searching with different keywords</p>
                     </div>
                   )}
-                  </div>
                 </div>
+              </div>
             </motion.div>
           </motion.div>
         </>

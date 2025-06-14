@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Settings, User, Shield, Server, Palette, 
   Save, Camera, Mail, Lock, Globe, Users,
-  Eye, EyeOff, Check, AlertCircle, Moon, Sun
+  Eye, EyeOff, Check, AlertCircle, Moon, Sun,
+  Monitor, Type
 } from 'lucide-react';
 import { useAuth } from '../components/context/AuthContext';
 import AnimatedButton from '../components/ui/AnimatedButton';
@@ -278,74 +279,58 @@ export const SettingsPage: React.FC = () => {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-          className="lg:col-span-1"
-        >
-          <Card variant="subtle" className="p-2">
-            {tabs.map((tab, index) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              
-              return (
-                <motion.button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as SettingsTab)}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={
+      {/* Tab Navigation */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="mb-6"
+      >
+        <div className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-low))] backdrop-blur-md rounded-xl p-1 inline-flex w-full sm:w-auto">
+          {tabs.map((tab, index) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            
+            return (
+              <motion.button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as SettingsTab)}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`
+                  flex items-center justify-center sm:justify-start space-x-2 px-4 py-2.5 rounded-lg flex-1 sm:flex-initial
+                  transition-all duration-300 min-w-0
+                  ${
                     isActive
-                      ? {
-                          opacity: 1,
-                          x: 0,
-                          backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-                        }
-                      : { opacity: 1, x: 0 }
+                      ? 'bg-[rgba(var(--glass-rgb),var(--glass-alpha-high))] text-[var(--text-1)] shadow-md'
+                      : 'text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[rgba(var(--glass-rgb),0.1)]'
                   }
-                  whileHover={{ x: 4 }}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all ${
-                    isActive
-                      ? 'bg-[var(--gradient-primary)] text-white'
-                      : 'text-text-2 hover:text-text-1 hover:bg-glass-low'
-                  }`}
-                  style={
-                    isActive
-                      ? {
-                          background: 'var(--gradient-primary)',
-                          backgroundSize: '200% 200%',
-                        }
-                      : {}
-                  }
-                  transition={
-                    isActive
-                      ? {
-                          delay: index * 0.05,
-                          backgroundPosition: {
-                            duration: 3,
-                            repeat: Infinity,
-                          },
-                        }
-                      : { delay: index * 0.05 }
-                  }
-                >
-                  <Icon size={20} />
-                  <span className="font-medium">{tab.label}</span>
-                </motion.button>
-              );
-            })}
-          </Card>
-        </motion.div>
+                `}
+              >
+                <Icon size={18} className="shrink-0" />
+                <span className="font-medium hidden sm:inline">{tab.label}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-gradient-to-r from-[var(--primary-yellow)]/10 via-[var(--primary-pink)]/10 to-[var(--primary-purple)]/10 rounded-lg -z-10"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+              </motion.button>
+            );
+          })}
+        </div>
+      </motion.div>
 
-        {/* Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="lg:col-span-3"
-        >
+      {/* Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
           <AnimatePresence mode="wait">
             {/* Profile Settings */}
             {activeTab === 'profile' && (
@@ -834,7 +819,7 @@ export const SettingsPage: React.FC = () => {
                       {[
                         { value: 'light', label: 'Light', icon: Sun },
                         { value: 'dark', label: 'Dark', icon: Moon },
-                        { value: 'auto', label: 'Auto', icon: Settings },
+                        { value: 'auto', label: 'Auto', icon: Monitor },
                       ].map((theme) => {
                         const Icon = theme.icon;
                         return (
@@ -906,7 +891,8 @@ export const SettingsPage: React.FC = () => {
 
                   {/* Font Size */}
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-text-2 mb-2">
+                    <label className="block text-sm font-medium text-text-2 mb-2 flex items-center">
+                      <Type size={16} className="mr-2" />
                       Font Size
                     </label>
                     <div className="flex space-x-3">
@@ -943,8 +929,11 @@ export const SettingsPage: React.FC = () => {
                     className="flex items-center justify-between p-3 rounded-lg glass-card-subtle cursor-pointer hover:bg-glass-low transition-all mb-6"
                   >
                     <div className="flex-1">
-                      <p className="font-medium text-text-1">Reduce Motion</p>
-                      <p className="text-xs text-text-2">
+                      <div className="flex items-center">
+                        <Monitor size={16} className="mr-2 text-text-1" />
+                        <p className="font-medium text-text-1">Reduce Motion</p>
+                      </div>
+                      <p className="text-xs text-text-2 ml-6">
                         Minimize animations and transitions
                       </p>
                     </div>
