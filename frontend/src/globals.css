@@ -934,4 +934,70 @@
     overflow-y: auto;
     border-top: 1px solid var(--border-1);
   }
+  
+  /* Sonner toast customization */
+  :where([data-sonner-toaster]) {
+    --normal-bg: rgba(var(--glass-rgb), var(--glass-alpha-high));
+    --normal-border: var(--glass-border-prominent);
+    --normal-text: var(--text-1);
+    
+    --success-bg: rgba(var(--glass-rgb), var(--glass-alpha-high));
+    --success-border: var(--primary-teal);
+    --success-text: var(--text-1);
+    
+    --error-bg: rgba(var(--glass-rgb), var(--glass-alpha-high));
+    --error-border: var(--primary-pink);
+    --error-text: var(--text-1);
+    
+    --warning-bg: rgba(var(--glass-rgb), var(--glass-alpha-high));
+    --warning-border: var(--primary-yellow);
+    --warning-text: var(--text-1);
+    
+    --info-bg: rgba(var(--glass-rgb), var(--glass-alpha-high));
+    --info-border: var(--primary-purple);
+    --info-text: var(--text-1);
+  }
+  
+  :where([data-sonner-toast]) {
+    backdrop-filter: blur(20px) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+  }
+  
+  :where([data-sonner-toast][data-type="success"]) {
+    background: var(--success-bg) !important;
+    border: 1px solid var(--success-border) !important;
+    color: var(--success-text) !important;
+  }
+  
+  :where([data-sonner-toast][data-type="error"]) {
+    background: var(--error-bg) !important;
+    border: 1px solid var(--error-border) !important;
+    color: var(--error-text) !important;
+  }
+  
+  :where([data-sonner-toast][data-type="warning"]) {
+    background: var(--warning-bg) !important;
+    border: 1px solid var(--warning-border) !important;
+    color: var(--warning-text) !important;
+  }
+  
+  :where([data-sonner-toast][data-type="info"]) {
+    background: var(--info-bg) !important;
+    border: 1px solid var(--info-border) !important;
+    color: var(--info-text) !important;
+  }
+  
+  :where([data-sonner-toast] [data-close-button]) {
+    background: rgba(var(--glass-rgb), 0.1) !important;
+    border: 1px solid rgba(var(--glass-rgb), 0.2) !important;
+    color: var(--text-2) !important;
+  }
+  
+  :where([data-sonner-toast] [data-close-button]:hover) {
+    background: rgba(var(--glass-rgb), 0.2) !important;
+    border-color: rgba(var(--glass-rgb), 0.3) !important;
+  }
 }

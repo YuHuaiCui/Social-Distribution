@@ -1,81 +1,61 @@
 import React from 'react';
-import toast, { Toaster, ToastOptions } from 'react-hot-toast';
+import { toast, Toaster } from 'sonner';
 
 interface ToastContextType {
-  showSuccess: (message: string, options?: ToastOptions) => void;
-  showError: (message: string, options?: ToastOptions) => void;
-  showInfo: (message: string, options?: ToastOptions) => void;
-  showWarning: (message: string, options?: ToastOptions) => void;
+  showSuccess: (message: string) => void;
+  showError: (message: string) => void;
+  showInfo: (message: string) => void;
+  showWarning: (message: string) => void;
 }
 
 const ToastContext = React.createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const showSuccess = (message: string, options?: ToastOptions) => {
+  const showSuccess = (message: string) => {
     toast.success(message, {
       duration: 3000,
-      position: 'top-right',
-      style: {
-        background: 'var(--card-bg)',
-        color: 'var(--text-primary)',
-        border: '1px solid var(--primary-purple)',
-      },
-      iconTheme: {
-        primary: 'var(--primary-purple)',
-        secondary: '#fff',
-      },
-      ...options,
+      className: 'sonner-toast-success',
     });
   };
 
-  const showError = (message: string, options?: ToastOptions) => {
+  const showError = (message: string) => {
     toast.error(message, {
       duration: 5000,
-      position: 'top-right',
-      style: {
-        background: 'var(--card-bg)',
-        color: 'var(--text-primary)',
-        border: '1px solid var(--primary-pink)',
-      },
-      iconTheme: {
-        primary: 'var(--primary-pink)',
-        secondary: '#fff',
-      },
-      ...options,
+      className: 'sonner-toast-error',
     });
   };
 
-  const showInfo = (message: string, options?: ToastOptions) => {
-    toast(message, {
+  const showInfo = (message: string) => {
+    toast.info(message, {
       duration: 4000,
-      position: 'top-right',
-      style: {
-        background: 'var(--card-bg)',
-        color: 'var(--text-primary)',
-        border: '1px solid var(--primary-teal)',
-      },
-      icon: '💡',
-      ...options,
+      className: 'sonner-toast-info',
     });
   };
 
-  const showWarning = (message: string, options?: ToastOptions) => {
-    toast(message, {
+  const showWarning = (message: string) => {
+    toast.warning(message, {
       duration: 4000,
-      position: 'top-right',
-      style: {
-        background: 'var(--card-bg)',
-        color: 'var(--text-primary)',
-        border: '1px solid var(--primary-yellow)',
-      },
-      icon: '⚠️',
-      ...options,
+      className: 'sonner-toast-warning',
     });
   };
 
   return (
     <ToastContext.Provider value={{ showSuccess, showError, showInfo, showWarning }}>
-      <Toaster />
+      <Toaster 
+        theme="system"
+        position="top-right"
+        richColors
+        expand={true}
+        closeButton
+        toastOptions={{
+          classNames: {
+            toast: 'sonner-toast',
+            title: 'sonner-title',
+            description: 'sonner-description',
+            closeButton: 'sonner-close',
+          },
+        }}
+      />
       {children}
     </ToastContext.Provider>
   );
