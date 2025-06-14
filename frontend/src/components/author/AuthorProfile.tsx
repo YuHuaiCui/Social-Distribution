@@ -20,8 +20,13 @@ const AuthorProfile = () => {
     }/api/authors/${authorId}/entries`;
     console.log("Fetching entries from:", url);
 
+    // had to specify method and headers in order for it to work on WSL
     fetch(url, {
+      method: "GET",
       credentials: "include",
+      headers: {
+      "Content-Type": "application/json", // ensures Django doesn't reject the request }
+      }
     })
       .then((res) => {
         console.log("Response status:", res.status);
