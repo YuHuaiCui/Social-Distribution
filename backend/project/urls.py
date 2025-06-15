@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/auth/github/callback/', auth.github_callback, name='github-callback'),
     path('api/author/me/', auth.author_me, name='author-me'),
     path('accounts/logout/', auth.logout_view, name='logout'),
+ 
     
     # Django AllAuth URLs - make sure this is included
     path('accounts/', include('allauth.urls')),

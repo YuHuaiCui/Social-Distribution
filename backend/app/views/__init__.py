@@ -1,5 +1,7 @@
 # Import all views to make them available when importing from app.views
 from .author import AuthorViewSet, IsAdminOrOwnerOrReadOnly
+from .entry import EntryViewSet
+
 from .base import *  # Import existing views
 
 # from .entry import EntryViewSet
