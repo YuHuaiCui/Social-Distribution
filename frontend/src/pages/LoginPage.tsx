@@ -12,6 +12,7 @@ import AnimatedLogo from '../components/ui/AnimatedLogo';
 import Input from '../components/ui/Input';
 import Card from '../components/ui/Card';
 import ThemeToggle from '../components/ui/ThemeToggle';
+import Checkbox from '../components/ui/Checkbox';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -97,7 +98,7 @@ export const LoginPage: React.FC = () => {
             className="text-center mb-8"
           >
             <AnimatedLogo variant="secondary" size="md" />
-            <h1 className="text-3xl font-bold text-text-1 mb-2">Welcome Back</h1>
+            <h1 className="text-3xl font-bold text-text-1 mt-4 mb-2">Welcome Back</h1>
             <p className="text-text-2">Sign in to your Social Distribution account</p>
           </motion.div>
 
@@ -153,41 +154,14 @@ export const LoginPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      className="sr-only"
+                  <label className="flex items-center cursor-pointer">
+                    <Checkbox
                       checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
+                      onChange={setRememberMe}
+                      size="md"
+                      id="remember-me"
                     />
-                    <div className="relative w-5 h-5 mr-2">
-                      <div className={`
-                        w-5 h-5 rounded 
-                        border-2 transition-all duration-200
-                        ${rememberMe 
-                          ? 'bg-[var(--primary-violet)] border-[var(--primary-violet)]' 
-                          : 'bg-transparent border-[var(--border-1)] group-hover:border-[var(--primary-violet)]'}
-                      `}>
-                        {rememberMe && (
-                          <svg 
-                            className="w-3 h-3 text-white absolute top-0.5 left-0.5" 
-                            fill="none" 
-                            viewBox="0 0 24 24" 
-                            stroke="currentColor"
-                          >
-                            <path 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round" 
-                              strokeWidth={3} 
-                              d="M5 13l4 4L19 7" 
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-text-2 group-hover:text-text-1 transition-colors">
-                      Remember me
-                    </span>
+                    <span className="ml-2 text-text-2 select-none">Remember me</span>
                   </label>
                   <Link 
                     to="/forgot-password" 

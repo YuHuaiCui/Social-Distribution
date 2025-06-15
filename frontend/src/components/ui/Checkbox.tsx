@@ -8,6 +8,7 @@ interface CheckboxProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   id?: string;
+  name?: string;
 }
 
 export const Checkbox: React.FC<CheckboxProps> = ({
@@ -17,6 +18,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   size = 'md',
   className = '',
   id,
+  name,
 }) => {
   const sizes = {
     sm: { box: 'w-4 h-4', check: 12 },
@@ -36,9 +38,9 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       opacity: 1,
       transition: {
         pathLength: { 
-          type: "spring", 
-          duration: 0.5, 
-          bounce: 0 
+          type: "tween", 
+          duration: 0.3, 
+          ease: "easeOut"
         },
         opacity: { duration: 0.1 }
       }
@@ -46,55 +48,68 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   };
 
   return (
-    <label 
-      htmlFor={id}
-      className={`relative inline-flex items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
-    >
+    <div className={`relative inline-flex items-center ${className}`}>
       <input
         type="checkbox"
         id={id}
-        className="sr-only"
+        name={name}
         checked={checked}
         onChange={(e) => !disabled && onChange(e.target.checked)}
         disabled={disabled}
-      />
-      <motion.div
         className={`
-          ${sizeConfig.box} 
+          ${sizeConfig.box}
+          appearance-none
           rounded-md
+          cursor-pointer
           transition-all duration-200
-          ${checked 
-            ? 'bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-violet)] border-transparent' 
-            : 'bg-[rgba(var(--glass-rgb),0.3)] backdrop-blur-sm border-2 border-[var(--border-1)]'
-          }
-          shadow-sm hover:shadow-md
+          bg-[rgba(var(--glass-rgb),0.3)]
+          backdrop-blur-sm
+          border-2
+          border-[var(--border-1)]
+          hover:border-[var(--primary-violet)]
+          focus:outline-none
+          focus:ring-2
+          focus:ring-[var(--primary-violet)]
+          focus:ring-opacity-50
+          checked:bg-gradient-to-br
+          checked:from-[var(--primary-purple)]
+          checked:to-[var(--primary-violet)]
+          checked:border-transparent
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+          shadow-sm
+          hover:shadow-md
         `}
-        whileHover={!disabled ? { scale: 1.05 } : {}}
-        whileTap={!disabled ? { scale: 0.95 } : {}}
-      >
-        <AnimatePresence>
-          {checked && (
-            <motion.svg
-              className="absolute inset-0 w-full h-full p-0.5"
-              viewBox="0 0 24 24"
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-            >
-              <motion.path
-                d="M5 13l4 4L19 7"
-                stroke="white"
-                strokeWidth="3"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                variants={checkmarkVariants}
-              />
-            </motion.svg>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </label>
+      />
+      
+      {/* Animated checkmark */}
+      <AnimatePresence>
+        {checked && (
+          <motion.svg
+            className={`absolute ${sizeConfig.box} pointer-events-none`}
+            style={{
+              left: '0',
+              top: '50%',
+              transform: 'translateY(-50%)',
+            }}
+            viewBox="0 0 24 24"
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+          >
+            <motion.path
+              d="M5 13l4 4L19 7"
+              stroke="white"
+              strokeWidth="3"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              variants={checkmarkVariants}
+            />
+          </motion.svg>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

@@ -124,7 +124,7 @@ export const SignupPage: React.FC = () => {
             className="text-center mb-8"
           >
             <AnimatedLogo variant="rainbow" size="md" />
-            <h1 className="text-3xl font-bold text-text-1 mb-2">Create Account</h1>
+            <h1 className="text-3xl font-bold text-text-1 mt-4 mb-2">Create Account</h1>
             <p className="text-text-2">Join the Social Distribution network</p>
           </motion.div>
 
