@@ -1111,6 +1111,19 @@
     z-index: 250;
   }
   
+  /* Search modal contrast improvements - light text for both themes due to darkened backdrop */
+  :root[data-theme='light'] {
+    --search-results-primary: #F1F5F9;   /* Light text for darkened backdrop */
+    --search-results-secondary: #CBD5E1; /* Light gray for darkened backdrop */
+    --search-results-accent: #A78BFA;    /* Light purple for hover states */
+  }
+  
+  :root[data-theme='dark'] {
+    --search-results-primary: #F8FAFC;   /* Very light text for dark backgrounds */
+    --search-results-secondary: #CBD5E1; /* Light gray for dark backgrounds */
+    --search-results-accent: #A78BFA;    /* Light purple for hover states */
+  }
+  
   /* Enhanced glass morphism for search focus */
   .search-glass {
     background: rgba(var(--glass-rgb), var(--glass-alpha-high));

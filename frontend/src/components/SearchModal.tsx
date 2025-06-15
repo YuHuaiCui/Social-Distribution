@@ -237,14 +237,14 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-high))] backdrop-blur-2xl rounded-2xl border border-[var(--glass-border-prominent)] shadow-xl max-h-[40vh] overflow-y-auto"
+                  className="bg-[rgba(var(--glass-rgb),0.95)] backdrop-blur-2xl rounded-2xl border border-[var(--glass-border-prominent)] shadow-xl max-h-[40vh] overflow-y-auto"
                 >
                   {isLoading && (
                     <div className="p-8 text-center">
                       <div className="inline-flex items-center justify-center">
                         <div className="w-8 h-8 rounded-full border-2 border-[var(--primary-purple)] border-t-transparent animate-spin" />
                       </div>
-                      <p className="mt-3 text-sm text-[var(--text-2)]">Searching...</p>
+                      <p className="mt-3 text-sm text-[var(--search-results-secondary)]">Searching...</p>
                     </div>
                   )}
 
@@ -253,7 +253,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                       {/* Posts */}
                       {results.posts.length > 0 && (
                         <div className="p-4">
-                          <h3 className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-3">
+                          <h3 className="text-xs font-medium text-[var(--search-results-secondary)] uppercase tracking-wider mb-3">
                             Posts
                           </h3>
                           <div className="space-y-2">
@@ -268,14 +268,14 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                                 <div className="flex items-center">
                                   <FileText size={16} className="text-[var(--primary-purple)] mr-3 shrink-0" />
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-medium text-[var(--text-1)] truncate group-hover:text-[var(--primary-purple)] transition-colors">
+                                    <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors">
                                       {post.title}
                                     </h4>
-                                    <p className="text-xs text-[var(--text-2)] truncate">
+                                    <p className="text-xs text-[var(--search-results-secondary)] truncate">
                                       {typeof post.author === 'object' ? post.author.display_name : 'Unknown Author'}
                                     </p>
                                   </div>
-                                  <ArrowRight size={14} className="text-[var(--text-2)] ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  <ArrowRight size={14} className="text-[var(--search-results-secondary)] ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                               </motion.button>
                             ))}
@@ -286,7 +286,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                       {/* Tags */}
                       {results.tags.length > 0 && (
                         <div className="p-4 border-t border-[var(--glass-border)]">
-                          <h3 className="text-xs font-medium text-[var(--text-2)] uppercase tracking-wider mb-3">
+                          <h3 className="text-xs font-medium text-[var(--search-results-secondary)] uppercase tracking-wider mb-3">
                             Tags
                           </h3>
                           <div className="flex flex-wrap gap-2">
@@ -294,7 +294,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                               <motion.button
                                 key={tag}
                                 onClick={() => handleResultClick('tag', tag)}
-                                className="px-3 py-1.5 rounded-full bg-gradient-to-r from-[var(--primary-purple)]/10 to-[var(--primary-pink)]/10 hover:from-[var(--primary-purple)]/20 hover:to-[var(--primary-pink)]/20 text-sm text-[var(--text-1)] border border-[var(--glass-border)] transition-all"
+                                className="px-3 py-1.5 rounded-full bg-gradient-to-r from-[var(--primary-purple)]/10 to-[var(--primary-pink)]/10 hover:from-[var(--primary-purple)]/20 hover:to-[var(--primary-pink)]/20 text-sm text-[var(--search-results-primary)] font-medium border border-[var(--glass-border)] transition-all"
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ delay: index * 0.05 }}
@@ -313,9 +313,9 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
 
                   {!isLoading && query && !hasResults && (
                     <div className="p-8 text-center">
-                      <Search size={32} className="text-[var(--text-2)] mx-auto mb-4 opacity-50" />
-                      <p className="text-[var(--text-1)] font-medium">No results found</p>
-                      <p className="text-sm text-[var(--text-2)] mt-1">Try searching with different keywords</p>
+                      <Search size={32} className="text-[var(--search-results-secondary)] mx-auto mb-4 opacity-50" />
+                      <p className="text-[var(--search-results-primary)] font-medium">No results found</p>
+                      <p className="text-sm text-[var(--search-results-secondary)] mt-1">Try searching with different keywords</p>
                     </div>
                   )}
                 </motion.div>
