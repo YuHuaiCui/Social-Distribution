@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from app.views import AuthorViewSet
 from app.views import EntryViewSet  # or wherever you put it
 from rest_framework_nested.routers import NestedDefaultRouter
+from app.views.auth import auth_status, github_callback, author_me, logout_view
 
 # namespacing app
 app_name = "social-distribution"
@@ -20,6 +21,13 @@ urlpatterns = [
     # Include all router URLs
     path("", include(router.urls)),
     path("", include(authors_router.urls)),
+    
+    # Auth endpoints
+    path('api/auth/status/', auth_status, name='auth-status'),
+    path('api/auth/github/callback/', github_callback, name='github-callback'),
+    path('api/authors/me/', author_me, name='author-me'),
+    path('api/auth/logout/', logout_view, name='logout'),
+    
     # Additional API endpoints can be added here
     # path('api/other-endpoint/', other_view, name='other-endpoint'),
 ]

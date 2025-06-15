@@ -10,11 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@playwright/test": "^1.53.0",
     "@tailwindcss/vite": "^4.1.8",
-    "framer-motion": "^12.15.0",
+    "@tanstack/react-router": "^1.121.12",
+    "framer-motion": "^12.18.1",
+    "lucide-react": "^0.515.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.1"
+    "react-router-dom": "^7.6.1",
+    "sonner": "^2.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
