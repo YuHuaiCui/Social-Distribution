@@ -216,20 +216,20 @@ function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-background-1 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-black mb-2">Profile</h1>
-          <p className="text-gray-600">Manage your account information</p>
+          <h1 className="text-4xl font-bold text-text-1 mb-2">Profile</h1>
+          <p className="text-text-2">Manage your account information</p>
         </div>
 
         {error && (
-          <div className="bg-white border-l-4 border-black p-4 mb-6 rounded-lg shadow-sm">
+          <div className="glass-card-main border-l-4 border-brand-500 p-4 mb-6 rounded-lg shadow-sm">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg
-                  className="h-5 w-5 text-black"
+                  className="h-5 w-5 text-brand-500"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -241,18 +241,18 @@ function Profile() {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-black font-medium">{error}</p>
+                <p className="text-text-1 font-medium">{error}</p>
               </div>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+        <div className="glass-card-main rounded-2xl shadow-lg overflow-hidden border border-border-1">
           {isEditing ? (
             <div className="p-8">
               <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-bold text-black">Edit Profile</h2>
-                <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center">
+                <h2 className="text-2xl font-bold text-text-1">Edit Profile</h2>
+                <div className="w-12 h-12 bg-brand-500 rounded-full flex items-center justify-center">
                   <svg
                     className="w-6 h-6 text-white"
                     fill="none"
@@ -277,7 +277,7 @@ function Profile() {
                   />
                   <label
                     htmlFor="avatar-upload"
-                    className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <svg
                       className="w-8 h-8 text-white"
@@ -312,7 +312,7 @@ function Profile() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
-                      className="block text-sm font-semibold text-black mb-2"
+                      className="block text-sm font-semibold text-text-1 mb-2"
                       htmlFor="displayName"
                     >
                       Display Name
@@ -323,14 +323,14 @@ function Profile() {
                       name="displayName"
                       value={formData.displayName}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200 bg-white"
+                      className="w-full px-4 py-3 border border-border-1 rounded-lg focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 bg-input-bg text-text-1 placeholder:text-text-2"
                       placeholder="Enter your display name"
                     />
                   </div>
 
                   <div>
                     <label
-                      className="block text-sm font-semibold text-black mb-2"
+                      className="block text-sm font-semibold text-text-1 mb-2"
                       htmlFor="githubUsername"
                     >
                       GitHub Username
@@ -341,7 +341,7 @@ function Profile() {
                       name="githubUsername"
                       value={formData.githubUsername}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200 bg-white"
+                      className="w-full px-4 py-3 border border-border-1 rounded-lg focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 bg-input-bg text-text-1 placeholder:text-text-2"
                       placeholder="Enter your GitHub username"
                     />
                   </div>
@@ -350,7 +350,7 @@ function Profile() {
                 <div>
                   {" "}
                   <label
-                    className="block text-sm font-semibold text-black mb-2"
+                    className="block text-sm font-semibold text-text-1 mb-2"
                     htmlFor="email"
                   >
                     Email
@@ -362,11 +362,11 @@ function Profile() {
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200 bg-white"
+                      className="w-full px-4 py-3 border border-border-1 rounded-lg focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 bg-input-bg text-text-1 placeholder:text-text-2"
                       placeholder="Enter your email address"
                       required
                     />
-                    <div className="text-xs mt-1 text-gray-500">
+                    <div className="text-xs mt-1 text-text-2">
                       Email is used for account recovery and notifications
                     </div>
                   </div>
@@ -374,7 +374,7 @@ function Profile() {
 
                 <div>
                   <label
-                    className="block text-sm font-semibold text-black mb-2"
+                    className="block text-sm font-semibold text-text-1 mb-2"
                     htmlFor="bio"
                   >
                     Bio
@@ -385,7 +385,7 @@ function Profile() {
                     value={formData.bio}
                     onChange={handleInputChange}
                     rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200 bg-white resize-none"
+                    className="w-full px-4 py-3 border border-border-1 rounded-lg focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 bg-input-bg text-text-1 placeholder:text-text-2 resize-none"
                     placeholder="Tell us about yourself..."
                   />
                 </div>
@@ -394,7 +394,7 @@ function Profile() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="flex-1 bg-black hover:bg-gray-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                    className="flex-1 btn-primary font-semibold py-3 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center">
@@ -440,7 +440,7 @@ function Profile() {
                         });
                       }
                     }}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-black font-semibold py-3 px-6 rounded-lg transition-all duration-200"
+                    className="flex-1 glass-card-subtle hover:glass-card-main text-text-1 font-semibold py-3 px-6 rounded-lg transition-all duration-200 border border-border-1"
                   >
                     Cancel
                   </button>
@@ -450,7 +450,7 @@ function Profile() {
           ) : (
             <div>
               {/* Cover Section */}
-              <div className="h-32 bg-gradient-to-r from-gray-900 to-black relative">
+              <div className="h-32 bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-violet)] relative">
                 <div className="absolute -bottom-16 left-8">
                   <div className="relative group">
                     {" "}
@@ -460,7 +460,7 @@ function Profile() {
                     />
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="absolute -bottom-2 -right-2 w-10 h-10 bg-black border-4 border-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors shadow-lg"
+                      className="absolute -bottom-2 -right-2 w-10 h-10 bg-brand-500 border-4 border-background-1 rounded-full flex items-center justify-center hover:bg-brand-600 transition-colors shadow-lg"
                     >
                       <svg
                         className="w-5 h-5 text-white"
@@ -484,13 +484,13 @@ function Profile() {
               <div className="pt-20 pb-8 px-8">
                 <div className="flex justify-between items-start mb-8">
                   <div>
-                    <h2 className="text-3xl font-bold text-black mb-1">
+                    <h2 className="text-3xl font-bold text-text-1 mb-1">
                       {profile?.displayName}
                     </h2>
                   </div>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="bg-black hover:bg-gray-800 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                    className="btn-primary font-semibold py-2 px-6 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                   >
                     Edit Profile
                   </button>
@@ -498,9 +498,9 @@ function Profile() {
 
                 {/* Info Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                  <div className="glass-card-subtle p-6 rounded-xl border border-border-1">
                     <div className="flex items-center">
-                      <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center mr-4">
+                      <div className="w-12 h-12 bg-brand-500 rounded-lg flex items-center justify-center mr-4">
                         <svg
                           className="w-6 h-6 text-white"
                           fill="none"
@@ -516,19 +516,19 @@ function Profile() {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">
+                        <p className="text-sm font-medium text-text-2">
                           Email
                         </p>
-                        <p className="text-lg font-semibold text-black">
+                        <p className="text-lg font-semibold text-text-1">
                           {profile?.email || "Not provided"}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                  <div className="glass-card-subtle p-6 rounded-xl border border-border-1">
                     <div className="flex items-center">
-                      <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center mr-4">
+                      <div className="w-12 h-12 bg-brand-500 rounded-lg flex items-center justify-center mr-4">
                         <svg
                           className="w-6 h-6 text-white"
                           fill="currentColor"
@@ -538,7 +538,7 @@ function Profile() {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">
+                        <p className="text-sm font-medium text-text-2">
                           GitHub
                         </p>
                         {profile?.githubUsername ? (
@@ -546,12 +546,12 @@ function Profile() {
                             href={`https://github.com/${profile.githubUsername}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-lg font-semibold text-black hover:text-gray-700 transition-colors"
+                            className="text-lg font-semibold text-brand-500 hover:text-brand-600 transition-colors"
                           >
                             {profile.githubUsername}
                           </a>
                         ) : (
-                          <p className="text-lg font-semibold text-black">
+                          <p className="text-lg font-semibold text-text-1">
                             Not provided
                           </p>
                         )}
@@ -561,10 +561,10 @@ function Profile() {
                 </div>
 
                 {/* Bio Section */}
-                <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                  <h3 className="text-xl font-bold text-black mb-4 flex items-center">
+                <div className="glass-card-subtle p-6 rounded-xl border border-border-1">
+                  <h3 className="text-xl font-bold text-text-1 mb-4 flex items-center">
                     <svg
-                      className="w-5 h-5 mr-2 text-gray-600"
+                      className="w-5 h-5 mr-2 text-text-2"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -578,7 +578,7 @@ function Profile() {
                     </svg>
                     About
                   </h3>
-                  <p className="text-gray-700 leading-relaxed">
+                  <p className="text-text-1 leading-relaxed">
                     {profile?.bio || "This user hasn't written a bio yet."}
                   </p>
                 </div>

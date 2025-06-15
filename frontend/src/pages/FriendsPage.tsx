@@ -148,8 +148,8 @@ export const FriendsPage: React.FC = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2 overflow-x-auto pb-3 pr-2">
           <motion.button
             onClick={() => setFilter('friends')}
             className="relative"
@@ -159,7 +159,7 @@ export const FriendsPage: React.FC = () => {
             {filter === 'friends' ? (
               <AnimatedGradient
                 gradientColors={['var(--primary-purple)', 'var(--primary-pink)', 'var(--primary-violet)']}
-                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2"
+                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2 flex-shrink-0"
                 textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
                 duration={20}
               >
@@ -172,7 +172,7 @@ export const FriendsPage: React.FC = () => {
                 )}
               </AnimatedGradient>
             ) : (
-              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2">
+              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0">
                 <Users size={18} />
                 <span className="font-medium">Friends</span>
                 {!isLoading && (
@@ -193,7 +193,7 @@ export const FriendsPage: React.FC = () => {
             {filter === 'following' ? (
               <AnimatedGradient
                 gradientColors={['var(--primary-teal)', 'var(--primary-blue)', 'var(--primary-purple)']}
-                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2"
+                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2 flex-shrink-0"
                 textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
                 duration={25}
               >
@@ -204,7 +204,7 @@ export const FriendsPage: React.FC = () => {
                 </span>
               </AnimatedGradient>
             ) : (
-              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2">
+              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0">
                 <UserPlus size={18} />
                 <span className="font-medium">Following</span>
                 <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
@@ -223,7 +223,7 @@ export const FriendsPage: React.FC = () => {
             {filter === 'followers' ? (
               <AnimatedGradient
                 gradientColors={['var(--primary-coral)', 'var(--primary-yellow)', 'var(--primary-pink)']}
-                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2"
+                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2 flex-shrink-0"
                 textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
                 duration={30}
               >
@@ -234,7 +234,7 @@ export const FriendsPage: React.FC = () => {
                 </span>
               </AnimatedGradient>
             ) : (
-              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2">
+              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0">
                 <UserCheck size={18} />
                 <span className="font-medium">Followers</span>
                 <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
@@ -246,7 +246,7 @@ export const FriendsPage: React.FC = () => {
         </div>
 
         {/* Search */}
-        <div className="w-64">
+        <div className="w-full lg:w-64">
           <Input
             type="text"
             placeholder="Search users..."
@@ -291,11 +291,16 @@ export const FriendsPage: React.FC = () => {
                 layout
               >
                 <AuthorCard
-                  author={author}
-                  isFollowing={followingIds.has(author.id)}
-                  isFriend={followingIds.has(author.id) && followerIds.has(author.id)}
-                  showFollowButton={filter !== 'followers' || !followingIds.has(author.id)}
-                  onFollowToggle={() => handleFollowToggle(author.id)}
+                  author={{
+                    ...author,
+                    is_following: followingIds.has(author.id),
+                    is_followed_by: followerIds.has(author.id),
+                    follower_count: 0,
+                    following_count: 0,
+                    post_count: 0
+                  }}
+                  showActions={filter !== 'followers' || !followingIds.has(author.id)}
+                  onFollow={() => handleFollowToggle(author.id)}
                 />
               </motion.div>
             ))}

@@ -31,7 +31,7 @@ export const AnimatedGradient: React.FC<AnimatedGradientProps> = ({
 
   return (
     <Component
-      className={`relative overflow-hidden ${className}`}
+      className={`relative overflow-hidden block ${className}`}
       onClick={onClick}
       whileHover={disabled ? {} : { scale: 1.05, y: -2 }}
       whileTap={disabled ? {} : { scale: 0.95 }}

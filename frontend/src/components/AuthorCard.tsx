@@ -84,7 +84,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
     return (
       <motion.div
         whileHover={{ scale: 1.02 }}
-        className={`flex items-center space-x-3 p-3 rounded-lg glass-card-subtle hover:bg-glass-low transition-all ${className}`}
+        className={`flex items-center space-x-3 p-3 rounded-lg glass-card-subtle bg-[rgba(var(--glass-rgb),0.85)] backdrop-blur-md hover:bg-glass-low transition-all ${className}`}
       >
         <Link to={`/authors/${author.id}`}>
           <Avatar
@@ -116,7 +116,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   }
 
   return (
-    <Card variant="main" hoverable className={className}>
+    <Card variant="main" hoverable className={`bg-[rgba(var(--glass-rgb),0.85)] backdrop-blur-md ${className}`}>
       <div className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
@@ -185,24 +185,24 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         
         {/* Stats */}
         {showStats && (
-          <div className="flex items-center space-x-6 mb-4 text-sm">
-            <div className="flex items-center space-x-1">
-              <FileText size={16} className="text-text-2" />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-sm">
+            <div className="flex items-center space-x-1 min-w-0">
+              <FileText size={16} className="text-text-2 flex-shrink-0" />
               <span className="font-semibold text-text-1">
                 {formatCount(author.post_count || 0)}
               </span>
               <span className="text-text-2">posts</span>
             </div>
             
-            <Link to={`/authors/${author.id}/followers`} className="flex items-center space-x-1 hover:underline">
-              <Users size={16} className="text-text-2" />
+            <Link to={`/authors/${author.id}/followers`} className="flex items-center space-x-1 hover:underline min-w-0">
+              <Users size={16} className="text-text-2 flex-shrink-0" />
               <span className="font-semibold text-text-1">
                 {formatCount(author.follower_count || 0)}
               </span>
               <span className="text-text-2">followers</span>
             </Link>
             
-            <Link to={`/authors/${author.id}/following`} className="flex items-center space-x-1 hover:underline">
+            <Link to={`/authors/${author.id}/following`} className="flex items-center space-x-1 hover:underline min-w-0">
               <span className="font-semibold text-text-1">
                 {formatCount(author.following_count || 0)}
               </span>

@@ -68,12 +68,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       return;
     }
     
-    if (!content.trim() && !contentType.startsWith('image/')) {
+    if (!content.trim() && contentType && !contentType.startsWith('image/')) {
       setError('Please enter some content');
       return;
     }
     
-    if (contentType.startsWith('image/') && images.length === 0) {
+    if (contentType && contentType.startsWith('image/') && images.length === 0) {
       setError('Please upload at least one image');
       return;
     }
@@ -145,7 +145,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const contentTypeOptions = [
     { value: 'text/markdown', label: 'Markdown', icon: FileText },
     { value: 'text/plain', label: 'Plain Text', icon: FileText },
-    { value: 'image', label: 'Image', icon: ImageIcon },
+    { value: 'image/png', label: 'Image', icon: ImageIcon },
   ];
 
   return (
@@ -202,7 +202,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 <div className="flex items-center space-x-2">
                   {contentTypeOptions.map((option) => {
                     const Icon = option.icon;
-                    const isSelected = contentType === option.value;
+                    const isSelected = option.value === 'image/png' 
+                      ? contentType?.startsWith('image/') 
+                      : contentType === option.value;
                     
                     return (
                       <motion.button
@@ -210,7 +212,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         type="button"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setContentType(option.value as ContentType)}
+                        onClick={() => {
+                          const value = option.value === 'image/png' ? 'image/png' : option.value;
+                          setContentType(value as ContentType);
+                        }}
                         className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                           isSelected 
                             ? 'bg-[var(--primary-violet)] text-white' 
@@ -251,7 +256,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                           transition={{ duration: 0.2 }}
                           className="px-4 pb-4"
                         >
-                          {contentType.startsWith('image/') ? (
+                          {contentType && contentType.startsWith('image/') ? (
                             <div>
                               <ImageUploader
                                 onImagesChange={setImages}
