@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import HomePage from "./pages/HomePage";
 import Protected from "./components/protected/Protected";
+import PublicOnly from "./components/protected/PublicOnly";
 import AuthCallback from "./components/auth/AuthCallback";
 import Profile from "./components/profile/Profile";
 import InboxPage from "./pages/InboxPage";
@@ -18,11 +19,19 @@ import FriendsPage from "./pages/FriendsPage";
 export const routes: RouteObject[] = [
   {
     path: "/",
-    element: <LoginPage />,
+    element: (
+      <PublicOnly>
+        <LoginPage />
+      </PublicOnly>
+    ),
   },
   {
     path: "/signup",
-    element: <SignupPage />,
+    element: (
+      <PublicOnly>
+        <SignupPage />
+      </PublicOnly>
+    ),
   },
   {
     path: "/auth/callback",

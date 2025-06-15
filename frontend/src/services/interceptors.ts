@@ -7,6 +7,9 @@ import { api } from './api';
 // Store original fetch to avoid circular references
 const originalFetch = window.fetch;
 
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ['/', '/signup', '/auth/callback'];
+
 // Override global fetch to intercept all requests
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   try {
@@ -17,13 +20,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
       // Get current path
       const currentPath = window.location.pathname;
       
-      // Don't redirect if already on auth pages
-      if (currentPath !== '/' && currentPath !== '/signup' && currentPath !== '/auth/callback') {
+      // Don't redirect if already on public routes
+      if (!PUBLIC_ROUTES.includes(currentPath)) {
         // Clear any auth data
         localStorage.removeItem('authToken');
         sessionStorage.removeItem('authToken');
         
-        // Redirect to login
+        // Force a page reload to trigger auth check and redirect
         window.location.href = '/';
       }
     }
