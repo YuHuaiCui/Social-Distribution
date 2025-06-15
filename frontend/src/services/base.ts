@@ -2,7 +2,7 @@
  * Base API Service class that provides common functionality for all API services
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
@@ -20,43 +20,47 @@ export class BaseApiService {
    */
   protected getCsrfToken(): string | undefined {
     return document.cookie
-      .split('; ')
-      .find(row => row.startsWith('csrftoken='))
-      ?.split('=')[1];
+      .split("; ")
+      .find((row) => row.startsWith("csrftoken="))
+      ?.split("=")[1];
   }
 
   /**
    * Get auth token from localStorage or sessionStorage
    */
   protected getAuthToken(): string | undefined {
-    return localStorage.getItem('authToken') || sessionStorage.getItem('authToken') || undefined;
+    return (
+      localStorage.getItem("authToken") ||
+      sessionStorage.getItem("authToken") ||
+      undefined
+    );
   }
 
   /**
    * Helper method for making HTTP requests
    */
   protected async request<T>(
-    endpoint: string, 
+    endpoint: string,
     options: RequestOptions = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const { skipAuth = false, ...fetchOptions } = options;
-    
+
     const defaultHeaders: HeadersInit = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     // Add CSRF token if available
     const csrfToken = this.getCsrfToken();
     if (csrfToken) {
-      defaultHeaders['X-CSRFToken'] = csrfToken;
+      defaultHeaders["X-CSRFToken"] = csrfToken;
     }
 
     // Add auth token if available and not skipped
     if (!skipAuth) {
       const authToken = this.getAuthToken();
       if (authToken) {
-        defaultHeaders['Authorization'] = `Token ${authToken}`;
+        defaultHeaders["Authorization"] = `Token ${authToken}`;
       }
     }
 
@@ -66,7 +70,7 @@ export class BaseApiService {
         ...defaultHeaders,
         ...fetchOptions.headers,
       },
-      credentials: 'include', // Always include cookies
+      credentials: "include", // Always include cookies
     };
 
     try {
@@ -74,9 +78,13 @@ export class BaseApiService {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({
-          message: `HTTP error! status: ${response.status}`
+          message: `HTTP error! status: ${response.status}`,
         }));
-        throw new Error(error.message || error.detail || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          error.message ||
+            error.detail ||
+            `HTTP error! status: ${response.status}`
+        );
       }
 
       // Handle empty responses (like 204 No Content)
@@ -89,7 +97,7 @@ export class BaseApiService {
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error('An unexpected error occurred');
+      throw new Error("An unexpected error occurred");
     }
   }
 
@@ -104,8 +112,9 @@ export class BaseApiService {
       }
     });
     const queryString = queryParams.toString();
-    return queryString ? `?${queryString}` : '';
+    return queryString ? `?${queryString}` : "";
   }
+
   /**
    * Helper method for handling FormData requests (e.g., file uploads)
    */
@@ -114,14 +123,17 @@ export class BaseApiService {
     formData: FormData,
     options: RequestOptions = {}
   ): Promise<T> {
-    const { headers = {}, method = 'POST', ...otherOptions } = options;
-    
+    const { headers = {}, ...otherOptions } = options;
+
     // Remove Content-Type header to let browser set it with boundary for FormData
-    const { 'Content-Type': _, ...otherHeaders } = headers as Record<string, string>;
-    
+    const { "Content-Type": _, ...otherHeaders } = headers as Record<
+      string,
+      string
+    >;
+
     return this.request<T>(endpoint, {
       ...otherOptions,
-      method,
+      method: "POST",
       headers: otherHeaders,
       body: formData,
     });

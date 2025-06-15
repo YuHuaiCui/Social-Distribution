@@ -84,9 +84,6 @@ class Entry(models.Model):
         max_length=20, choices=VISIBILITY_CHOICES, default=PUBLIC
     )
 
-    # Add image field
-    image = models.ImageField(upload_to='entries/', blank=True, null=True)
-
     # GitHub integration
     source = models.URLField(blank=True, help_text="Source URL (e.g., GitHub)")
     origin = models.URLField(blank=True, help_text="Origin URL")

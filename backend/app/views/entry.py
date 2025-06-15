@@ -6,8 +6,6 @@ from django.db import models
 from app.models import Entry, Author
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
-import json
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 class EntryViewSet(viewsets.ModelViewSet):
     """
@@ -17,7 +15,6 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     serializer_class = EntrySerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         """
@@ -72,59 +69,19 @@ class EntryViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
 
     def create(self, request, *args, **kwargs):
-        print(f"Request content type: {request.content_type}")
-        print(f"Request POST data: {request.POST}")
-        print(f"Request FILES: {request.FILES}")
+        """
+        Override create to handle both JSON and FormData properly.
+        """
+        print(f"CREATE DEBUG - User: {request.user}")
+        print(f"CREATE DEBUG - Data: {request.data}")
+        print(f"CREATE DEBUG - Content-Type: {request.content_type}")
         
-        try:
-            # Handle multipart form data (with image)
-            if hasattr(request, 'FILES') and request.FILES:
-                # Get form data
-                entry_data = {
-                    'title': request.POST.get('title', ''),
-                    'content': request.POST.get('content', ''),
-                    'content_type': request.POST.get('content_type', 'text'),
-                    'visibility': request.POST.get('visibility', 'public'),
-                }
-                
-                # Handle categories
-                categories_str = request.POST.get('categories')
-                if categories_str and categories_str not in ['undefined', 'null', '']:
-                    try:
-                        categories = json.loads(categories_str)
-                        if isinstance(categories, list):
-                            entry_data['categories'] = categories
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-                
-                # Add image if present
-                image = request.FILES.get('image')
-                if image:
-                    entry_data['image'] = image
-                    
-            else:
-                # Handle JSON data (no image)
-                entry_data = request.data.copy()
-            
-            print(f"Final entry_data: {entry_data}")
-            
-            # Use the serializer
-            serializer = self.get_serializer(data=entry_data)
-            if serializer.is_valid():
-                entry = serializer.save(author=request.user)
-                return Response(
-                    self.get_serializer(entry).data, 
-                    status=status.HTTP_201_CREATED
-                )
-            else:
-                print(f"Serializer errors: {serializer.errors}")
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
-        except Exception as e:
-            print(f"Exception in create: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return Response(
-                {'error': f'Server error: {str(e)}'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        # Handle the serializer context properly
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Perform the creation
+        self.perform_create(serializer)
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
