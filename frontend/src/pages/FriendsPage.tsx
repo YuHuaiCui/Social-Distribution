@@ -140,7 +140,7 @@ export const FriendsPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-5xl">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-1 mb-2">Connections</h1>

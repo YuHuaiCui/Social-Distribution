@@ -209,7 +209,7 @@ export const InboxPage: React.FC = () => {
   const unreadCount = items.filter(item => !item.is_read).length;
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-5xl mx-auto">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

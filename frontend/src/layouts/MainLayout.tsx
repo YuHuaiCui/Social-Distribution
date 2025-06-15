@@ -21,8 +21,8 @@ export const MainLayout: React.FC = () => {
         <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
         
         <div className="flex-1 flex flex-col">
-          <div className="layout-with-sidebars max-w-content-xl mx-auto flex-1">
-            {/* Left Sidebar - only show when logged in */}
+          <div className="layout-with-sidebars max-w-content-xl mx-auto flex-1 w-full">
+            {/* Left Sidebar - only show when logged in and on desktop */}
             {user && (
               <aside className="hidden lg:block h-full overflow-y-auto">
                 <div className="sticky top-0">
@@ -33,12 +33,12 @@ export const MainLayout: React.FC = () => {
             
             {/* Main Content */}
             <main className="flex-1 min-w-0 h-full overflow-y-auto pb-16 lg:pb-0">
-              <div className="min-h-full">
+              <div className="min-h-full w-full">
                 <Outlet />
               </div>
             </main>
             
-            {/* Right Sidebar - only show when logged in */}
+            {/* Right Sidebar - only show when logged in and on larger screens */}
             {user && (
               <aside className="hidden xl:block h-full overflow-y-auto">
                 <div className="sticky top-0">
@@ -53,8 +53,10 @@ export const MainLayout: React.FC = () => {
             <Footer />
           </div>
           
-          {/* Global Footer - always visible */}
-          <GlobalFooter />
+          {/* Global Footer - hidden on mobile, visible on desktop */}
+          <div className="hidden lg:block">
+            <GlobalFooter />
+          </div>
         </div>
       </div>
     </div>

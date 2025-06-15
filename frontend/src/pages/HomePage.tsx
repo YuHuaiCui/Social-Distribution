@@ -118,7 +118,7 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-3xl">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-4xl mx-auto">
       {/* Feed Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-text-1">

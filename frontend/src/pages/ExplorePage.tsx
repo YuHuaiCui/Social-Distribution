@@ -222,7 +222,7 @@ export const ExplorePage: React.FC = () => {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-6xl">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-7xl mx-auto">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
