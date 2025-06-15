@@ -382,17 +382,17 @@
 
   /* Direct color assignments for light/dark modes */
   :root[data-theme='light'] .glass-card-main {
-    background-color: rgba(255, 255, 255, 0.95) !important;
+    background-color: rgba(255, 255, 255, 0.65) !important;
   }
 
   :root[data-theme='dark'] .glass-card-main {
-    background-color: rgba(20, 29, 55, 0.95) !important;
+    background-color: rgba(15, 23, 42, 0.65) !important;
     border-width: 1.5px;
-    border-color: rgba(78, 108, 148, 0.4);
+    border-color: rgba(78, 108, 148, 0.3);
     box-shadow: 
-      0 6px 24px rgba(0, 0, 0, 0.25),
-      0 2px 8px rgba(0, 0, 0, 0.2),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      0 6px 24px rgba(0, 0, 0, 0.15),
+      0 2px 8px rgba(0, 0, 0, 0.1),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   }
 
   .glass-card-prominent {
@@ -420,22 +420,22 @@
 
   /* Prominent glass for main content - higher opacity */
   .glass-card {
-    background: rgba(var(--glass-rgb), var(--glass-alpha-medium));
+    background: rgba(var(--glass-rgb), 0.5);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
     box-shadow: 
-      0 4px 12px rgba(0, 0, 0, 0.05),
-      0 1px 3px rgba(0, 0, 0, 0.1);
+      0 4px 12px rgba(0, 0, 0, 0.03),
+      0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   /* Dark mode specific card styles */
   :root[data-theme='dark'] .glass-card {
-    border-width: 1.5px;
+    border-width: 1px;
     box-shadow: 
-      0 4px 20px rgba(0, 0, 0, 0.2),
-      0 1px 5px rgba(0, 0, 0, 0.15),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      0 4px 20px rgba(0, 0, 0, 0.08),
+      0 1px 5px rgba(0, 0, 0, 0.05),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   }
 
   /* Sidebar elements - more subtle, transparent */

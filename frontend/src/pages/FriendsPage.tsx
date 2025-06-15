@@ -149,100 +149,97 @@ export const FriendsPage: React.FC = () => {
 
       {/* Filter Tabs */}
       <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center gap-2 overflow-x-auto pb-3 pr-2 scrollbar-hide">
-          <motion.button
-            onClick={() => setFilter('friends')}
-            className="relative"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {filter === 'friends' ? (
-              <AnimatedGradient
-                gradientColors={['var(--primary-purple)', 'var(--primary-pink)', 'var(--primary-violet)']}
-                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2 flex-shrink-0"
-                textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
-                duration={20}
-              >
-                <Users size={18} />
-                <span className="font-medium">Friends</span>
-                {!isLoading && (
-                  <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                    {authors.filter(a => followingIds.has(a.id) && followerIds.has(a.id)).length}
-                  </span>
-                )}
-              </AnimatedGradient>
-            ) : (
-              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0">
-                <Users size={18} />
-                <span className="font-medium">Friends</span>
-                {!isLoading && (
-                  <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                    {authors.filter(a => followingIds.has(a.id) && followerIds.has(a.id)).length}
-                  </span>
-                )}
-              </div>
-            )}
-          </motion.button>
-
-          <motion.button
-            onClick={() => setFilter('following')}
-            className="relative"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {filter === 'following' ? (
-              <AnimatedGradient
-                gradientColors={['var(--primary-teal)', 'var(--primary-blue)', 'var(--primary-purple)']}
-                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2 flex-shrink-0"
-                textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
-                duration={25}
-              >
-                <UserPlus size={18} />
-                <span className="font-medium">Following</span>
+        <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-hide">
+          {filter === 'friends' ? (
+            <AnimatedGradient
+              gradientColors={['var(--primary-purple)', 'var(--primary-pink)', 'var(--primary-violet)']}
+              className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center gap-2 flex-shrink-0"
+              textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center gap-2"
+              duration={20}
+              onClick={() => setFilter('friends')}
+            >
+              <Users size={18} />
+              <span className="font-medium">Friends</span>
+              {!isLoading && (
                 <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                  {followingIds.size}
+                  {authors.filter(a => followingIds.has(a.id) && followerIds.has(a.id)).length}
                 </span>
-              </AnimatedGradient>
-            ) : (
-              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0">
-                <UserPlus size={18} />
-                <span className="font-medium">Following</span>
+              )}
+            </AnimatedGradient>
+          ) : (
+            <motion.div 
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+              onClick={() => setFilter('friends')}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Users size={18} />
+              <span className="font-medium">Friends</span>
+              {!isLoading && (
                 <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                  {followingIds.size}
+                  {authors.filter(a => followingIds.has(a.id) && followerIds.has(a.id)).length}
                 </span>
-              </div>
-            )}
-          </motion.button>
+              )}
+            </motion.div>
+          )}
 
-          <motion.button
-            onClick={() => setFilter('followers')}
-            className="relative"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {filter === 'followers' ? (
-              <AnimatedGradient
-                gradientColors={['var(--primary-coral)', 'var(--primary-yellow)', 'var(--primary-pink)']}
-                className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center space-x-2 flex-shrink-0"
-                textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
-                duration={30}
-              >
-                <UserCheck size={18} />
-                <span className="font-medium">Followers</span>
-                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                  {followerIds.size}
-                </span>
-              </AnimatedGradient>
-            ) : (
-              <div className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0">
-                <UserCheck size={18} />
-                <span className="font-medium">Followers</span>
-                <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                  {followerIds.size}
-                </span>
-              </div>
-            )}
-          </motion.button>
+          {filter === 'following' ? (
+            <AnimatedGradient
+              gradientColors={['var(--primary-teal)', 'var(--primary-blue)', 'var(--primary-purple)']}
+              className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center gap-2 flex-shrink-0"
+              textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center gap-2"
+              duration={25}
+              onClick={() => setFilter('following')}
+            >
+              <UserPlus size={18} />
+              <span className="font-medium">Following</span>
+              <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                {followingIds.size}
+              </span>
+            </AnimatedGradient>
+          ) : (
+            <motion.div 
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+              onClick={() => setFilter('following')}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <UserPlus size={18} />
+              <span className="font-medium">Following</span>
+              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                {followingIds.size}
+              </span>
+            </motion.div>
+          )}
+
+          {filter === 'followers' ? (
+            <AnimatedGradient
+              gradientColors={['var(--primary-coral)', 'var(--primary-yellow)', 'var(--primary-pink)']}
+              className="px-4 py-2 rounded-lg shadow-md cursor-pointer flex items-center gap-2 flex-shrink-0"
+              textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center gap-2"
+              duration={30}
+              onClick={() => setFilter('followers')}
+            >
+              <UserCheck size={18} />
+              <span className="font-medium">Followers</span>
+              <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                {followerIds.size}
+              </span>
+            </AnimatedGradient>
+          ) : (
+            <motion.div 
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+              onClick={() => setFilter('followers')}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <UserCheck size={18} />
+              <span className="font-medium">Followers</span>
+              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                {followerIds.size}
+              </span>
+            </motion.div>
+          )}
         </div>
 
         {/* Search */}
@@ -291,16 +288,11 @@ export const FriendsPage: React.FC = () => {
                 layout
               >
                 <AuthorCard
-                  author={{
-                    ...author,
-                    is_following: followingIds.has(author.id),
-                    is_followed_by: followerIds.has(author.id),
-                    follower_count: 0,
-                    following_count: 0,
-                    post_count: 0
-                  }}
-                  showActions={filter !== 'followers' || !followingIds.has(author.id)}
-                  onFollow={() => handleFollowToggle(author.id)}
+                  author={author}
+                  isFollowing={followingIds.has(author.id)}
+                  isFriend={followingIds.has(author.id) && followerIds.has(author.id)}
+                  showFollowButton={filter !== 'followers' || !followingIds.has(author.id)}
+                  onFollowToggle={() => handleFollowToggle(author.id)}
                 />
               </motion.div>
             ))}

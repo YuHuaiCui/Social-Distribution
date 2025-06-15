@@ -301,52 +301,110 @@ export const PostCard: React.FC<PostCardProps> = ({
       </div>
       
       {/* Post stats and interaction buttons */}
-      <div className="card-footer flex items-center justify-between border-t border-border-1 pt-3">
-        <div className="flex space-x-5">
-          <Button
-            variant="ghost"
-            size="sm"
+      <div className="card-footer border-t border-border-1 -mx-5 -mb-5 px-0 rounded-b-xl overflow-hidden">
+        <div className="flex items-stretch divide-x divide-border-1">
+          {/* Like Button */}
+          <button
             onClick={handleLike}
-            className={`${liked ? 'text-brand-500' : 'text-text-2'} hover:text-brand-500`}
+            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
             aria-label={liked ? "Unlike this post" : "Like this post"}
           >
-            <ThumbsUp size={18} className="mr-1.5" fill={liked ? 'currentColor' : 'none'} />
-            <span className="text-sm">{likeCount}</span>
-          </Button>
+            {/* Gradient background on hover or when liked */}
+            <motion.div
+              className={`absolute inset-0 transition-opacity ${liked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+              style={{
+                background: 'linear-gradient(135deg, var(--primary-pink) 0%, var(--primary-purple) 100%)',
+              }}
+            />
+            <motion.div
+              className={`relative z-10 flex items-center gap-2 ${liked ? 'text-white' : 'text-text-2 group-hover:text-white'} transition-colors`}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              animate={liked ? {
+                rotate: [0, -20, 20, -10, 10, 0],
+                scale: [1, 1.2, 1.1, 1.15, 1.05, 1],
+              } : {}}
+              transition={{ duration: 0.5 }}
+            >
+              <ThumbsUp size={18} fill={liked ? 'currentColor' : 'none'} />
+              <span className="text-sm font-medium">{likeCount}</span>
+            </motion.div>
+          </button>
           
-          <Link to={`/posts/${post.id}`}>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-text-2 hover:text-brand-500"
+          {/* Comment Button */}
+          <Link to={`/posts/${post.id}`} className="flex-1">
+            <button
+              className="w-full h-full flex items-center justify-center py-3 relative overflow-hidden group transition-all"
               aria-label="View comments"
             >
-              <MessageCircle size={18} className="mr-1.5" />
-              <span className="text-sm">{post.comments_count || 0}</span>
-            </Button>
+              {/* Gradient background on hover */}
+              <motion.div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{
+                  background: 'linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)',
+                }}
+              />
+              <motion.div 
+                className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <MessageCircle size={18} />
+                <span className="text-sm font-medium">{post.comments_count || 0}</span>
+              </motion.div>
+            </button>
           </Link>
           
-          <Button
-            variant="ghost"
-            size="sm"
+          {/* Share Button */}
+          <button
             onClick={handleShare}
-            className="text-text-2 hover:text-brand-500"
+            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
             aria-label="Share this post"
           >
-            <Share2 size={18} className="mr-1.5" />
-            <span className="text-sm">Share</span>
-          </Button>
+            {/* Gradient background on hover */}
+            <motion.div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{
+                background: 'linear-gradient(135deg, var(--primary-yellow) 0%, var(--primary-coral) 100%)',
+              }}
+            />
+            <motion.div 
+              className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Share2 size={18} />
+              <span className="text-sm font-medium">Share</span>
+            </motion.div>
+          </button>
           
-          <Button
-            variant="ghost"
-            size="sm"
+          {/* Save Button */}
+          <button
             onClick={handleSave}
-            className={`${saved ? 'text-brand-500' : 'text-text-2'} hover:text-brand-500`}
+            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
             aria-label={saved ? "Unsave this post" : "Save this post"}
           >
-            <Bookmark size={18} className="mr-1.5" fill={saved ? 'currentColor' : 'none'} />
-            <span className="text-sm">Save</span>
-          </Button>
+            {/* Gradient background on hover or when saved */}
+            <motion.div
+              className={`absolute inset-0 transition-opacity ${saved ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+              style={{
+                background: 'linear-gradient(135deg, var(--primary-violet) 0%, var(--primary-purple) 100%)',
+              }}
+            />
+            <motion.div
+              className={`relative z-10 flex items-center gap-2 ${saved ? 'text-white' : 'text-text-2 group-hover:text-white'} transition-colors`}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              animate={saved ? {
+                scale: [1, 1.2, 1],
+                rotate: [0, 10, -10, 0],
+              } : {}}
+              transition={{ duration: 0.3 }}
+            >
+              <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
+              <span className="text-sm font-medium">Save</span>
+            </motion.div>
+          </button>
         </div>
       </div>
     </Card>

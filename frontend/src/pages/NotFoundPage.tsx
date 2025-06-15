@@ -52,88 +52,37 @@ export const NotFoundPage: React.FC = () => {
         </p>
       </motion.div>
 
-      {/* Floating Elements */}
-      <div className="relative h-32 mb-12 overflow-visible">
-        <motion.div
-          className="absolute left-1/4 top-0"
-          animate={{
-            x: [0, 30, -20, 0],
-            y: [0, -30, -10, 0],
-            rotate: [0, 15, -10, 0],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        >
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--primary-yellow)] to-[var(--primary-pink)] opacity-80 blur-md dark:opacity-40 dark:blur-xl" />
-        </motion.div>
-        <motion.div
-          className="absolute right-1/4 top-8"
-          animate={{
-            x: [0, -40, 20, 0],
-            y: [0, 20, 40, 0],
-            rotate: [0, -20, 10, 0],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 1,
-          }}
-        >
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[var(--primary-teal)] to-[var(--primary-blue)] opacity-70 blur-lg dark:opacity-30 dark:blur-2xl" />
-        </motion.div>
-        <motion.div
-          className="absolute left-1/2 -translate-x-1/2 top-4"
-          animate={{
-            x: [0, -20, 30, 0],
-            y: [0, 20, -25, 0],
-            scale: [1, 1.3, 0.9, 1],
-            opacity: [0.6, 0.8, 0.4, 0.6],
-          }}
-          transition={{
-            duration: 12,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 0.5,
-          }}
-        >
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-violet)] opacity-60 blur-xl dark:opacity-25 dark:blur-3xl" />
-        </motion.div>
-        {/* Small floating elements */}
-        <motion.div
-          className="absolute left-[15%] top-16"
-          animate={{
-            x: [0, 50, 10, 0],
-            y: [0, -40, -20, 0],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 2,
-          }}
-        >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary-coral)] to-[var(--primary-pink)] opacity-70 blur-sm dark:opacity-20 dark:blur-lg" />
-        </motion.div>
-        <motion.div
-          className="absolute right-[10%] top-20"
-          animate={{
-            x: [0, -30, 40, 0],
-            y: [0, 30, -10, 0],
-          }}
-          transition={{
-            duration: 7,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 3,
-          }}
-        >
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary-yellow)] to-[var(--primary-coral)] opacity-60 blur-md dark:opacity-20 dark:blur-xl" />
-        </motion.div>
-      </div>
+      {/* Animated dots - moved here */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="mb-8 flex justify-center space-x-3"
+      >
+        {[
+          ['var(--primary-purple)', 'var(--primary-pink)'],
+          ['var(--primary-teal)', 'var(--primary-blue)'],
+          ['var(--primary-yellow)', 'var(--primary-coral)']
+        ].map((colors, i) => (
+          <motion.div
+            key={i}
+            className="w-3 h-3 rounded-full"
+            style={{
+              background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
+            }}
+            animate={{
+              y: [0, -12, 0],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              delay: i * 0.2,
+              ease: 'easeInOut',
+            }}
+          />
+        ))}
+      </motion.div>
 
       {/* Action Buttons */}
       <motion.div
@@ -185,29 +134,6 @@ export const NotFoundPage: React.FC = () => {
         <p className="text-xs text-text-2">
           Try using the search bar in the header to find what you need
         </p>
-      </motion.div>
-
-      {/* Animated dots */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.2 }}
-        className="mt-12 flex justify-center space-x-2"
-      >
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            className="w-2 h-2 rounded-full bg-text-2"
-            animate={{
-              y: [0, -10, 0],
-            }}
-            transition={{
-              duration: 1.5,
-              repeat: Infinity,
-              delay: i * 0.2,
-            }}
-          />
-        ))}
       </motion.div>
     </div>
   );

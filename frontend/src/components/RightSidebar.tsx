@@ -11,14 +11,14 @@ interface RightSidebarProps {
 
 const RightSidebar: React.FC<RightSidebarProps> = ({
   friends = [],
-  trendingTags = ['cmput404', 'distributedsystems', 'programming', 'react', 'typescript'],
+  trendingTags = ['technology', 'design', 'programming', 'webdev', 'opensource'],
 }) => {
   return (
     <aside className="hidden lg:block w-72 shrink-0">
       <div className="sticky top-24 space-y-6">
         {/* Friends Online */}
         {friends.length > 0 && (
-          <div className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-low))] backdrop-blur-md rounded-2xl border border-[var(--glass-border)] p-4">
+          <div className="rounded-2xl border border-border-1 p-4">
             <h3 className="text-[color:var(--text-2)] text-sm font-medium mb-3">
               Friends Online
             </h3>
@@ -61,7 +61,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
         )}
 
         {/* Trending Tags */}
-        <div className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-low))] backdrop-blur-md rounded-2xl border border-[var(--glass-border)] p-4">
+        <div className="rounded-2xl border border-border-1 p-4">
           <h3 className="text-[color:var(--text-2)] text-sm font-medium mb-3">
             Trending Tags
           </h3>
@@ -97,7 +97,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Quick Stats */}
-        <div className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-low))] backdrop-blur-md rounded-2xl border border-[var(--glass-border)] p-4">
+        <div className="rounded-2xl border border-border-1 p-4">
           <h3 className="text-[color:var(--text-2)] text-sm font-medium mb-3">
             Your Stats
           </h3>

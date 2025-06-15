@@ -273,7 +273,7 @@ export const ExplorePage: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-3 overflow-x-auto pb-3 pr-2 scrollbar-hide">
+        <div className="flex items-center gap-3 overflow-x-auto pb-3 scrollbar-hide">
           {tabs.map((tab, index) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -287,8 +287,8 @@ export const ExplorePage: React.FC = () => {
               >
                 <AnimatedGradient
                   gradientColors={tab.gradientColors}
-                  className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium shadow-md cursor-pointer flex-shrink-0"
-                  textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium shadow-md cursor-pointer flex-shrink-0"
+                  textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center gap-2"
                   duration={20}
                   onClick={() => setActiveTab(tab.id as ExploreTab)}
                 >
@@ -297,19 +297,19 @@ export const ExplorePage: React.FC = () => {
                 </AnimatedGradient>
               </motion.div>
             ) : (
-              <motion.button
+              <motion.div
                 key={`${tab.id}-inactive`}
-                onClick={() => setActiveTab(tab.id as ExploreTab)}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium glass-card-subtle text-text-1 hover:text-text-1 transition-all cursor-pointer flex-shrink-0"
+                onClick={() => setActiveTab(tab.id as ExploreTab)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium glass-card-subtle text-text-1 hover:text-text-1 transition-all cursor-pointer flex-shrink-0"
               >
                 <Icon size={18} />
                 <span>{tab.label}</span>
-              </motion.button>
+              </motion.div>
             );
           })}
 
