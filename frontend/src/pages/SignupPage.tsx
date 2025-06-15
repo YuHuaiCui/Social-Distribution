@@ -134,7 +134,7 @@ export const SignupPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card variant="prominent" className="p-8">
+            <Card variant="prominent" className="p-8 bg-[rgba(var(--glass-rgb),0.75)] backdrop-blur-2xl">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>

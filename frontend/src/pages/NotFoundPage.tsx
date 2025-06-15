@@ -1,10 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, ArrowLeft, Search, Compass } from 'lucide-react';
+import { Home, ArrowLeft, Search, Compass, LogIn, UserPlus } from 'lucide-react';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import { useAuth } from '../components/context/AuthContext';
 
 export const NotFoundPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+
   return (
     <div className="w-full max-w-4xl mx-auto text-center">
       {/* 404 Animation */}
@@ -91,25 +94,51 @@ export const NotFoundPage: React.FC = () => {
         transition={{ delay: 0.6 }}
         className="flex flex-col sm:flex-row items-center justify-center gap-4"
       >
-        <Link to="/home">
-          <AnimatedButton
-            variant="primary"
-            size="lg"
-            icon={<Home size={20} />}
-          >
-            Go Home
-          </AnimatedButton>
-        </Link>
-        
-        <Link to="/explore">
-          <AnimatedButton
-            variant="secondary"
-            size="lg"
-            icon={<Compass size={20} />}
-          >
-            Explore
-          </AnimatedButton>
-        </Link>
+        {isAuthenticated ? (
+          <>
+            <Link to="/home">
+              <AnimatedButton
+                variant="primary"
+                size="lg"
+                icon={<Home size={20} />}
+              >
+                Go Home
+              </AnimatedButton>
+            </Link>
+            
+            <Link to="/explore">
+              <AnimatedButton
+                variant="secondary"
+                size="lg"
+                icon={<Compass size={20} />}
+              >
+                Explore
+              </AnimatedButton>
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link to="/">
+              <AnimatedButton
+                variant="primary"
+                size="lg"
+                icon={<LogIn size={20} />}
+              >
+                Sign In
+              </AnimatedButton>
+            </Link>
+            
+            <Link to="/signup">
+              <AnimatedButton
+                variant="secondary"
+                size="lg"
+                icon={<UserPlus size={20} />}
+              >
+                Sign Up
+              </AnimatedButton>
+            </Link>
+          </>
+        )}
         
         <button
           onClick={() => window.history.back()}
@@ -120,21 +149,23 @@ export const NotFoundPage: React.FC = () => {
         </button>
       </motion.div>
 
-      {/* Search Suggestion */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.9 }}
-        className="mt-12 glass-card-subtle p-6 rounded-2xl max-w-md mx-auto"
-      >
-        <div className="flex items-center justify-center gap-2 text-text-2 mb-2">
-          <Search size={18} />
-          <span className="text-sm">Looking for something specific?</span>
-        </div>
-        <p className="text-xs text-text-2">
-          Try using the search bar in the header to find what you need
-        </p>
-      </motion.div>
+      {/* Search Suggestion - only for authenticated users */}
+      {isAuthenticated && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9 }}
+          className="mt-12 glass-card-subtle p-6 rounded-2xl max-w-md mx-auto"
+        >
+          <div className="flex items-center justify-center gap-2 text-text-2 mb-2">
+            <Search size={18} />
+            <span className="text-sm">Looking for something specific?</span>
+          </div>
+          <p className="text-xs text-text-2">
+            Try using the search bar in the header to find what you need
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 };

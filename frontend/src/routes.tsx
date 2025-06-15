@@ -3,6 +3,7 @@ import MainLayout from "./layouts/MainLayout";
 import ErrorLayout from "./layouts/ErrorLayout";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import HomePage from "./pages/HomePage";
 import Protected from "./components/protected/Protected";
 import PublicOnly from "./components/protected/PublicOnly";
@@ -30,6 +31,14 @@ export const routes: RouteObject[] = [
     element: (
       <PublicOnly>
         <SignupPage />
+      </PublicOnly>
+    ),
+  },
+  {
+    path: "/forgot-password",
+    element: (
+      <PublicOnly>
+        <ForgotPasswordPage />
       </PublicOnly>
     ),
   },

@@ -33,11 +33,12 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
         relative rounded-full 
         bg-[rgba(var(--glass-rgb),var(--glass-alpha))] 
         backdrop-blur-xl
-        border border-[var(--glass-border-subtle)]
-        hover:border-[var(--glass-border-prominent)]
+        border border-[var(--border-1)]
+        hover:border-[var(--primary-violet)]
         transition-all duration-300
         flex items-center justify-center
         group
+        cursor-pointer
         ${className}
       `}
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}

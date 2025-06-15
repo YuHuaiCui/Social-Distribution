@@ -5,7 +5,7 @@ import { api } from "../../services/api";
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: () => void;
+  login: (rememberMe?: boolean) => void;
   logout: () => void;
   loading: boolean;
   user: Author | null;
@@ -36,6 +36,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     const checkAuthStatus = async () => {
       try {
         setLoading(true);
+        
+        // Check if we should skip auth check (no rememberMe and no session)
+        const hasRememberMe = localStorage.getItem('rememberMe') === 'true';
+        const hasSession = document.cookie.includes('sessionid');
+        
+        if (!hasRememberMe && !hasSession) {
+          // User didn't choose to be remembered and has no active session
+          setIsAuthenticated(false);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
         // Check auth status with backend
         const response = await api.getAuthStatus();
         
@@ -50,6 +63,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         // Clear any stored auth tokens
         localStorage.removeItem('authToken');
         sessionStorage.removeItem('authToken');
+        
+        // If auth check fails, also clear rememberMe
+        localStorage.removeItem('rememberMe');
       } finally {
         setLoading(false);
       }
@@ -58,8 +74,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     checkAuthStatus();
   }, [lastChecked]);
 
-  const login = () => {
+  const login = (rememberMe: boolean = false) => {
     setIsAuthenticated(true);
+    // Store auth persistence preference
+    if (rememberMe) {
+      localStorage.setItem('rememberMe', 'true');
+    } else {
+      localStorage.removeItem('rememberMe');
+    }
     // After successful login, fetch user info and update lastChecked to trigger the effect
     setLastChecked(Date.now());
   };
@@ -71,6 +93,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       
       setIsAuthenticated(false);
       setUser(null);
+      // Clear remember me preference
+      localStorage.removeItem('rememberMe');
+      // Clear any stored auth tokens
+      localStorage.removeItem('authToken');
+      sessionStorage.removeItem('authToken');
       // Update lastChecked to trigger the auth check effect
       setLastChecked(Date.now());
     } catch (error) {

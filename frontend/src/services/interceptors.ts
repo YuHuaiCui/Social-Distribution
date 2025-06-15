@@ -8,7 +8,7 @@ import { api } from './api';
 const originalFetch = window.fetch;
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/', '/signup', '/auth/callback'];
+const PUBLIC_ROUTES = ['/', '/signup', '/forgot-password', '/auth/callback'];
 
 // Override global fetch to intercept all requests
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

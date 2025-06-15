@@ -18,6 +18,7 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const { showSuccess, showError } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -60,7 +61,7 @@ export const LoginPage: React.FC = () => {
     try {
       // Try to login with the API
       await api.login(formData);
-      login();
+      login(rememberMe);
       showSuccess('Welcome back! Redirecting...');
       navigate('/home');
     } catch (err: any) {
@@ -106,7 +107,7 @@ export const LoginPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card variant="prominent" className="p-8">
+            <Card variant="prominent" className="p-8 bg-[rgba(var(--glass-rgb),0.75)] backdrop-blur-2xl">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-text-1 mb-1.5">
@@ -152,12 +153,41 @@ export const LoginPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center cursor-pointer">
+                  <label className="flex items-center cursor-pointer group">
                     <input 
                       type="checkbox" 
-                      className="mr-2"
+                      className="sr-only"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
                     />
-                    <span className="text-text-2">Remember me</span>
+                    <div className="relative w-5 h-5 mr-2">
+                      <div className={`
+                        w-5 h-5 rounded 
+                        border-2 transition-all duration-200
+                        ${rememberMe 
+                          ? 'bg-[var(--primary-violet)] border-[var(--primary-violet)]' 
+                          : 'bg-transparent border-[var(--border-1)] group-hover:border-[var(--primary-violet)]'}
+                      `}>
+                        {rememberMe && (
+                          <svg 
+                            className="w-3 h-3 text-white absolute top-0.5 left-0.5" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={3} 
+                              d="M5 13l4 4L19 7" 
+                            />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-text-2 group-hover:text-text-1 transition-colors">
+                      Remember me
+                    </span>
                   </label>
                   <Link 
                     to="/forgot-password" 
