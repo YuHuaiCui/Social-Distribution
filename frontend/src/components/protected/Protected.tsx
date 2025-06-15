@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import AuthLoadingScreen from "../ui/AuthLoadingScreen";
+import MinLoadingWrapper from "../ui/MinLoadingWrapper";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -10,18 +10,16 @@ type ProtectedRouteProps = {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
-  // If we're still loading, show a full-screen loading spinner
-  if (loading) {
-    return <AuthLoadingScreen message="Verifying access..." />;
-  }
-
-  // If we're authenticated, render the children
-  if (isAuthenticated) {
-    return <>{children}</>;
-  }
-
-  // Otherwise, redirect to login
-  return <Navigate to="/" replace />;
+  // Use MinLoadingWrapper to ensure smooth transitions
+  return (
+    <MinLoadingWrapper isLoading={loading} message="Verifying access...">
+      {isAuthenticated ? (
+        <>{children}</>
+      ) : (
+        <Navigate to="/" replace />
+      )}
+    </MinLoadingWrapper>
+  );
 };
 
 export default ProtectedRoute;

@@ -11,6 +11,7 @@ import AnimatedButton from '../components/ui/AnimatedButton';
 import AnimatedLogo from '../components/ui/AnimatedLogo';
 import Input from '../components/ui/Input';
 import Card from '../components/ui/Card';
+import ThemeToggle from '../components/ui/ThemeToggle';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -76,6 +77,15 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center relative">
       <BackgroundEffects />
+      
+      {/* Theme Toggle - positioned at top right */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="absolute top-4 right-4 z-20"
+      >
+        <ThemeToggle size="md" />
+      </motion.div>
       
       <div className="container mx-auto px-4 relative z-10">
         <div className="w-full max-w-lg mx-auto">

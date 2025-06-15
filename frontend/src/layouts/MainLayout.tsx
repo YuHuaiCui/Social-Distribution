@@ -7,21 +7,17 @@ import LeftSidebar from '../components/LeftSidebar';
 import RightSidebar from '../components/RightSidebar';
 import SearchModal from '../components/SearchModal';
 import BackgroundEffects from '../components/ui/BackgroundEffects';
-import AuthLoadingScreen from '../components/ui/AuthLoadingScreen';
+import MinLoadingWrapper from '../components/ui/MinLoadingWrapper';
 import { useAuth } from '../components/context/AuthContext';
 
 export const MainLayout: React.FC = () => {
   const { user, loading } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Don't render anything until auth check is complete
-  if (loading) {
-    return <AuthLoadingScreen message="Loading application..." />;
-  }
-
   return (
-    <div className="min-h-screen bg-[var(--bg-color)] relative flex flex-col">
-      <BackgroundEffects />
+    <MinLoadingWrapper isLoading={loading} message="Loading application...">
+      <div className="min-h-screen bg-[var(--bg-color)] relative flex flex-col">
+        <BackgroundEffects />
       <div className="relative z-10 flex flex-col min-h-screen">
         <Header onSearchClick={() => setIsSearchOpen(true)} />
         <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
@@ -66,6 +62,7 @@ export const MainLayout: React.FC = () => {
         </div>
       </div>
     </div>
+    </MinLoadingWrapper>
   );
 };
 

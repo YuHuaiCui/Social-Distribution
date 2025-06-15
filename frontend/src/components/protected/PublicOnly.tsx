@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import AuthLoadingScreen from "../ui/AuthLoadingScreen";
+import MinLoadingWrapper from "../ui/MinLoadingWrapper";
 
 type PublicOnlyProps = {
   children: React.ReactNode;
@@ -14,18 +14,16 @@ type PublicOnlyProps = {
 const PublicOnly: React.FC<PublicOnlyProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
-  // If we're still loading, show a full-screen loading spinner
-  if (loading) {
-    return <AuthLoadingScreen />;
-  }
-
-  // If authenticated, redirect to home
-  if (isAuthenticated) {
-    return <Navigate to="/home" replace />;
-  }
-
-  // Otherwise, render the children (login/signup page)
-  return <>{children}</>;
+  // Use MinLoadingWrapper to ensure smooth transitions
+  return (
+    <MinLoadingWrapper isLoading={loading} message="Loading...">
+      {isAuthenticated ? (
+        <Navigate to="/home" replace />
+      ) : (
+        <>{children}</>
+      )}
+    </MinLoadingWrapper>
+  );
 };
 
 export default PublicOnly;
