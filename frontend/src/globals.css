@@ -82,7 +82,7 @@
     --bg-overlay: rgba(248, 250, 252, 0.5);
     --glass-rgb: 255 255 255;      /* white glass */
     --glass-alpha: .45;
-    --glass-alpha-high: .6;       /* higher opacity for prominent elements */
+    --glass-alpha-high: .95;       /* higher opacity for dropdowns/menus */
     --glass-alpha-medium: .5;     /* medium opacity for content */
     --glass-alpha-low: .35;         /* lower opacity for sidebar elements */
     --glass-border: rgba(255, 255, 255, 0.4);
@@ -150,7 +150,7 @@
     --bg-overlay: rgba(10, 15, 30, 0.7); /* slightly less opaque overlay */
     --glass-rgb: 15 23 42;
     --glass-alpha: 0.45; /* reduced opacity for glassmorphism */
-    --glass-alpha-high: 0.6;      /* higher opacity for prominent elements */
+    --glass-alpha-high: 0.95;      /* higher opacity for dropdowns/menus */
     --glass-alpha-medium: 0.5;    /* medium opacity for content */
     --glass-alpha-low: 0.35;        /* lower opacity for sidebar elements */
     --glass-border: rgba(78, 108, 148, 0.3); /* more visible borders */
@@ -396,7 +396,7 @@
   }
 
   .glass-card-prominent {
-    background: rgb(var(--glass-rgb) / 0.5);
+    background: rgb(var(--glass-rgb) / var(--glass-alpha-high));
     border: 1px solid var(--glass-border-prominent);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
