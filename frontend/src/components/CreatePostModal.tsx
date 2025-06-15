@@ -22,6 +22,15 @@ interface CreatePostModalProps {
   editingPost?: Entry;
 }
 
+function getCookie(name: string): string | null {
+  const cookieValue = document.cookie
+    .split('; ')
+    .find(row => row.startsWith(name + '='))
+    ?.split('=')[1];
+  return cookieValue || null;
+}
+
+
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   isOpen,
   onClose,
@@ -41,12 +50,14 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [images, setImages] = useState<File[]>([]);
   const [expandedSection, setExpandedSection] = useState<'content' | 'tags' | 'privacy' | null>('content');
 
+
+  
   // Pre-fill form when editing
   React.useEffect(() => {
     if (editingPost) {
       setTitle(editingPost.title);
       setContent(editingPost.content);
-      setContentType(editingPost.content_type);
+      setContentType(editingPost.content_type || 'text/markdown' );
       setVisibility(editingPost.visibility);
       setCategories(editingPost.categories || []);
     } else {
@@ -61,27 +72,46 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   }, [editingPost]);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("🔁 handleSubmit triggered");
+
     e.preventDefault();
+
+    if (!contentType) {
+    setError("Missing content type");
+    return;
+    }
+
     
     if (!title.trim()) {
       setError('Please enter a title');
       return;
     }
+    console.log("✅ Passed title check");
     
     if (!content.trim() && contentType && !contentType.startsWith('image/')) {
       setError('Please enter some content');
       return;
     }
+    console.log("✅ Passed content check");
     
     if (contentType && contentType.startsWith('image/') && images.length === 0) {
       setError('Please upload at least one image');
       return;
     }
+
+    console.log("✅ Passed image check");
     
     setIsLoading(true);
     setError('');
-    
+
+    console.log("title:", title);
+    console.log("content:", content);
+    console.log("contentType:", contentType);
+    console.log("images:", images);
+
+      
     try {
+      console.log("📌 editingPost is", editingPost);
       if (editingPost) {
         // Mock post update - replace with API call
         const updatedPost: Entry = {
@@ -100,26 +130,35 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         onSuccess?.(updatedPost);
       } else {
         // Mock post creation - replace with API call
-        const newPost: Entry = {
-          id: Date.now().toString(),
-          url: `http://localhost:8000/api/entries/${Date.now()}/`,
-          author: user!,
-          title,
-          content,
-          content_type: contentType,
-          visibility,
-          categories,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          likes_count: 0,
-          comments_count: 0,
-        };
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        onSuccess?.(newPost);
+        const entryData = {
+        title,
+        content,
+        content_type: contentType,
+        visibility,
+        categories,
+      };
+
+      console.log("🔄 Sending entry data:", entryData);
+      console.log("👤 User ID used in endpoint:", user?.id);
+      const response = await fetch(`http://localhost:8000/api/authors/${user?.id}/entries/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken') || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(entryData),
+      });
+      console.log("📡 Got response:", response.status);
+      if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to create post');
       }
+      const newPost = await response.json();
+      console.log("✅ Post created:", newPost);
+      onSuccess?.(newPost);
       handleClose();
+      } 
     } catch (err: any) {
       setError(err.message || `Failed to ${editingPost ? 'update' : 'create'} post`);
     } finally {

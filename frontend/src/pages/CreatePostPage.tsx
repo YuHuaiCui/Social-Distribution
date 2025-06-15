@@ -12,6 +12,8 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import ImageUploader from '../components/ImageUploader';
 import CategoryTags from '../components/CategoryTags';
 import PrivacySelector from '../components/PrivacySelector';
+import { useAuth } from '../components/context/AuthContext';
+
 
 type ContentType = 'text/plain' | 'text/markdown' | 'image';
 type Visibility = 'public' | 'friends' | 'unlisted';
@@ -29,60 +31,77 @@ export const CreatePostPage: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!title.trim()) {
-      setError('Please enter a title');
-      return;
-    }
-    
-    if (!content.trim() && contentType !== 'image') {
-      setError('Please enter some content');
-      return;
-    }
-    
-    if (contentType === 'image' && images.length === 0) {
-      setError('Please upload at least one image');
-      return;
-    }
-    
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      // TODO: Create post via API
-      // const postData = {
-      //   title,
-      //   source: window.location.origin,
-      //   origin: window.location.origin,
-      //   content,
-      //   contentType,
-      //   visibility,
-      //   categories,
-      //   unlisted,
-      // };
-      
-      // Handle image uploads if needed
-      if (images.length > 0) {
-        // Upload images and get URLs
-        // This would be handled by your API
-      }
-      
-      // Create post via API
-      // await api.createPost(postData);
-      
-      // Mock success
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Navigate to the new post or home
-      navigate('/home');
-    } catch (err: any) {
-      setError(err.message || 'Failed to create post');
-    } finally {
-      setIsLoading(false);
-    }
+  const { user } = useAuth();
+
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  console.log("Submit triggered");
+
+  if (!title.trim()) {
+    setError('Please enter a title');
+    return;
+  }
+
+  if (!content.trim() && contentType !== 'image') {
+    setError('Please enter some content');
+    return;
+  }
+
+  if (contentType === 'image' && images.length === 0) {
+    setError('Please upload at least one image');
+    return;
+  }
+
+  setIsLoading(true);
+  setError('');
+
+  const entryData = {
+    title,
+    content,
+    content_type: contentType,
+    visibility,
+    categories,
   };
+
+  try {
+    console.log("Sending entry data:", entryData);
+
+    const response = await fetch(`http://localhost:8000/api/authors/${user?.id}/entries/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(entryData),
+    });
+
+    const result = await response.json();
+    console.log("Backend response:", result);
+
+    if (!response.ok) {
+      const err = result;
+      throw new Error(err.detail || 'Failed to create post');
+    }
+
+    // Handle image uploads if needed
+    if (images.length > 0) {
+      // Upload images and get URLs
+      // This would be handled by your API
+    }
+
+    // Mock success
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Navigate to the new post or home
+    navigate('/home');
+  } catch (err: any) {
+    console.error("Error creating post:", err);
+    setError('Something went wrong.');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const contentTypeOptions = [
     { value: 'text/markdown', label: 'Markdown', icon: FileText },
@@ -323,3 +342,4 @@ export const CreatePostPage: React.FC = () => {
 };
 
 export default CreatePostPage;
+  

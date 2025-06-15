@@ -16,6 +16,8 @@ import SearchResultsPage from "./pages/SearchResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import FriendsPage from "./pages/FriendsPage";
 import CreateEntryForm from "./components/CreateEntryForm";
+import CreatePostPage from "./pages/CreatePostPage";
+
 
 
 export const routes: RouteObject[] = [
@@ -107,10 +109,10 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-      path: "/create-entry",
+      path: "/create",
       element: (
         <Protected>
-          <CreateEntryForm />
+          <CreatePostPage />
         </Protected>
       ),
     },
