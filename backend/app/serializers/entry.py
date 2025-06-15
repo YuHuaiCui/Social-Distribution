@@ -1,7 +1,11 @@
 from rest_framework import serializers
 from app.models import Entry
+from app.models import Author
+from app.serializers.author import AuthorSerializer  # 🟢 Import the AuthorSerializer
 
 class EntrySerializer(serializers.ModelSerializer):
+    author = AuthorSerializer(read_only=True)  # 🟢 Replace default behavior
+
     class Meta:
         model = Entry
         fields = [
