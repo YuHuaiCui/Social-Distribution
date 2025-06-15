@@ -1,18 +1,26 @@
+/**
+ * @deprecated This file is deprecated. Use individual service imports from './services' instead.
+ * This file is kept for backwards compatibility only.
+ */
+
 import type { 
   Author, 
   Entry, 
   Comment, 
   Like, 
   Follow, 
-  Inbox,
+  InboxItem as Inbox,
   PaginatedResponse,
   LoginCredentials,
   SignupData,
   AuthResponse
-} from '../types/models';
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+/**
+ * @deprecated Use individual service classes instead
+ */
 class ApiService {
   private baseUrl: string;
 
