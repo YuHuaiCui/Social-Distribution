@@ -57,6 +57,7 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Try to login with the API
       await api.login(formData);
       login();
       showSuccess('Welcome back! Redirecting...');
@@ -172,7 +173,7 @@ export const LoginPage: React.FC = () => {
                   <div className="w-full border-t border-border-1"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 py-1 bg-white dark:bg-[rgb(var(--glass-rgb))] text-text-2 rounded-full border border-border-1">
+                  <span className="px-4 py-1 bg-[rgba(var(--glass-rgb),0.8)] backdrop-blur-sm text-text-2 rounded-full border border-border-1">
                     Or continue with
                   </span>
                 </div>

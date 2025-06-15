@@ -157,7 +157,7 @@ export const FollowList: React.FC<FollowListProps> = ({
                 backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
               }}
               transition={{
-                duration: 5,
+                duration: 25,
                 repeat: Infinity,
               }}
               style={{

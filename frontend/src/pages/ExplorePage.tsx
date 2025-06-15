@@ -7,6 +7,7 @@ import {
 import type { Entry, Author } from '../types/models';
 import PostCard from '../components/PostCard';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import AnimatedGradient from '../components/ui/AnimatedGradient';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Avatar from '../components/Avatar/Avatar';
@@ -40,6 +41,20 @@ export const ExplorePage: React.FC = () => {
   useEffect(() => {
     fetchExploreData();
   }, [activeTab, searchQuery]);
+
+  // Utility to get consistent color for categories
+  const getCategoryColor = (categoryName: string, index: number) => {
+    const colors = [
+      'var(--primary-blue)',
+      'var(--primary-purple)',
+      'var(--primary-teal)',
+      'var(--primary-pink)',
+      'var(--primary-coral)',
+      'var(--primary-violet)',
+      'var(--primary-yellow)'
+    ];
+    return colors[index % colors.length];
+  };
 
   const fetchExploreData = async () => {
     setIsLoading(true);
@@ -155,8 +170,14 @@ export const ExplorePage: React.FC = () => {
           { name: 'AI/ML', count: 76, color: 'var(--primary-pink)' },
           { name: 'Web Development', count: 65, color: 'var(--primary-coral)' },
           { name: 'Mobile Dev', count: 54, color: 'var(--primary-violet)' },
+          { name: 'Data Science', count: 45, color: 'var(--primary-yellow)' },
         ];
-        setCategories(mockCategories);
+        // Ensure all categories have colors
+        const categoriesWithColors = mockCategories.map((cat, index) => ({
+          ...cat,
+          color: cat.color || getCategoryColor(cat.name, index)
+        }));
+        setCategories(categoriesWithColors);
       }
       
       // Apply search filter
@@ -194,10 +215,10 @@ export const ExplorePage: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'trending', label: 'Trending', icon: TrendingUp, gradient: 'var(--gradient-primary)' },
-    { id: 'authors', label: 'Authors', icon: Users, gradient: 'var(--gradient-secondary)' },
-    { id: 'categories', label: 'Categories', icon: Hash, gradient: 'var(--gradient-tertiary)' },
-    { id: 'recent', label: 'Recent', icon: Sparkles, gradient: 'var(--gradient-quaternary)' },
+    { id: 'trending', label: 'Trending', icon: TrendingUp, gradientColors: ['var(--primary-purple)', 'var(--primary-pink)'] },
+    { id: 'authors', label: 'Authors', icon: Users, gradientColors: ['var(--primary-teal)', 'var(--primary-blue)'] },
+    { id: 'categories', label: 'Categories', icon: Hash, gradientColors: ['var(--primary-yellow)', 'var(--primary-coral)'] },
+    { id: 'recent', label: 'Recent', icon: Sparkles, gradientColors: ['var(--primary-violet)', 'var(--primary-purple)'] },
   ];
 
   return (
@@ -210,22 +231,14 @@ export const ExplorePage: React.FC = () => {
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <div className="flex items-center space-x-3 mb-4 md:mb-0">
-            <motion.div 
-              className="w-12 h-12 rounded-full gradient-main flex items-center justify-center"
-              animate={{
-                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-              }}
-              transition={{
-                duration: 5,
-                repeat: Infinity,
-              }}
-              style={{
-                background: 'var(--gradient-primary)',
-                backgroundSize: '200% 200%',
-              }}
+            <AnimatedGradient
+              gradientColors={['var(--primary-purple)', 'var(--primary-pink)', 'var(--primary-teal)', 'var(--primary-violet)', 'var(--primary-yellow)']}
+              className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
+              textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+              duration={15}
             >
-              <Compass className="w-6 h-6 text-white" />
-            </motion.div>
+              <Compass className="w-6 h-6" />
+            </AnimatedGradient>
             <div>
               <h1 className="text-2xl font-bold text-text-1">Explore</h1>
               <p className="text-sm text-text-2">Discover amazing content and people</p>
@@ -265,44 +278,34 @@ export const ExplorePage: React.FC = () => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             
-            return (
+            return isActive ? (
+              <motion.div
+                key={`${tab.id}-active`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <AnimatedGradient
+                  gradientColors={tab.gradientColors}
+                  className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium shadow-md cursor-pointer"
+                  textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center space-x-2"
+                  duration={20}
+                  onClick={() => setActiveTab(tab.id as ExploreTab)}
+                >
+                  <Icon size={18} />
+                  <span>{tab.label}</span>
+                </AnimatedGradient>
+              </motion.div>
+            ) : (
               <motion.button
-                key={tab.id}
+                key={`${tab.id}-inactive`}
                 onClick={() => setActiveTab(tab.id as ExploreTab)}
                 initial={{ opacity: 0, y: 20 }}
-                animate={
-                  isActive
-                    ? {
-                        opacity: 1,
-                        y: 0,
-                        backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-                      }
-                    : { opacity: 1, y: 0 }
-                }
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                  isActive ? 'text-white' : 'glass-card-subtle text-text-1 hover:text-text-1'
-                }`}
-                style={
-                  isActive
-                    ? {
-                        background: tab.gradient,
-                        backgroundSize: '200% 200%',
-                      }
-                    : {}
-                }
-                transition={
-                  isActive
-                    ? {
-                        delay: index * 0.05,
-                        backgroundPosition: {
-                          duration: 3,
-                          repeat: Infinity,
-                        },
-                      }
-                    : { delay: index * 0.05 }
-                }
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium glass-card-subtle text-text-1 hover:text-text-1 transition-all"
               >
                 <Icon size={18} />
                 <span>{tab.label}</span>
@@ -355,7 +358,7 @@ export const ExplorePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}
+              className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-4'}
             >
               {posts.map((post, index) => (
                 <motion.div
@@ -458,17 +461,21 @@ export const ExplorePage: React.FC = () => {
                   <Card
                     variant="main"
                     hoverable
-                    className="p-6 cursor-pointer text-center"
+                    className="p-6 cursor-pointer text-center h-full flex flex-col justify-center min-h-[160px] border-l-4 transition-all"
                     style={{
-                      borderLeft: `4px solid ${category.color}`,
+                      borderLeftColor: category.color,
                     }}
                   >
-                    <div
+                    <motion.div
                       className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
-                      style={{ backgroundColor: `${category.color}20` }}
+                      style={{
+                        backgroundColor: `${category.color}20`,
+                      }}
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      whileTap={{ scale: 0.95 }}
                     >
                       <Hash size={24} style={{ color: category.color }} />
-                    </div>
+                    </motion.div>
                     <h3 className="font-semibold text-text-1 mb-1">
                       {category.name}
                     </h3>

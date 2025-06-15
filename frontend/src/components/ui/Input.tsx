@@ -23,7 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
       )}
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-2">
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 z-10">
             {icon}
           </div>
         )}
@@ -31,9 +31,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
           ref={ref}
           className={`
             w-full px-4 py-3 ${icon ? 'pl-10' : ''}
-            bg-input-bg border border-border-1 rounded-lg
+            bg-[rgba(var(--glass-rgb),0.5)] backdrop-blur-sm
+            border border-[var(--border-1)] rounded-lg
             text-text-1 placeholder:text-text-2
-            focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent
+            focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-[var(--primary-violet)]
+            hover:bg-[rgba(var(--glass-rgb),0.6)]
             transition-all duration-200
             ${error ? 'border-red-500' : ''}
             ${className}

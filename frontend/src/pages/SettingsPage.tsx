@@ -12,6 +12,8 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Avatar from '../components/Avatar/Avatar';
 import Loader from '../components/ui/Loader';
+import Toggle from '../components/ui/Toggle';
+import Checkbox from '../components/ui/Checkbox';
 
 type SettingsTab = 'profile' | 'account' | 'privacy' | 'node' | 'appearance';
 
@@ -263,7 +265,7 @@ export const SettingsPage: React.FC = () => {
             backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
           }}
           transition={{
-            duration: 5,
+            duration: 20,
             repeat: Infinity,
           }}
           style={{
@@ -286,7 +288,7 @@ export const SettingsPage: React.FC = () => {
         transition={{ delay: 0.1 }}
         className="mb-6"
       >
-        <div className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-low))] backdrop-blur-md rounded-xl p-1 inline-flex w-full sm:w-auto">
+        <div className="bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-md rounded-xl p-2 inline-flex w-full sm:w-auto border border-[var(--border-1)] gap-1">
           {tabs.map((tab, index) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -301,24 +303,27 @@ export const SettingsPage: React.FC = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`
-                  flex items-center justify-center sm:justify-start space-x-2 px-4 py-2.5 rounded-lg flex-1 sm:flex-initial
+                  relative flex items-center justify-center sm:justify-start gap-2 px-5 py-3 rounded-lg flex-1 sm:flex-initial
                   transition-all duration-300 min-w-0
                   ${
                     isActive
-                      ? 'bg-[rgba(var(--glass-rgb),var(--glass-alpha-high))] text-[var(--text-1)] shadow-md'
-                      : 'text-[var(--text-2)] hover:text-[var(--text-1)] hover:bg-[rgba(var(--glass-rgb),0.1)]'
+                      ? 'text-white'
+                      : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
                   }
                 `}
               >
-                <Icon size={18} className="shrink-0" />
-                <span className="font-medium hidden sm:inline">{tab.label}</span>
                 {isActive && (
                   <motion.div
                     layoutId="activeTab"
-                    className="absolute inset-0 bg-gradient-to-r from-[var(--primary-yellow)]/10 via-[var(--primary-pink)]/10 to-[var(--primary-purple)]/10 rounded-lg -z-10"
+                    className="absolute inset-0 rounded-lg bg-gradient-to-r from-[var(--primary-purple)] via-[var(--primary-pink)] to-[var(--primary-violet)] shadow-lg animate-gradient-slow"
+                    style={{
+                      backgroundSize: '200% 200%',
+                    }}
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
+                <Icon size={18} className="shrink-0 relative z-10" />
+                <span className="font-medium hidden sm:inline relative z-10">{tab.label}</span>
               </motion.button>
             );
           })}
@@ -331,7 +336,7 @@ export const SettingsPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-          <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait">
             {/* Profile Settings */}
             {activeTab === 'profile' && (
               <motion.div
@@ -524,11 +529,11 @@ export const SettingsPage: React.FC = () => {
                   <h2 className="text-xl font-semibold text-text-1 mb-6">Privacy Settings</h2>
                   
                   {/* Default Post Visibility */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-text-2 mb-2">
+                  <div className="mb-8">
+                    <label className="block text-sm font-medium text-text-2 mb-3">
                       Default Post Visibility
                     </label>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {[
                         { value: 'public', label: 'Public', icon: Globe, desc: 'Anyone can see your posts' },
                         { value: 'friends', label: 'Friends Only', icon: Users, desc: 'Only your friends can see' },
@@ -539,26 +544,28 @@ export const SettingsPage: React.FC = () => {
                           <motion.label
                             key={option.value}
                             whileHover={{ x: 4 }}
-                            className={`flex items-center p-3 rounded-lg cursor-pointer transition-all ${
+                            className={`flex items-center p-4 rounded-lg cursor-pointer transition-all border ${
                               privacySettings.defaultVisibility === option.value
-                                ? 'bg-[var(--primary-violet)]/20 border-2 border-[var(--primary-violet)]'
-                                : 'glass-card-subtle hover:bg-glass-low'
+                                ? 'bg-gradient-to-r from-[var(--primary-purple)]/10 to-[var(--primary-violet)]/10 border-[var(--primary-violet)]'
+                                : 'bg-[rgba(var(--glass-rgb),0.3)] border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)]'
                             }`}
                           >
-                            <input
-                              type="radio"
-                              name="visibility"
-                              value={option.value}
-                              checked={privacySettings.defaultVisibility === option.value}
-                              onChange={(e) => setPrivacySettings({
-                                ...privacySettings,
-                                defaultVisibility: e.target.value as any
-                              })}
-                              className="sr-only"
-                            />
-                            <Icon size={20} className="mr-3 text-text-1" />
-                            <div className="flex-1">
-                              <p className="font-medium text-text-1">{option.label}</p>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="radio"
+                                name="visibility"
+                                value={option.value}
+                                checked={privacySettings.defaultVisibility === option.value}
+                                onChange={(e) => setPrivacySettings({
+                                  ...privacySettings,
+                                  defaultVisibility: e.target.value as any
+                                })}
+                                className="w-5 h-5 border-2 border-[var(--border-1)] text-[var(--primary-violet)] focus:ring-2 focus:ring-[var(--primary-violet)] focus:ring-offset-0"
+                              />
+                              <Icon size={20} className="text-text-1" />
+                            </div>
+                            <div className="flex-1 ml-3">
+                              <p className="font-medium text-text-1 mb-1">{option.label}</p>
                               <p className="text-xs text-text-2">{option.desc}</p>
                             </div>
                             {privacySettings.defaultVisibility === option.value && (
@@ -577,7 +584,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
 
                   {/* Privacy Toggles */}
-                  <div className="space-y-4">
+                  <div className="space-y-6 mb-8">
                     {[
                       {
                         key: 'requireApprovalToFollow',
@@ -600,41 +607,26 @@ export const SettingsPage: React.FC = () => {
                         desc: 'Other users can send you private messages',
                       },
                     ].map((setting) => (
-                      <motion.label
+                      <motion.div
                         key={setting.key}
                         whileHover={{ x: 4 }}
-                        className="flex items-center justify-between p-3 rounded-lg glass-card-subtle cursor-pointer hover:bg-glass-low transition-all"
+                        className="flex items-center justify-between p-4 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] border border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)] transition-all"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-text-1">{setting.label}</p>
+                        <div className="flex-1 pr-4">
+                          <p className="font-medium text-text-1 mb-1">{setting.label}</p>
                           <p className="text-xs text-text-2">{setting.desc}</p>
                         </div>
-                        <motion.div
-                          whileTap={{ scale: 0.9 }}
-                          className={`relative w-12 h-6 rounded-full transition-colors ${
-                            privacySettings[setting.key as keyof PrivacySettings]
-                              ? 'bg-[var(--primary-violet)]'
-                              : 'bg-glass-low'
-                          }`}
-                        >
-                          <motion.div
-                            animate={{
-                              x: privacySettings[setting.key as keyof PrivacySettings] ? 24 : 0
-                            }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                            className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md"
+                        <div className="flex items-center">
+                          <Toggle
+                            checked={privacySettings[setting.key as keyof PrivacySettings] as boolean}
+                            onChange={(checked) => setPrivacySettings({
+                              ...privacySettings,
+                              [setting.key]: checked
+                            })}
+                            className="ml-4"
                           />
-                        </motion.div>
-                        <input
-                          type="checkbox"
-                          checked={privacySettings[setting.key as keyof PrivacySettings] as boolean}
-                          onChange={(e) => setPrivacySettings({
-                            ...privacySettings,
-                            [setting.key]: e.target.checked
-                          })}
-                          className="sr-only"
-                        />
-                      </motion.label>
+                        </div>
+                      </motion.div>
                     ))}
                   </div>
 
@@ -711,79 +703,45 @@ export const SettingsPage: React.FC = () => {
 
                   {/* Federation Settings */}
                   <div className="space-y-4">
-                    <motion.label
+                    <motion.div
                       whileHover={{ x: 4 }}
-                      className="flex items-center justify-between p-3 rounded-lg glass-card-subtle cursor-pointer hover:bg-glass-low transition-all"
+                      className="flex items-center justify-between p-4 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] border border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)] transition-all"
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 pr-4">
                         <p className="font-medium text-text-1">Enable Federation</p>
                         <p className="text-xs text-text-2">
                           Allow your node to connect with other nodes
                         </p>
                       </div>
-                      <motion.div
-                        whileTap={{ scale: 0.9 }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${
-                          nodeSettings.federationEnabled
-                            ? 'bg-[var(--primary-violet)]'
-                            : 'bg-glass-low'
-                        }`}
-                      >
-                        <motion.div
-                          animate={{
-                            x: nodeSettings.federationEnabled ? 24 : 0
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md"
-                        />
-                      </motion.div>
-                      <input
-                        type="checkbox"
+                      <Toggle
                         checked={nodeSettings.federationEnabled}
-                        onChange={(e) => setNodeSettings({
+                        onChange={(checked) => setNodeSettings({
                           ...nodeSettings,
-                          federationEnabled: e.target.checked
+                          federationEnabled: checked
                         })}
-                        className="sr-only"
+                        className="ml-4"
                       />
-                    </motion.label>
+                    </motion.div>
 
-                    <motion.label
+                    <motion.div
                       whileHover={{ x: 4 }}
-                      className="flex items-center justify-between p-3 rounded-lg glass-card-subtle cursor-pointer hover:bg-glass-low transition-all"
+                      className="flex items-center justify-between p-4 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] border border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)] transition-all"
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 pr-4">
                         <p className="font-medium text-text-1">Auto-accept Remote Follows</p>
                         <p className="text-xs text-text-2">
                           Automatically accept follow requests from other nodes
                         </p>
                       </div>
-                      <motion.div
-                        whileTap={{ scale: 0.9 }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${
-                          nodeSettings.autoAcceptRemoteFollows
-                            ? 'bg-[var(--primary-violet)]'
-                            : 'bg-glass-low'
-                        }`}
-                      >
-                        <motion.div
-                          animate={{
-                            x: nodeSettings.autoAcceptRemoteFollows ? 24 : 0
-                          }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md"
-                        />
-                      </motion.div>
-                      <input
-                        type="checkbox"
+                      <Toggle
                         checked={nodeSettings.autoAcceptRemoteFollows}
-                        onChange={(e) => setNodeSettings({
+                        onChange={(checked) => setNodeSettings({
                           ...nodeSettings,
-                          autoAcceptRemoteFollows: e.target.checked
+                          autoAcceptRemoteFollows: checked
                         })}
-                        className="sr-only"
+                        className="ml-4"
                       />
-                    </motion.label>
+                    </motion.div>
                   </div>
 
                   <AnimatedButton
@@ -924,11 +882,11 @@ export const SettingsPage: React.FC = () => {
                   </div>
 
                   {/* Reduce Motion */}
-                  <motion.label
+                  <motion.div
                     whileHover={{ x: 4 }}
-                    className="flex items-center justify-between p-3 rounded-lg glass-card-subtle cursor-pointer hover:bg-glass-low transition-all mb-6"
+                    className="flex items-center justify-between p-4 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] border border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)] transition-all mb-6"
                   >
-                    <div className="flex-1">
+                    <div className="flex-1 pr-4">
                       <div className="flex items-center">
                         <Monitor size={16} className="mr-2 text-text-1" />
                         <p className="font-medium text-text-1">Reduce Motion</p>
@@ -937,32 +895,15 @@ export const SettingsPage: React.FC = () => {
                         Minimize animations and transitions
                       </p>
                     </div>
-                    <motion.div
-                      whileTap={{ scale: 0.9 }}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        appearanceSettings.reduceMotion
-                          ? 'bg-[var(--primary-violet)]'
-                          : 'bg-glass-low'
-                      }`}
-                    >
-                      <motion.div
-                        animate={{
-                          x: appearanceSettings.reduceMotion ? 24 : 0
-                        }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                        className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md"
-                      />
-                    </motion.div>
-                    <input
-                      type="checkbox"
+                    <Toggle
                       checked={appearanceSettings.reduceMotion}
-                      onChange={(e) => setAppearanceSettings({
+                      onChange={(checked) => setAppearanceSettings({
                         ...appearanceSettings,
-                        reduceMotion: e.target.checked
+                        reduceMotion: checked
                       })}
-                      className="sr-only"
+                      className="ml-4"
                     />
-                  </motion.label>
+                  </motion.div>
 
                   <AnimatedButton
                     onClick={handleSaveAppearance}
@@ -1000,7 +941,6 @@ export const SettingsPage: React.FC = () => {
             )}
           </AnimatePresence>
         </motion.div>
-      </div>
     </div>
   );
 };

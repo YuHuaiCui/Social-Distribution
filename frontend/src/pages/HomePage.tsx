@@ -6,6 +6,7 @@ import { useCreatePost } from '../components/context/CreatePostContext';
 import type { Entry } from '../types/models';
 import PostCard from '../components/PostCard';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import AnimatedGradient from '../components/ui/AnimatedGradient';
 import Card from '../components/ui/Card';
 
 export const HomePage: React.FC = () => {
@@ -128,38 +129,66 @@ export const HomePage: React.FC = () => {
         
         {/* Feed Tabs */}
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setFeed('all')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              feed === 'all' 
-                ? 'bg-brand-500 text-white' 
-                : 'text-text-2 hover:text-text-1 hover:bg-glass-low'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFeed('friends')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              feed === 'friends' 
-                ? 'bg-brand-500 text-white' 
-                : 'text-text-2 hover:text-text-1 hover:bg-glass-low'
-            }`}
-          >
-            <Users size={16} className="inline mr-1" />
-            Friends
-          </button>
-          <button
-            onClick={() => setFeed('liked')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              feed === 'liked' 
-                ? 'bg-brand-500 text-white' 
-                : 'text-text-2 hover:text-text-1 hover:bg-glass-low'
-            }`}
-          >
-            <Star size={16} className="inline mr-1" />
-            Liked
-          </button>
+          {feed === 'all' ? (
+            <AnimatedGradient
+              gradientColors={['var(--primary-purple)', 'var(--primary-pink)', 'var(--primary-teal)', 'var(--primary-violet)']}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium shadow-md cursor-pointer"
+              textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+              duration={20}
+              onClick={() => setFeed('all')}
+            >
+              All
+            </AnimatedGradient>
+          ) : (
+            <button
+              onClick={() => setFeed('all')}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-text-2 hover:text-text-1 hover:bg-[rgba(var(--glass-rgb),0.3)]"
+            >
+              All
+            </button>
+          )}
+          
+          {feed === 'friends' ? (
+            <AnimatedGradient
+              gradientColors={['var(--primary-teal)', 'var(--primary-blue)', 'var(--primary-purple)', 'var(--primary-teal)']}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium shadow-md cursor-pointer flex items-center"
+              textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center"
+              duration={25}
+              onClick={() => setFeed('friends')}
+            >
+              <Users size={16} className="mr-1" />
+              Friends
+            </AnimatedGradient>
+          ) : (
+            <button
+              onClick={() => setFeed('friends')}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-text-2 hover:text-text-1 hover:bg-[rgba(var(--glass-rgb),0.3)] flex items-center"
+            >
+              <Users size={16} className="mr-1" />
+              Friends
+            </button>
+          )}
+          
+          {feed === 'liked' ? (
+            <AnimatedGradient
+              gradientColors={['var(--primary-coral)', 'var(--primary-yellow)', 'var(--primary-pink)', 'var(--primary-coral)']}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium shadow-md cursor-pointer flex items-center"
+              textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] flex items-center"
+              duration={30}
+              onClick={() => setFeed('liked')}
+            >
+              <Star size={16} className="mr-1" />
+              Liked
+            </AnimatedGradient>
+          ) : (
+            <button
+              onClick={() => setFeed('liked')}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-text-2 hover:text-text-1 hover:bg-[rgba(var(--glass-rgb),0.3)] flex items-center"
+            >
+              <Star size={16} className="mr-1" />
+              Liked
+            </button>
+          )}
         </div>
       </div>
 
@@ -176,6 +205,7 @@ export const HomePage: React.FC = () => {
             size="lg"
             icon={<Plus size={20} />}
             className="w-full"
+            animationDuration={15}
           >
             Create New Post
           </AnimatedButton>

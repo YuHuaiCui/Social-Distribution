@@ -7,6 +7,7 @@ import { useToast } from './context/ToastContext';
 import LoadingImage from './ui/LoadingImage';
 import Card from './ui/Card';
 import Button from './ui/Button';
+import AnimatedGradient from './ui/AnimatedGradient';
 
 interface PostCardProps {
   post: Entry;
@@ -76,7 +77,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       .then(() => {
         showSuccess('Post link copied to clipboard!');
       })
-      .catch(err => {
+      .catch(() => {
         showError('Failed to copy link');
       });
   };
@@ -192,15 +193,31 @@ export const PostCard: React.FC<PostCardProps> = ({
         {/* Categories */}
         {post.categories && post.categories.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
-            {post.categories.map((category, index) => (
-              <Link
-                key={index}
-                to={`/search?category=${encodeURIComponent(category)}`}
-                className="px-3 py-1 rounded-full bg-cat-lilac text-text-1 text-sm hover:opacity-80 transition-opacity"
-              >
-                #{category}
-              </Link>
-            ))}
+            {post.categories.map((category, index) => {
+              const gradientSets = [
+                ['var(--primary-yellow)', 'var(--primary-pink)'],
+                ['var(--primary-pink)', 'var(--primary-purple)'],
+                ['var(--primary-purple)', 'var(--primary-teal)'],
+                ['var(--primary-teal)', 'var(--primary-coral)'],
+                ['var(--primary-coral)', 'var(--primary-violet)'],
+              ];
+              
+              return (
+                <Link
+                  key={index}
+                  to={`/search?category=${encodeURIComponent(category)}`}
+                >
+                  <AnimatedGradient
+                    gradientColors={gradientSets[index % gradientSets.length]}
+                    className="px-3 py-1 rounded-full text-sm font-medium shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                    duration={20 + index * 2}
+                  >
+                    #{category}
+                  </AnimatedGradient>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

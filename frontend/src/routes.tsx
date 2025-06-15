@@ -1,5 +1,6 @@
 import { type RouteObject } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
+import ErrorLayout from "./layouts/ErrorLayout";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import HomePage from "./pages/HomePage";
@@ -11,6 +12,7 @@ import ExplorePage from "./pages/ExplorePage";
 import PostDetailPage from "./pages/PostDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 export const routes: RouteObject[] = [
   {
@@ -91,6 +93,28 @@ export const routes: RouteObject[] = [
             <SettingsPage />
           </Protected>
         ),
+      },
+    ],
+  },
+  // Error pages with separate layout
+  {
+    element: <ErrorLayout />,
+    children: [
+      {
+        path: "/messages",
+        element: <NotFoundPage />,
+      },
+      {
+        path: "/saved",
+        element: <NotFoundPage />,
+      },
+      {
+        path: "/notifications",
+        element: <NotFoundPage />,
+      },
+      {
+        path: "*",
+        element: <NotFoundPage />,
       },
     ],
   },

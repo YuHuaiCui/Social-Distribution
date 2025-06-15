@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, User, FileText, Hash, MessageSquare, Globe, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, FileText, Hash, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './context/ToastContext';
-import Input from './ui/Input';
-import Card from './ui/Card';
+import AnimatedGradient from './ui/AnimatedGradient';
 import type { Entry, Author, Comment } from '../types/models';
 
 interface SearchModalProps {
@@ -22,7 +21,7 @@ interface SearchResults {
 
 const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { showError } = useToast();
+  const showError = () => console.error('Search error');
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -69,8 +68,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
             url: '/posts/1',
             title: 'Introduction to React Hooks',
             content: 'Learn about React hooks...',
-            content_type: 'text/markdown',
-            visibility: 'public',
+            content_type: 'text/markdown' as const,
+            visibility: 'public' as const,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             author: {
@@ -128,7 +127,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
       scale: 1, 
       y: 0,
       transition: { 
-        type: "spring", 
+        type: "spring" as const, 
         damping: 25,
         stiffness: 300,
         duration: 0.4 
@@ -177,65 +176,69 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
               exit="exit"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="relative">
-                {/* Glass morphism search container */}
-                <div className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-high))] backdrop-blur-2xl rounded-2xl border border-[var(--glass-border-prominent)] shadow-2xl overflow-hidden">
-                  {/* Close button */}
-                  <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 p-2 rounded-full bg-[rgba(var(--glass-rgb),0.1)] hover:bg-[rgba(var(--glass-rgb),0.2)] transition-all z-10"
-                  >
-                    <X size={18} className="text-[var(--text-2)]" />
-                  </button>
-                  
-                  {/* Search Input Container */}
-                  <div className="p-8 pb-6">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary-yellow)]/20 via-[var(--primary-pink)]/20 to-[var(--primary-purple)]/20 rounded-xl blur-xl" />
-                      <div className="relative">
-                        <Search size={24} className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-2)] pointer-events-none" />
-                        <input
-                          ref={inputRef}
-                          type="text"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                          placeholder="Search posts, authors, or tags..."
-                          className="w-full pl-14 pr-5 py-5 text-lg bg-[rgba(var(--glass-rgb),0.5)] backdrop-blur-md border border-[var(--glass-border)] rounded-xl text-[var(--text-1)] placeholder:text-[var(--text-2)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-purple)]/50 focus:border-[var(--primary-purple)]/50 transition-all"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                              onClose();
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
+              {/* Popular searches - above search bar */}
+              {!query && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center justify-center gap-3 mb-6"
+                >
+                  <span className="text-sm font-medium text-white/90 drop-shadow-lg">Popular:</span>
+                  {['React', 'TypeScript', 'Distributed Systems', 'CMPUT404'].map((suggestion, index) => {
+                    const gradientSets = [
+                      ['var(--primary-yellow)', 'var(--primary-pink)', 'var(--primary-purple)'],
+                      ['var(--primary-teal)', 'var(--primary-blue)', 'var(--primary-purple)'],
+                      ['var(--primary-coral)', 'var(--primary-violet)', 'var(--primary-pink)'],
+                      ['var(--primary-purple)', 'var(--primary-teal)', 'var(--primary-yellow)']
+                    ];
                     
-                    {/* Popular searches - shown when no query */}
-                    {!query && (
+                    return (
                       <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-4 flex flex-wrap gap-2"
+                        key={suggestion}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
                       >
-                        <span className="text-xs text-[var(--text-2)] mr-2">Popular:</span>
-                        {['React', 'TypeScript', 'Distributed Systems', 'CMPUT404'].map((suggestion, index) => (
-                          <motion.button
-                            key={suggestion}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: index * 0.05 }}
-                            onClick={() => setQuery(suggestion)}
-                            className="px-3 py-1 text-xs rounded-full bg-gradient-to-r from-[var(--primary-yellow)]/10 via-[var(--primary-pink)]/10 to-[var(--primary-purple)]/10 hover:from-[var(--primary-yellow)]/20 hover:via-[var(--primary-pink)]/20 hover:to-[var(--primary-purple)]/20 text-[var(--text-1)] border border-[var(--glass-border)] transition-all"
-                          >
-                            {suggestion}
-                          </motion.button>
-                        ))}
+                        <AnimatedGradient
+                          gradientColors={gradientSets[index]}
+                          className="px-4 py-2 text-sm font-medium rounded-full shadow-lg hover:shadow-xl cursor-pointer"
+                          textClassName="text-white font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+                          duration={15}
+                          onClick={() => setQuery(suggestion)}
+                        >
+                          {suggestion}
+                        </AnimatedGradient>
                       </motion.div>
-                    )}
-                  </div>
+                    );
+                  })}
+                </motion.div>
+              )}
+              
+              {/* Glassmorphic search bar */}
+              <div className="relative mb-8">
+                <Search size={24} className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--text-2)] pointer-events-none z-10" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search posts, authors, or tags..."
+                  className="w-full pl-16 pr-6 py-6 text-lg bg-[rgba(var(--glass-rgb),0.6)] backdrop-blur-2xl border-2 border-[var(--glass-border-prominent)] rounded-full text-[var(--text-1)] placeholder:text-[var(--text-2)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-purple)]/30 focus:border-[var(--primary-purple)]/50 transition-all shadow-xl"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      onClose();
+                    }
+                  }}
+                />
+              </div>
 
-                  {/* Results or States */}
-                  <div className="max-h-[40vh] overflow-y-auto border-t border-[var(--glass-border)]">
+              {/* Results or States */}
+              {(isLoading || hasResults || (query && !hasResults)) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-[rgba(var(--glass-rgb),var(--glass-alpha-high))] backdrop-blur-2xl rounded-2xl border border-[var(--glass-border-prominent)] shadow-xl max-h-[40vh] overflow-y-auto"
+                >
                   {isLoading && (
                     <div className="p-8 text-center">
                       <div className="inline-flex items-center justify-center">
@@ -315,8 +318,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                       <p className="text-sm text-[var(--text-2)] mt-1">Try searching with different keywords</p>
                     </div>
                   )}
-                </div>
-              </div>
+                </motion.div>
+              )}
             </motion.div>
           </motion.div>
         </>

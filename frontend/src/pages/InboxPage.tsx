@@ -258,7 +258,7 @@ export const InboxPage: React.FC = () => {
               filter === btn.value
                 ? {
                     backgroundPosition: {
-                      duration: 8,
+                      duration: 20,
                       repeat: Infinity,
                     },
                   }

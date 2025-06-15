@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search } from 'lucide-react';
-import { SearchModal } from './SearchModal';
+import SearchModal from './SearchModal';
 
 interface SearchBarProps {
   className?: string;

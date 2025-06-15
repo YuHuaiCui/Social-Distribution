@@ -10,9 +10,9 @@ interface CardProps extends HTMLMotionProps<"div"> {
 }
 
 const variantStyles = {
-  main: 'glass-card-main',
-  prominent: 'glass-card-prominent',
-  subtle: 'glass-card-subtle',
+  main: 'glass-card-main border border-[var(--border-1)]',
+  prominent: 'glass-card-prominent border border-[var(--glass-border-prominent)] shadow-lg',
+  subtle: 'glass-card-subtle border border-[var(--glass-border)]',
 };
 
 export const Card: React.FC<CardProps> = ({

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Author } from '../types/models';
+import AnimatedGradient from './ui/AnimatedGradient';
 
 interface RightSidebarProps {
   friends?: Author[];
@@ -65,19 +66,33 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
             Trending Tags
           </h3>
           <div className="flex flex-wrap gap-2">
-            {trendingTags.map((tag, index) => (
-              <motion.button 
-                key={tag}
-                className="text-xs bg-[color:var(--glass-rgb)]/10 px-3 py-1.5 rounded-full text-[color:var(--text-1)] hover:bg-[color:var(--glass-rgb)]/20"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                #{tag}
-              </motion.button>
-            ))}
+            {trendingTags.map((tag, index) => {
+              const gradientSets = [
+                ['var(--primary-yellow)', 'var(--primary-pink)'],
+                ['var(--primary-pink)', 'var(--primary-purple)'],
+                ['var(--primary-purple)', 'var(--primary-teal)'],
+                ['var(--primary-teal)', 'var(--primary-coral)'],
+                ['var(--primary-coral)', 'var(--primary-violet)'],
+              ];
+              
+              return (
+                <motion.div
+                  key={tag}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <AnimatedGradient
+                    gradientColors={gradientSets[index % gradientSets.length]}
+                    className="text-xs px-3 py-1.5 rounded-full font-medium shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                    duration={20}
+                  >
+                    #{tag}
+                  </AnimatedGradient>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
 
