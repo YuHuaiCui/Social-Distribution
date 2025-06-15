@@ -3,9 +3,10 @@ import CreatePostModal from '../CreatePostModal';
 import type { Entry } from '../../types/models';
 
 interface CreatePostContextType {
-  openCreatePost: () => void;
+  openCreatePost: (editPost?: Entry) => void;
   closeCreatePost: () => void;
   isOpen: boolean;
+  editingPost?: Entry;
 }
 
 const CreatePostContext = createContext<CreatePostContextType | undefined>(undefined);
@@ -28,22 +29,31 @@ export const CreatePostProvider: React.FC<CreatePostProviderProps> = ({
   onPostCreated 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<Entry | undefined>();
 
-  const openCreatePost = () => setIsOpen(true);
-  const closeCreatePost = () => setIsOpen(false);
+  const openCreatePost = (editPost?: Entry) => {
+    setEditingPost(editPost);
+    setIsOpen(true);
+  };
+
+  const closeCreatePost = () => {
+    setIsOpen(false);
+    setEditingPost(undefined);
+  };
 
   const handleSuccess = (post: Entry) => {
     onPostCreated?.(post);
-    // You can add a toast notification here
+    closeCreatePost();
   };
 
   return (
-    <CreatePostContext.Provider value={{ openCreatePost, closeCreatePost, isOpen }}>
+    <CreatePostContext.Provider value={{ openCreatePost, closeCreatePost, isOpen, editingPost }}>
       {children}
       <CreatePostModal 
         isOpen={isOpen} 
         onClose={closeCreatePost}
         onSuccess={handleSuccess}
+        editingPost={editingPost}
       />
     </CreatePostContext.Provider>
   );

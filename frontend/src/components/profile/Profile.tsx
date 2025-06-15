@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import Loader from "../ui/Loader";
 import Avatar from "../Avatar/Avatar";
 import { useAuth } from "../context/AuthContext";
+import GitHubActivity from "../GitHubActivity";
 
 type ProfileData = {
   displayName: string;
@@ -581,6 +582,13 @@ function Profile() {
                     {profile?.bio || "This user hasn't written a bio yet."}
                   </p>
                 </div>
+
+                {/* GitHub Activity Section */}
+                {profile?.githubUsername && (
+                  <div className="mt-6">
+                    <GitHubActivity username={profile.githubUsername} />
+                  </div>
+                )}
               </div>
             </div>
           )}

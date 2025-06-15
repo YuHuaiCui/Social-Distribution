@@ -19,12 +19,14 @@ interface CreatePostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (post: Entry) => void;
+  editingPost?: Entry;
 }
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  editingPost,
 }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +40,25 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [expandedSection, setExpandedSection] = useState<'content' | 'tags' | 'privacy' | null>('content');
+
+  // Pre-fill form when editing
+  React.useEffect(() => {
+    if (editingPost) {
+      setTitle(editingPost.title);
+      setContent(editingPost.content);
+      setContentType(editingPost.content_type);
+      setVisibility(editingPost.visibility);
+      setCategories(editingPost.categories || []);
+    } else {
+      // Reset form when creating new post
+      setTitle('');
+      setContent('');
+      setContentType('text/markdown');
+      setVisibility('public');
+      setCategories([]);
+      setImages([]);
+    }
+  }, [editingPost]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,28 +82,46 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     setError('');
     
     try {
-      // Mock post creation - replace with API call
-      const newPost: Entry = {
-        id: Date.now().toString(),
-        url: `http://localhost:8000/api/entries/${Date.now()}/`,
-        author: user!,
-        title,
-        content,
-        content_type: contentType,
-        visibility,
-        categories,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        likes_count: 0,
-        comments_count: 0,
-      };
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      onSuccess?.(newPost);
+      if (editingPost) {
+        // Mock post update - replace with API call
+        const updatedPost: Entry = {
+          ...editingPost,
+          title,
+          content,
+          content_type: contentType,
+          visibility,
+          categories,
+          updated_at: new Date().toISOString(),
+        };
+        
+        // In real implementation: await api.updateEntry(editingPost.id, updatedPost);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        onSuccess?.(updatedPost);
+      } else {
+        // Mock post creation - replace with API call
+        const newPost: Entry = {
+          id: Date.now().toString(),
+          url: `http://localhost:8000/api/entries/${Date.now()}/`,
+          author: user!,
+          title,
+          content,
+          content_type: contentType,
+          visibility,
+          categories,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          likes_count: 0,
+          comments_count: 0,
+        };
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        onSuccess?.(newPost);
+      }
       handleClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to create post');
+      setError(err.message || `Failed to ${editingPost ? 'update' : 'create'} post`);
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +170,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-1">
-              <h2 className="text-xl font-semibold text-text-1">Create New Post</h2>
+              <h2 className="text-xl font-semibold text-text-1">
+                {editingPost ? 'Edit Post' : 'Create New Post'}
+              </h2>
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
@@ -364,7 +405,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 loading={isLoading}
                 icon={!isLoading && <Save size={16} />}
               >
-                Create Post
+                {editingPost ? 'Update Post' : 'Create Post'}
               </AnimatedButton>
             </div>
           </motion.div>

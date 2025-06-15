@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Bookmark } from 'lucide-react';
+import { ThumbsUp, MessageCircle, Share2, MoreHorizontal, Bookmark, Edit, Trash2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Entry, Author } from '../types/models';
 import { api } from '../services/api';
+import { useAuth } from './context/AuthContext';
+import { useCreatePost } from './context/CreatePostContext';
 import { useToast } from './context/ToastContext';
 import LoadingImage from './ui/LoadingImage';
 import Card from './ui/Card';
@@ -24,10 +27,14 @@ export const PostCard: React.FC<PostCardProps> = ({
   isLiked = false, 
   isSaved = false 
 }) => {
+  const { user } = useAuth();
+  const { openCreatePost } = useCreatePost();
   const { showSuccess, showError, showInfo } = useToast();
   const [liked, setLiked] = useState(isLiked);
   const [saved, setSaved] = useState(isSaved);
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
+  const [showActions, setShowActions] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
   
   // Get author info (handle both object and URL reference)
   const author = typeof post.author === 'string' 
@@ -81,6 +88,42 @@ export const PostCard: React.FC<PostCardProps> = ({
         showError('Failed to copy link');
       });
   };
+
+  const handleEdit = () => {
+    setShowActions(false);
+    openCreatePost(post);
+  };
+
+  const handleDelete = async () => {
+    setShowActions(false);
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      try {
+        // Mock API call - replace with actual API
+        await new Promise(resolve => setTimeout(resolve, 500));
+        showSuccess('Post deleted successfully');
+        // In real implementation, remove post from UI or refresh
+      } catch (error) {
+        showError('Failed to delete post');
+      }
+    }
+  };
+
+  // Check if current user is the author
+  const isOwnPost = user && author.id === user.id;
+
+  // Handle click outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
+        setShowActions(false);
+      }
+    };
+
+    if (showActions) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showActions]);
 
   const renderContent = () => {
     if (post.content_type === 'text/markdown') {
@@ -156,14 +199,49 @@ export const PostCard: React.FC<PostCardProps> = ({
             </div>
           </Link>
           
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto p-1"
-            aria-label="Post options"
-          >
-            <MoreHorizontal size={18} />
-          </Button>
+          {isOwnPost && (
+            <div className="ml-auto relative" ref={actionsRef}>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setShowActions(!showActions)}
+                className="p-2 rounded-lg hover:bg-glass-low transition-colors"
+                aria-label="Post options"
+              >
+                <MoreHorizontal size={18} className="text-text-2" />
+              </motion.button>
+              
+              <AnimatePresence>
+                {showActions && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                    className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden z-dropdown"
+                  >
+                    <motion.button
+                      whileHover={{ x: 4 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      onClick={handleEdit}
+                      className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Edit size={16} />
+                      <span>Edit Post</span>
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ x: 4 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      onClick={handleDelete}
+                      className="w-full px-4 py-2.5 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Trash2 size={16} />
+                      <span>Delete Post</span>
+                    </motion.button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
         
         {/* Post title */}

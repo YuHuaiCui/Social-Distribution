@@ -13,6 +13,7 @@ import PostDetailPage from "./pages/PostDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import FriendsPage from "./pages/FriendsPage";
 
 export const routes: RouteObject[] = [
   {
@@ -67,6 +68,14 @@ export const routes: RouteObject[] = [
         element: (
           <Protected>
             <ExplorePage />
+          </Protected>
+        ),
+      },
+      {
+        path: "/friends",
+        element: (
+          <Protected>
+            <FriendsPage />
           </Protected>
         ),
       },
