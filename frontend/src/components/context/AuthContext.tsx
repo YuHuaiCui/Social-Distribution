@@ -180,9 +180,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     };
 
     console.log("Creating session data:", sessionData);
-    localStorage.setItem("sessionData", JSON.stringify(sessionData));
-
-    // Store auth persistence preference
+    localStorage.setItem("sessionData", JSON.stringify(sessionData));    // Store auth persistence preference
     if (rememberMe) {
       localStorage.setItem("rememberMe", "true");
       console.log("Remember me enabled");
@@ -191,10 +189,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       console.log("Remember me disabled - 24 hour session created");
     }
 
-    // Give the backend a moment to establish the session before checking auth status
-    setTimeout(() => {
-      setLastChecked(Date.now());
-    }, 100);
+    // Update auth state immediately for better performance
+    setLastChecked(Date.now());
   };
 
   const logout = async () => {
