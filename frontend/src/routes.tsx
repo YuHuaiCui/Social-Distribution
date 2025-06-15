@@ -8,7 +8,6 @@ import HomePage from "./pages/HomePage";
 import Protected from "./components/protected/Protected";
 import PublicOnly from "./components/protected/PublicOnly";
 import AuthCallback from "./components/auth/AuthCallback";
-import Profile from "./components/profile/Profile";
 import InboxPage from "./pages/InboxPage";
 import ExplorePage from "./pages/ExplorePage";
 import PostDetailPage from "./pages/PostDetailPage";
@@ -54,22 +53,6 @@ export const routes: RouteObject[] = [
         element: (
           <Protected>
             <HomePage />
-          </Protected>
-        ),
-      },
-      {
-        path: "/authors/:authorId",
-        element: (
-          <Protected>
-            <Profile />
-          </Protected>
-        ),
-      },
-      {
-        path: "/profile",
-        element: (
-          <Protected>
-            <Profile />
           </Protected>
         ),
       },

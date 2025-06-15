@@ -97,6 +97,7 @@ def login_view(request):
     """Handle user login"""
     username = request.data.get('username')
     password = request.data.get('password')
+    remember_me = request.data.get('remember_me', False)
     
     if not username or not password:
         return Response({'message': 'Username and password are required'}, status=400)
@@ -107,6 +108,14 @@ def login_view(request):
     if user is not None:
         # Login the user with the default Django backend
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        
+        # Set session timeout based on remember_me preference
+        if remember_me:
+            # Remember me: 2 weeks (current default)
+            request.session.set_expiry(1209600)  # 2 weeks in seconds
+        else:
+            # Regular login: 24 hours
+            request.session.set_expiry(86400)  # 24 hours in seconds
         
         # Get the author data
         try:

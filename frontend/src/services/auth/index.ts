@@ -3,35 +3,51 @@
  * Handles login, logout, signup, and auth status
  */
 
-import { BaseApiService } from '../base';
-import type { 
-  LoginCredentials, 
-  SignupData, 
+import { BaseApiService } from "../base";
+import type {
+  LoginCredentials,
+  SignupData,
   AuthResponse,
-  TokenResponse,
   PasswordResetRequest,
   PasswordResetConfirm,
-  ChangePasswordData
-} from '../../types';
+  ChangePasswordData,
+  Author,
+} from "../../types";
+
+// Backend login response format
+interface BackendLoginResponse {
+  success: boolean;
+  user: Author;
+  message: string;
+  token?: string;
+}
 
 export class AuthService extends BaseApiService {
   /**
    * Login with username and password
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.request<any>('/api/auth/login/', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-      skipAuth: true,
-    });
-    
+    const response = await this.request<BackendLoginResponse>(
+      "/api/auth/login/",
+      {
+        method: "POST",
+        body: JSON.stringify(credentials),
+        skipAuth: true,
+      }
+    );
+
     // Store token if provided
     if (response.token) {
       const storage = credentials.remember_me ? localStorage : sessionStorage;
-      storage.setItem('authToken', response.token);
+      storage.setItem("authToken", response.token);
     }
-    
-    return response;
+
+    // Transform backend response to match AuthResponse interface
+    return {
+      user: response.user,
+      token: response.token,
+      isAuthenticated: response.success || false,
+    };
   }
 
   /**
@@ -39,13 +55,13 @@ export class AuthService extends BaseApiService {
    */
   async logout(): Promise<void> {
     try {
-      await this.request('/api/auth/logout/', {
-        method: 'POST',
+      await this.request("/api/auth/logout/", {
+        method: "POST",
       });
     } finally {
       // Clear auth tokens regardless of API response
-      localStorage.removeItem('authToken');
-      sessionStorage.removeItem('authToken');
+      localStorage.removeItem("authToken");
+      sessionStorage.removeItem("authToken");
     }
   }
 
@@ -53,8 +69,8 @@ export class AuthService extends BaseApiService {
    * Sign up a new user
    */
   async signup(data: SignupData): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/api/auth/signup/', {
-      method: 'POST',
+    return this.request<AuthResponse>("/api/auth/signup/", {
+      method: "POST",
       body: JSON.stringify(data),
       skipAuth: true,
     });
@@ -65,11 +81,12 @@ export class AuthService extends BaseApiService {
    */
   async getAuthStatus(): Promise<AuthResponse> {
     try {
-      return await this.request<AuthResponse>('/api/auth/status/');
+      return await this.request<AuthResponse>("/api/auth/status/");
     } catch (error) {
+      console.error("Auth status check failed:", error);
       // If auth check fails, user is not authenticated
       return {
-        user: null as any,
+        user: null,
         isAuthenticated: false,
       };
     }
@@ -78,33 +95,48 @@ export class AuthService extends BaseApiService {
   /**
    * Request password reset
    */
-  async requestPasswordReset(data: PasswordResetRequest): Promise<{ success: boolean; message: string }> {
-    return this.request<{ success: boolean; message: string }>('/api/auth/password-reset/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      skipAuth: true,
-    });
+  async requestPasswordReset(
+    data: PasswordResetRequest
+  ): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(
+      "/api/auth/password-reset/",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+        skipAuth: true,
+      }
+    );
   }
 
   /**
    * Confirm password reset with token
    */
-  async confirmPasswordReset(data: PasswordResetConfirm): Promise<{ success: boolean; message: string }> {
-    return this.request<{ success: boolean; message: string }>('/api/auth/password-reset/confirm/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      skipAuth: true,
-    });
+  async confirmPasswordReset(
+    data: PasswordResetConfirm
+  ): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(
+      "/api/auth/password-reset/confirm/",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+        skipAuth: true,
+      }
+    );
   }
 
   /**
    * Change password for authenticated user
    */
-  async changePassword(data: ChangePasswordData): Promise<{ success: boolean; message: string }> {
-    return this.request<{ success: boolean; message: string }>('/api/auth/change-password/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async changePassword(
+    data: ChangePasswordData
+  ): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(
+      "/api/auth/change-password/",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
   }
 
   /**
@@ -121,18 +153,24 @@ export class AuthService extends BaseApiService {
   /**
    * Exchange OAuth2 code for token
    */
-  async exchangeOAuth2Code(provider: string, code: string): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/api/auth/oauth2/callback/', {
-      method: 'POST',
-      body: JSON.stringify({ provider, code }),
-      skipAuth: true,
-    });
-    
+  async exchangeOAuth2Code(
+    provider: string,
+    code: string
+  ): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>(
+      "/api/auth/oauth2/callback/",
+      {
+        method: "POST",
+        body: JSON.stringify({ provider, code }),
+        skipAuth: true,
+      }
+    );
+
     // Store token if provided
     if (response.token) {
-      localStorage.setItem('authToken', response.token);
+      localStorage.setItem("authToken", response.token);
     }
-    
+
     return response;
   }
 }

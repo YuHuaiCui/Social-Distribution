@@ -2,7 +2,7 @@
  * Authentication related types
  */
 
-import type { Author } from '../author';
+import type { Author } from "../author";
 
 export interface LoginCredentials {
   username: string;
@@ -20,7 +20,7 @@ export interface SignupData {
 }
 
 export interface AuthResponse {
-  user: Author;
+  user: Author | null;
   token?: string;
   isAuthenticated: boolean;
 }
