@@ -289,7 +289,7 @@ export const InboxPage: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           className="text-center py-12"
         >
-          <Card variant="main" className="inline-block p-12">
+          <Card variant="main" className="inline-block p-12 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
             <Inbox className="w-16 h-16 text-text-2 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-text-1 mb-2">No notifications</h3>
             <p className="text-text-2">
@@ -319,7 +319,7 @@ export const InboxPage: React.FC = () => {
                 <Card
                   variant={item.is_read ? 'subtle' : 'main'}
                   hoverable
-                  className={`card-layout ${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''}`}
+                  className={`card-layout ${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''} bg-[rgba(var(--glass-rgb),${item.is_read ? '0.3' : '0.4'})] backdrop-blur-lg`}
                 >
                   <div className="flex items-start space-x-4">
                     {/* Author Avatar */}

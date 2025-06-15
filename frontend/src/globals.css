@@ -81,10 +81,10 @@
     --bg-color: #f8fafc;
     --bg-overlay: rgba(248, 250, 252, 0.5);
     --glass-rgb: 255 255 255;      /* white glass */
-    --glass-alpha: .72;
-    --glass-alpha-high: .95;       /* higher opacity for prominent elements */
-    --glass-alpha-medium: .85;     /* medium opacity for content */
-    --glass-alpha-low: .6;         /* lower opacity for sidebar elements */
+    --glass-alpha: .45;
+    --glass-alpha-high: .6;       /* higher opacity for prominent elements */
+    --glass-alpha-medium: .5;     /* medium opacity for content */
+    --glass-alpha-low: .35;         /* lower opacity for sidebar elements */
     --glass-border: rgba(255, 255, 255, 0.4);
     --glass-border-prominent: rgba(255, 255, 255, 0.6);
     --shadow-color: rgba(163, 177, 198, 0.5);
@@ -149,10 +149,10 @@
     --bg-color: #0b1022;
     --bg-overlay: rgba(10, 15, 30, 0.7); /* slightly less opaque overlay */
     --glass-rgb: 15 23 42;
-    --glass-alpha: 0.92; /* significantly increased opacity */
-    --glass-alpha-high: 0.95;      /* higher opacity for prominent elements */
-    --glass-alpha-medium: 0.92;    /* medium opacity for content */
-    --glass-alpha-low: 0.8;        /* lower opacity for sidebar elements */
+    --glass-alpha: 0.45; /* reduced opacity for glassmorphism */
+    --glass-alpha-high: 0.6;      /* higher opacity for prominent elements */
+    --glass-alpha-medium: 0.5;    /* medium opacity for content */
+    --glass-alpha-low: 0.35;        /* lower opacity for sidebar elements */
     --glass-border: rgba(78, 108, 148, 0.3); /* more visible borders */
     --glass-border-prominent: rgba(78, 108, 148, 0.5);
     --shadow-color: rgba(0, 0, 0, 0.4);
@@ -382,11 +382,11 @@
 
   /* Direct color assignments for light/dark modes */
   :root[data-theme='light'] .glass-card-main {
-    background-color: rgba(255, 255, 255, 0.65) !important;
+    background-color: rgba(255, 255, 255, 0.4) !important;
   }
 
   :root[data-theme='dark'] .glass-card-main {
-    background-color: rgba(15, 23, 42, 0.65) !important;
+    background-color: rgba(15, 23, 42, 0.4) !important;
     border-width: 1.5px;
     border-color: rgba(78, 108, 148, 0.3);
     box-shadow: 
@@ -396,14 +396,14 @@
   }
 
   .glass-card-prominent {
-    background: rgb(var(--glass-rgb) / var(--glass-alpha-high));
+    background: rgb(var(--glass-rgb) / 0.5);
     border: 1px solid var(--glass-border-prominent);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
 
   .glass-card-subtle {
-    background: rgb(var(--glass-rgb) / var(--glass-alpha-low));
+    background: rgb(var(--glass-rgb) / 0.3);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -420,7 +420,7 @@
 
   /* Prominent glass for main content - higher opacity */
   .glass-card {
-    background: rgba(var(--glass-rgb), 0.5);
+    background: rgba(var(--glass-rgb), 0.35);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);

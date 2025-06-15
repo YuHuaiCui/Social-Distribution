@@ -359,7 +359,7 @@ Let's dive into each component...`,
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card variant="prominent" className="p-6 md:p-8 mb-6">
+        <Card variant="main" className="p-6 md:p-8 mb-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
           {/* Author Info */}
           <div className="flex items-center space-x-3 mb-6">
             <motion.div whileHover={{ scale: 1.05 }}>
@@ -461,7 +461,7 @@ Let's dive into each component...`,
         </Card>
 
         {/* Comments Section */}
-        <Card variant="main" className="p-6">
+        <Card variant="main" className="p-6 bg-[rgba(var(--glass-rgb),0.35)] backdrop-blur-xl">
           <h2 className="text-xl font-semibold text-text-1 mb-6">
             Comments ({comments.length})
           </h2>
@@ -532,7 +532,7 @@ Let's dive into each component...`,
                     size="md"
                   />
                   <div className="flex-1">
-                    <div className="glass-card-subtle rounded-lg p-4">
+                    <div className="glass-card-subtle rounded-lg p-4 bg-[rgba(var(--glass-rgb),0.3)] backdrop-blur-md">
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <span className="font-medium text-text-1">
@@ -567,7 +567,7 @@ Let's dive into each component...`,
                               alt={isAuthorObject(reply.author) ? reply.author.display_name : 'Author'}
                               size="sm"
                             />
-                            <div className="flex-1 glass-card-subtle rounded-lg p-3">
+                            <div className="flex-1 glass-card-subtle rounded-lg p-3 bg-[rgba(var(--glass-rgb),0.25)] backdrop-blur-md">
                               <div className="mb-1">
                                 <span className="font-medium text-sm text-text-1">
                                   {isAuthorObject(reply.author) ? reply.author.display_name : 'Unknown Author'}

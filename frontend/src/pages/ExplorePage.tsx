@@ -389,7 +389,7 @@ export const ExplorePage: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card variant="main" hoverable className="p-6">
+                  <Card variant="main" hoverable className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
                     <div className="flex flex-col items-center text-center">
                       <motion.div
                         whileHover={{ scale: 1.05 }}
@@ -461,7 +461,7 @@ export const ExplorePage: React.FC = () => {
                   <Card
                     variant="main"
                     hoverable
-                    className="p-6 cursor-pointer text-center h-full flex flex-col justify-center min-h-[160px] border-l-4 transition-all"
+                    className="p-6 cursor-pointer text-center h-full flex flex-col justify-center min-h-[160px] border-l-4 transition-all bg-[rgba(var(--glass-rgb),0.35)] backdrop-blur-lg"
                     style={{
                       borderLeftColor: category.color,
                     }}

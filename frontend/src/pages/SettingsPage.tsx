@@ -345,7 +345,7 @@ export const SettingsPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <Card variant="prominent" className="p-6">
+                <Card variant="main" className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
                   <h2 className="text-xl font-semibold text-text-1 mb-6">Profile Settings</h2>
                   
                   {/* Profile Image */}
@@ -432,7 +432,7 @@ export const SettingsPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <Card variant="prominent" className="p-6">
+                <Card variant="main" className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
                   <h2 className="text-xl font-semibold text-text-1 mb-6">Account Settings</h2>
                   
                   {/* Email */}
@@ -525,7 +525,7 @@ export const SettingsPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <Card variant="prominent" className="p-6">
+                <Card variant="main" className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
                   <h2 className="text-xl font-semibold text-text-1 mb-6">Privacy Settings</h2>
                   
                   {/* Default Post Visibility */}
@@ -651,7 +651,7 @@ export const SettingsPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <Card variant="prominent" className="p-6">
+                <Card variant="main" className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
                   <h2 className="text-xl font-semibold text-text-1 mb-6">Node Settings</h2>
                   
                   {/* Node Info */}
@@ -765,7 +765,7 @@ export const SettingsPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <Card variant="prominent" className="p-6">
+                <Card variant="main" className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
                   <h2 className="text-xl font-semibold text-text-1 mb-6">Appearance Settings</h2>
                   
                   {/* Theme Selection */}
