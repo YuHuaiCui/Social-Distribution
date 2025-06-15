@@ -15,6 +15,10 @@ import SettingsPage from "./pages/SettingsPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import FriendsPage from "./pages/FriendsPage";
+import CreateEntryForm from "./components/CreateEntryForm";
+import CreatePostPage from "./pages/CreatePostPage";
+
+
 
 export const routes: RouteObject[] = [
   {
@@ -104,6 +108,14 @@ export const routes: RouteObject[] = [
           </Protected>
         ),
       },
+      {
+      path: "/create",
+      element: (
+        <Protected>
+          <CreatePostPage />
+        </Protected>
+      ),
+    },
     ],
   },
   // Error pages with separate layout

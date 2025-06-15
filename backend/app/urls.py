@@ -1,6 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from app.views import AuthorViewSet
+from app.views import EntryViewSet  # or wherever you put it
+from rest_framework_nested.routers import NestedDefaultRouter
 from app.views.auth import auth_status, github_callback, author_me, logout_view
 
 # namespacing app
@@ -10,9 +12,15 @@ app_name = "social-distribution"
 router = DefaultRouter()
 router.register(r"api/authors", AuthorViewSet)
 
+# Nested router: /api/authors/<author_id>/entries/
+authors_router = NestedDefaultRouter(router, r"api/authors", lookup="author")
+authors_router.register(r"entries", EntryViewSet, basename="author-entries")
+
+
 urlpatterns = [
     # Include all router URLs
     path("", include(router.urls)),
+    path("", include(authors_router.urls)),
     
     # Auth endpoints
     path('api/auth/status/', auth_status, name='auth-status'),
