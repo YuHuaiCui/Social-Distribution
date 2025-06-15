@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     };
 
     console.log("Creating session data:", sessionData);
-    localStorage.setItem("sessionData", JSON.stringify(sessionData));    // Store auth persistence preference
+    localStorage.setItem("sessionData", JSON.stringify(sessionData)); // Store auth persistence preference
     if (rememberMe) {
       localStorage.setItem("rememberMe", "true");
       console.log("Remember me enabled");
