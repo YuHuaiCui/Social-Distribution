@@ -1,6 +1,5 @@
 import { type RouteObject } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
-import AuthLayout from "./layouts/AuthLayout";
 import ErrorLayout from "./layouts/ErrorLayout";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -18,24 +17,17 @@ import FriendsPage from "./pages/FriendsPage";
 
 export const routes: RouteObject[] = [
   {
+    path: "/",
+    element: <LoginPage />,
+  },
+  {
+    path: "/signup",
+    element: <SignupPage />,
+  },
+  {
     path: "/auth/callback",
     element: <AuthCallback />,
   },
-  // Auth pages with minimal layout
-  {
-    element: <AuthLayout />,
-    children: [
-      {
-        path: "/",
-        element: <LoginPage />,
-      },
-      {
-        path: "/signup",
-        element: <SignupPage />,
-      },
-    ],
-  },
-  // Main app pages with full layout
   {
     element: <MainLayout />,
     children: [
