@@ -232,3 +232,9 @@ REST_FRAMEWORK = {
 
 # Site URL for generating author URLs
 SITE_URL = "http://localhost:8000"
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT.mkdir(exist_ok=True)
+
+(MEDIA_ROOT / 'entries').mkdir(exist_ok=True)

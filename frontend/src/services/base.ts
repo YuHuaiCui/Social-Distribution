@@ -106,7 +106,6 @@ export class BaseApiService {
     const queryString = queryParams.toString();
     return queryString ? `?${queryString}` : '';
   }
-
   /**
    * Helper method for handling FormData requests (e.g., file uploads)
    */
@@ -115,14 +114,14 @@ export class BaseApiService {
     formData: FormData,
     options: RequestOptions = {}
   ): Promise<T> {
-    const { headers = {}, ...otherOptions } = options;
+    const { headers = {}, method = 'POST', ...otherOptions } = options;
     
     // Remove Content-Type header to let browser set it with boundary for FormData
     const { 'Content-Type': _, ...otherHeaders } = headers as Record<string, string>;
     
     return this.request<T>(endpoint, {
       ...otherOptions,
-      method: 'POST',
+      method,
       headers: otherHeaders,
       body: formData,
     });
