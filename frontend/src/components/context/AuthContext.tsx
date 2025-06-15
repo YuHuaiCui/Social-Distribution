@@ -37,6 +37,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       try {
         setLoading(true);
 
+        
+
         // Check for active session with expiry
         const sessionData = localStorage.getItem("sessionData");
         const hasRememberMe = localStorage.getItem("rememberMe") === "true";

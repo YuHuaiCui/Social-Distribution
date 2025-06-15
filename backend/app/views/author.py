@@ -189,10 +189,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         if request.method == "POST":
+            print("USER DEBUG:", request.user, request.user.id, request.user.is_authenticated, request.user.is_staff)
+
             # Ensure only the author can post their own entry
-            if request.user.id != author.id and not request.user.is_staff:
+            if not request.user.is_authenticated:
                 return Response({"detail": "Not authorized to create entry for this author."}, status=403)
 
+            author = request.user  # Override to ensure no spoofing
             data = request.data.copy()
             data["author"] = str(author.id)  # Set author ID explicitly
 
@@ -202,7 +205,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
             serializer = EntrySerializer(data=data)
             if serializer.is_valid():
-                entry = serializer.save()
+                entry = serializer.save(author=author)
                 return Response(EntrySerializer(entry).data, status=201)
             return Response(serializer.errors, status=400)
 
