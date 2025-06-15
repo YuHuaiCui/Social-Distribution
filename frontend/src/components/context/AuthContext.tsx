@@ -42,8 +42,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         setIsAuthenticated(response.isAuthenticated);
         setUser(response.user || null);
       } catch (error) {
+        // If we get a 401/403, the interceptor will handle redirect
+        // For other errors, just set as not authenticated
         setIsAuthenticated(false);
         setUser(null);
+        
+        // Clear any stored auth tokens
+        localStorage.removeItem('authToken');
+        sessionStorage.removeItem('authToken');
       } finally {
         setLoading(false);
       }
