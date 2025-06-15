@@ -273,7 +273,7 @@ export const ExplorePage: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-3 overflow-x-auto pb-3 pr-2">
+        <div className="flex items-center gap-3 overflow-x-auto pb-3 pr-2 scrollbar-hide">
           {tabs.map((tab, index) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;

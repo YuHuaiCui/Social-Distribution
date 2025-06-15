@@ -31,7 +31,7 @@ export const AnimatedGradient: React.FC<AnimatedGradientProps> = ({
 
   return (
     <Component
-      className={`relative overflow-hidden block ${className}`}
+      className={`relative overflow-hidden block rounded-lg ${className}`}
       onClick={onClick}
       whileHover={disabled ? {} : { scale: 1.05, y: -2 }}
       whileTap={disabled ? {} : { scale: 0.95 }}
@@ -40,7 +40,7 @@ export const AnimatedGradient: React.FC<AnimatedGradientProps> = ({
     >
       {/* Smooth animated gradient background */}
       <motion.div
-        className="absolute inset-0"
+        className="absolute inset-0 rounded-lg"
         style={{
           background: `linear-gradient(135deg, ${gradientStops})`,
           backgroundSize: '400% 400%',

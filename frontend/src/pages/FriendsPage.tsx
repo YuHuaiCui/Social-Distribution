@@ -148,8 +148,8 @@ export const FriendsPage: React.FC = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2 overflow-x-auto pb-3 pr-2">
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex items-center gap-2 overflow-x-auto pb-3 pr-2 scrollbar-hide">
           <motion.button
             onClick={() => setFilter('friends')}
             className="relative"

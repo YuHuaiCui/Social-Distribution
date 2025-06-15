@@ -895,6 +895,16 @@
     background: linear-gradient(135deg, var(--primary-pink) 0%, var(--primary-purple) 100%);
   }
 
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+  }
+
   /* Tailwind v4 custom utilities */
   @theme {
     --color-brand-500: var(--brand-500);
