@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, FileText, Image as ImageIcon, 
-  Save, ChevronDown
-} from 'lucide-react';
-import { useAuth } from './context/AuthContext';
-import type { Entry } from '../types/models';
-import AnimatedButton from './ui/AnimatedButton';
-import MarkdownEditor from './MarkdownEditor';
-import ImageUploader from './ImageUploader';
-import CategoryTags from './CategoryTags';
-import PrivacySelector from './PrivacySelector';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  FileText,
+  Image as ImageIcon,
+  Save,
+  ChevronDown,
+} from "lucide-react";
+import { useAuth } from "./context/AuthContext";
+import { entryService } from "../services";
+import type { Entry, CreateEntryData } from "../types";
+import AnimatedButton from "./ui/AnimatedButton";
+import MarkdownEditor from "./MarkdownEditor";
+import ImageUploader from "./ImageUploader";
+import CategoryTags from "./CategoryTags";
+import PrivacySelector from "./PrivacySelector";
 
-type ContentType = 'text/plain' | 'text/markdown' | 'image/png' | 'image/jpeg';
-type Visibility = 'public' | 'friends' | 'unlisted';
+type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg";
+type Visibility = "public" | "friends" | "unlisted";
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -21,15 +25,6 @@ interface CreatePostModalProps {
   onSuccess?: (post: Entry) => void;
   editingPost?: Entry;
 }
-
-function getCookie(name: string): string | null {
-  const cookieValue = document.cookie
-    .split('; ')
-    .find(row => row.startsWith(name + '='))
-    ?.split('=')[1];
-  return cookieValue || null;
-}
-
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   isOpen,
@@ -39,128 +34,100 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
+  const [error, setError] = useState("");
+
   // Form state
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [contentType, setContentType] = useState<ContentType>('text/markdown');
-  const [visibility, setVisibility] = useState<Visibility>('public');
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [contentType, setContentType] = useState<ContentType>("text/markdown");
+  const [visibility, setVisibility] = useState<Visibility>("public");
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
-  const [expandedSection, setExpandedSection] = useState<'content' | 'tags' | 'privacy' | null>('content');
-
-
-  
+  const [expandedSection, setExpandedSection] = useState<
+    "content" | "tags" | "privacy" | null
+  >("content");
   // Pre-fill form when editing
   React.useEffect(() => {
     if (editingPost) {
       setTitle(editingPost.title);
       setContent(editingPost.content);
-      setContentType(editingPost.content_type || 'text/markdown' );
-      setVisibility(editingPost.visibility);
+      setContentType(editingPost.content_type || "text/markdown");
+      // Ensure visibility is one of our valid types ('public', 'friends', 'unlisted')
+      setVisibility(
+        editingPost.visibility === "deleted" ? "public" : editingPost.visibility
+      );
       setCategories(editingPost.categories || []);
     } else {
       // Reset form when creating new post
-      setTitle('');
-      setContent('');
-      setContentType('text/markdown');
-      setVisibility('public');
+      setTitle("");
+      setContent("");
+      setContentType("text/markdown");
+      setVisibility("public");
       setCategories([]);
       setImages([]);
     }
   }, [editingPost]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log("🔁 handleSubmit triggered");
-
     e.preventDefault();
 
     if (!contentType) {
-    setError("Missing content type");
-    return;
+      setError("Missing content type");
+      return;
     }
 
-    
     if (!title.trim()) {
-      setError('Please enter a title');
-      return;
-    }
-    console.log("✅ Passed title check");
-    
-    if (!content.trim() && contentType && !contentType.startsWith('image/')) {
-      setError('Please enter some content');
-      return;
-    }
-    console.log("✅ Passed content check");
-    
-    if (contentType && contentType.startsWith('image/') && images.length === 0) {
-      setError('Please upload at least one image');
+      setError("Please enter a title");
       return;
     }
 
-    console.log("✅ Passed image check");
-    
+    if (!content.trim() && contentType && !contentType.startsWith("image/")) {
+      setError("Please enter some content");
+      return;
+    }
+
+    if (
+      contentType &&
+      contentType.startsWith("image/") &&
+      images.length === 0
+    ) {
+      setError("Please upload at least one image");
+      return;
+    }
+
     setIsLoading(true);
-    setError('');
+    setError("");
 
-    console.log("title:", title);
-    console.log("content:", content);
-    console.log("contentType:", contentType);
-    console.log("images:", images);
-
-      
     try {
-      console.log("📌 editingPost is", editingPost);
-      if (editingPost) {
-        // Mock post update - replace with API call
-        const updatedPost: Entry = {
-          ...editingPost,
-          title,
-          content,
-          content_type: contentType,
-          visibility,
-          categories,
-          updated_at: new Date().toISOString(),
-        };
-        
-        // In real implementation: await api.updateEntry(editingPost.id, updatedPost);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        onSuccess?.(updatedPost);
-      } else {
-        // Mock post creation - replace with API call
-        const entryData = {
+      const entryData: CreateEntryData = {
         title,
         content,
         content_type: contentType,
         visibility,
         categories,
+        ...(images.length > 0 && { image: images[0] }),
       };
+      if (editingPost) {
+        // Update existing post
+        const updatedPost = await entryService.updateEntry(
+          editingPost.id,
+          entryData
+        );
 
-      console.log("🔄 Sending entry data:", entryData);
-      console.log("👤 User ID used in endpoint:", user?.id);
-      const response = await fetch(`http://localhost:8000/api/authors/${user?.id}/entries/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCookie('csrftoken') || '',
-        },
-        credentials: 'include',
-        body: JSON.stringify(entryData),
-      });
-      console.log("📡 Got response:", response.status);
-      if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to create post');
+        onSuccess?.(updatedPost);
+      } else {
+        // Create new post
+        const newPost = await entryService.createEntry(entryData);
+
+        onSuccess?.(newPost);
+        handleClose();
       }
-      const newPost = await response.json();
-      console.log("✅ Post created:", newPost);
-      onSuccess?.(newPost);
-      handleClose();
-      } 
-    } catch (err: any) {
-      setError(err.message || `Failed to ${editingPost ? 'update' : 'create'} post`);
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "An unknown error occurred";
+      setError(
+        errorMessage || `Failed to ${editingPost ? "update" : "create"} post`
+      );
     } finally {
       setIsLoading(false);
     }
@@ -169,22 +136,22 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const handleClose = () => {
     if (!isLoading) {
       // Reset form
-      setTitle('');
-      setContent('');
-      setContentType('text/markdown');
-      setVisibility('public');
+      setTitle("");
+      setContent("");
+      setContentType("text/markdown");
+      setVisibility("public");
       setCategories([]);
       setImages([]);
-      setError('');
-      setExpandedSection('content');
+      setError("");
+      setExpandedSection("content");
       onClose();
     }
   };
 
   const contentTypeOptions = [
-    { value: 'text/markdown', label: 'Markdown', icon: FileText },
-    { value: 'text/plain', label: 'Plain Text', icon: FileText },
-    { value: 'image/png', label: 'Image', icon: ImageIcon },
+    { value: "text/markdown", label: "Markdown", icon: FileText },
+    { value: "text/plain", label: "Plain Text", icon: FileText },
+    { value: "image/png", label: "Image", icon: ImageIcon },
   ];
 
   return (
@@ -199,7 +166,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             onClick={handleClose}
             className="fixed inset-0 bg-black/50 z-modal-backdrop"
           />
-          
+
           {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -210,7 +177,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-1">
               <h2 className="text-xl font-semibold text-text-1">
-                {editingPost ? 'Edit Post' : 'Create New Post'}
+                {editingPost ? "Edit Post" : "Create New Post"}
               </h2>
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -221,7 +188,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 <X size={20} className="text-text-2" />
               </motion.button>
             </div>
-            
+
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -241,10 +208,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 <div className="flex items-center space-x-2">
                   {contentTypeOptions.map((option) => {
                     const Icon = option.icon;
-                    const isSelected = option.value === 'image/png' 
-                      ? contentType?.startsWith('image/') 
-                      : contentType === option.value;
-                    
+                    const isSelected =
+                      option.value === "image/png"
+                        ? contentType?.startsWith("image/")
+                        : contentType === option.value;
+
                     return (
                       <motion.button
                         key={option.value}
@@ -252,13 +220,16 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => {
-                          const value = option.value === 'image/png' ? 'image/png' : option.value;
+                          const value =
+                            option.value === "image/png"
+                              ? "image/png"
+                              : option.value;
                           setContentType(value as ContentType);
                         }}
                         className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                          isSelected 
-                            ? 'bg-[var(--primary-violet)] text-white' 
-                            : 'glass-card-subtle text-text-2 hover:text-text-1'
+                          isSelected
+                            ? "bg-[var(--primary-violet)] text-white"
+                            : "glass-card-subtle text-text-2 hover:text-text-1"
                         }`}
                       >
                         <Icon size={16} />
@@ -274,28 +245,34 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => setExpandedSection(expandedSection === 'content' ? null : 'content')}
+                      onClick={() =>
+                        setExpandedSection(
+                          expandedSection === "content" ? null : "content"
+                        )
+                      }
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Content</span>
                       <motion.div
-                        animate={{ rotate: expandedSection === 'content' ? 180 : 0 }}
+                        animate={{
+                          rotate: expandedSection === "content" ? 180 : 0,
+                        }}
                         transition={{ duration: 0.2 }}
                       >
                         <ChevronDown size={18} className="text-text-2" />
                       </motion.div>
                     </button>
-                    
+
                     <AnimatePresence>
-                      {expandedSection === 'content' && (
+                      {expandedSection === "content" && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
+                          animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="px-4 pb-4"
                         >
-                          {contentType && contentType.startsWith('image/') ? (
+                          {contentType && contentType.startsWith("image/") ? (
                             <div>
                               <ImageUploader
                                 onImagesChange={setImages}
@@ -316,7 +293,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                             </div>
                           ) : (
                             <div className="mt-3">
-                              {contentType === 'text/markdown' ? (
+                              {contentType === "text/markdown" ? (
                                 <MarkdownEditor
                                   value={content}
                                   onChange={setContent}
@@ -344,28 +321,36 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => setExpandedSection(expandedSection === 'tags' ? null : 'tags')}
+                      onClick={() =>
+                        setExpandedSection(
+                          expandedSection === "tags" ? null : "tags"
+                        )
+                      }
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Tags</span>
                       <div className="flex items-center space-x-2">
                         {categories.length > 0 && (
-                          <span className="text-sm text-text-2">{categories.length} tags</span>
+                          <span className="text-sm text-text-2">
+                            {categories.length} tags
+                          </span>
                         )}
                         <motion.div
-                          animate={{ rotate: expandedSection === 'tags' ? 180 : 0 }}
+                          animate={{
+                            rotate: expandedSection === "tags" ? 180 : 0,
+                          }}
                           transition={{ duration: 0.2 }}
                         >
                           <ChevronDown size={18} className="text-text-2" />
                         </motion.div>
                       </div>
                     </button>
-                    
+
                     <AnimatePresence>
-                      {expandedSection === 'tags' && (
+                      {expandedSection === "tags" && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
+                          animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="px-4 pb-4"
@@ -385,26 +370,34 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => setExpandedSection(expandedSection === 'privacy' ? null : 'privacy')}
+                      onClick={() =>
+                        setExpandedSection(
+                          expandedSection === "privacy" ? null : "privacy"
+                        )
+                      }
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Privacy</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-text-2 capitalize">{visibility}</span>
+                        <span className="text-sm text-text-2 capitalize">
+                          {visibility}
+                        </span>
                         <motion.div
-                          animate={{ rotate: expandedSection === 'privacy' ? 180 : 0 }}
+                          animate={{
+                            rotate: expandedSection === "privacy" ? 180 : 0,
+                          }}
                           transition={{ duration: 0.2 }}
                         >
                           <ChevronDown size={18} className="text-text-2" />
                         </motion.div>
                       </div>
                     </button>
-                    
+
                     <AnimatePresence>
-                      {expandedSection === 'privacy' && (
+                      {expandedSection === "privacy" && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
+                          animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="px-4 pb-4"
@@ -425,7 +418,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
+                    animate={{ opacity: 1, height: "auto" }}
                     className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm"
                   >
                     {error}
@@ -433,7 +426,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 )}
               </form>
             </div>
-            
+
             {/* Footer */}
             <div className="flex items-center justify-end space-x-3 p-6 border-t border-border-1">
               <AnimatedButton
@@ -449,8 +442,17 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 loading={isLoading}
                 icon={!isLoading && <Save size={16} />}
               >
-                {editingPost ? 'Update Post' : 'Create Post'}
+                {editingPost ? "Update Post" : "Create Post"}
               </AnimatedButton>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
+export default CreatePostModal;
             </div>
           </motion.div>
         </>
