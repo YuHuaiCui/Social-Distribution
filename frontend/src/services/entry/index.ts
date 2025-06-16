@@ -3,6 +3,7 @@
  * Handles post-related API calls including comments
  */
 
+
 import { BaseApiService } from "../base";
 import type {
   Entry,
@@ -212,7 +213,8 @@ export class EntryService extends BaseApiService {
    */
   async deleteComment(entryId: string, commentId: string): Promise<void> {
     await this.request(`/api/entries/${entryId}/comments/${commentId}/`, {
-      method: "DELETE",
+      method: "PATCH",
+      body: JSON.stringify({ visibility: "deleted" }),
     });
   }
 

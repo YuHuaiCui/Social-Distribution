@@ -109,7 +109,13 @@ export const HomePage: React.FC = () => {
               transition={{ duration: 0.3 }}
               layout
             >
-              <PostCard post={post} />
+              <PostCard post={post} 
+              onDelete={(deletedId) => {
+              setPosts((prev) => prev.filter(p => p.id !== deletedId)); }}
+              onUpdate={(updatedPost) => {
+              setPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
+          }}
+              />
             </motion.div>
           ))}
         </AnimatePresence>

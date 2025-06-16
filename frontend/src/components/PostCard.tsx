@@ -16,6 +16,8 @@ interface PostCardProps {
   post: Entry;
   onLike?: (isLiked: boolean) => void;
   onSave?: (isSaved: boolean) => void;
+  onDelete?: (postId: string) => void;
+  onUpdate?: (post: Entry) => void;
   isLiked?: boolean;
   isSaved?: boolean;
 }
@@ -23,7 +25,8 @@ interface PostCardProps {
 export const PostCard: React.FC<PostCardProps> = ({ 
   post, 
   onLike, 
-  onSave, 
+  onSave,
+  onDelete, 
   isLiked = false, 
   isSaved = false 
 }) => {
@@ -100,9 +103,13 @@ export const PostCard: React.FC<PostCardProps> = ({
     if (window.confirm('Are you sure you want to delete this post?')) {
       try {
         // Mock API call - replace with actual API
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await api.updateEntry(post.id, { visibility: 'deleted' });
         showSuccess('Post deleted successfully');
         // In real implementation, remove post from UI or refresh
+        // Optionally remove from UI
+        if (typeof onDelete === "function") {
+          onDelete(post.id);
+        }
       } catch (error) {
         showError('Failed to delete post');
       }

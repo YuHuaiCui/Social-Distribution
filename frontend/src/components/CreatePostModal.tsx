@@ -126,7 +126,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         const newPost = await entryService.createEntry(entryData);
 
         onSuccess?.(newPost);
+        console.log("Reloading...");
+        window.location.reload();
         handleClose();
+        
       }
     } catch (err: unknown) {
       const errorMessage =
