@@ -230,3 +230,6 @@ REST_FRAMEWORK = {
 
 # Site URL for generating author URLs
 SITE_URL = "http://localhost:8000"
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+os.makedirs(MEDIA_ROOT, exist_ok=True)
