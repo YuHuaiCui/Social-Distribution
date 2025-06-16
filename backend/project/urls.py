@@ -17,9 +17,20 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
+from app.views.follow import FollowViewSet
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'api/follows', FollowViewSet, basename='follow')
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
     path("", include("app.urls")),
+    path("", include(router.urls)),
+
+    # Following end points
+    path('api/follows/<int:pk>/accept/', FollowViewSet.as_view({'post': 'accept'}), name='accept-follow'),
+    path('api/follows/<int:pk>/reject/', FollowViewSet.as_view({'post': 'reject'}), name='reject-follow'),
+
 ]
