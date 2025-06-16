@@ -281,6 +281,11 @@ class ApiService {
     });
   }
 
+  async getAuthorEntries(authorId: string): Promise<Entry[]> {
+  return this.request<Entry[]>(`/api/authors/${authorId}/entries/`);
+}
+
+
   async clearInbox(): Promise<void> {
     // This endpoint needs to be implemented in backend
     await this.request('/api/inbox/clear/', {

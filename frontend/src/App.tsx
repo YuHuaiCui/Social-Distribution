@@ -5,6 +5,7 @@ import { CreatePostProvider } from "./components/context/CreatePostContext";
 import { ToastProvider } from "./components/context/ToastContext";
 import { ThemeProvider } from "./lib/theme";
 
+
 const router = createBrowserRouter(routes);
 
 function App() {
@@ -12,7 +13,7 @@ function App() {
     <ThemeProvider>
       <ToastProvider>
         <AuthProvider>
-          <CreatePostProvider>
+          <CreatePostProvider >
             <RouterProvider router={router} />
           </CreatePostProvider>
         </AuthProvider>

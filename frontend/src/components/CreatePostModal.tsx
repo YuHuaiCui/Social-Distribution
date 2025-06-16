@@ -32,7 +32,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onSuccess,
   editingPost,
 }) => {
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -109,6 +108,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       };
       if (editingPost) {
         // Update existing post
+        console.log("editingPost:", editingPost);
+        if (!editingPost.id) {
+          console.error("Editing post is missing an ID");
+          setError("Cannot update: missing post ID");
+          return;
+        }
         const updatedPost = await entryService.updateEntry(
           editingPost.id,
           entryData
@@ -120,6 +125,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         const newPost = await entryService.createEntry(entryData);
 
         onSuccess?.(newPost);
+        console.log("Reloading...");
+        window.location.reload();
         handleClose();
       }
     } catch (err: unknown) {

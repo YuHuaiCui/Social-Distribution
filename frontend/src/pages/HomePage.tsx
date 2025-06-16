@@ -89,7 +89,7 @@ export const HomePage: React.FC = () => {
              'Be the first to create a post!'}
           </p>
           {feed === 'all' && (
-            <AnimatedButton onClick={openCreatePost} icon={<Plus size={18} />}>
+            <AnimatedButton onClick={() => openCreatePost()} icon={<Plus size={18} />}>
               Create Post
             </AnimatedButton>
           )}
@@ -109,7 +109,13 @@ export const HomePage: React.FC = () => {
               transition={{ duration: 0.3 }}
               layout
             >
-              <PostCard post={post} />
+              <PostCard post={post} 
+              onDelete={(deletedId) => {
+              setPosts((prev) => prev.filter(p => p.id !== deletedId)); }}
+              onUpdate={(updatedPost) => {
+              setPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
+          }}
+              />
             </motion.div>
           ))}
         </AnimatePresence>

@@ -15,8 +15,9 @@ import SettingsPage from "./pages/SettingsPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import FriendsPage from "./pages/FriendsPage";
-import CreateEntryForm from "./components/CreateEntryForm";
 import CreatePostPage from "./pages/CreatePostPage";
+import AuthorProfilePage from "./pages/AuthorProfilePage";
+
 
 
 
@@ -116,6 +117,15 @@ export const routes: RouteObject[] = [
         </Protected>
       ),
     },
+    {
+    path: "/authors/:id",
+    element: (
+      <Protected>
+        <AuthorProfilePage />
+      </Protected>
+    ),
+},
+
     ],
   },
   // Error pages with separate layout

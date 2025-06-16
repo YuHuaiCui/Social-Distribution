@@ -85,3 +85,12 @@ class EntryViewSet(viewsets.ModelViewSet):
         
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    def destroy(self, request, *args, **kwargs):
+        entry = self.get_object()
+
+        # Only mark as deleted
+        entry.visibility = Entry.DELETED
+        entry.save()
+
+        return Response({'detail': 'Entry soft-deleted.'}, status=status.HTTP_204_NO_CONTENT)

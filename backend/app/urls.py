@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from app.views import AuthorViewSet
-from app.views import EntryViewSet  # or wherever you put it
+from app.views.entry import EntryViewSet  # or wherever you put it
 from app.views.auth import auth_status, github_callback, author_me, logout_view
 
 # namespacing app
