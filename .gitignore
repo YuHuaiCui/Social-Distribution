@@ -23,8 +23,9 @@ ENV/
 .pytype/
 
 # === Django ===
-**/migrations/*.py
-!**/migrations/__init__.py
+# Don't ignore migration files - they need to be committed
+# Only ignore the __pycache__ directories inside migrations
+**/migrations/__pycache__/
 
 # === JavaScript / Node.js ===
 node_modules/
