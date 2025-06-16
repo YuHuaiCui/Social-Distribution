@@ -32,7 +32,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onSuccess,
   editingPost,
 }) => {
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -129,7 +128,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         console.log("Reloading...");
         window.location.reload();
         handleClose();
-        
       }
     } catch (err: unknown) {
       const errorMessage =
