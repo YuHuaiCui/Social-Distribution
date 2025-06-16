@@ -111,11 +111,18 @@ export class EntryService extends BaseApiService {
   /**
    * Delete an entry
    */
-  async deleteEntry(id: string): Promise<void> {
+  async deleteEntry(id: string): Promise<boolean> {
+    try {
     await this.request(`/api/entries/${id}/`, {
       method: "DELETE",
     });
+    return true; // ✅ success
+  } catch (error) {
+    console.error("Failed to delete post:", error);
+    return false; // ❌ failure
   }
+}
+    
 
   /**
    * Get entries by author
