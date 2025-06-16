@@ -234,7 +234,6 @@ REST_FRAMEWORK = {
 SITE_URL = "http://localhost:8000"
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-MEDIA_ROOT.mkdir(exist_ok=True)
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+os.makedirs(MEDIA_ROOT, exist_ok=True)
 
-(MEDIA_ROOT / 'entries').mkdir(exist_ok=True)
