@@ -453,12 +453,3 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 };
 
 export default CreatePostModal;
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-};
-
-export default CreatePostModal;
