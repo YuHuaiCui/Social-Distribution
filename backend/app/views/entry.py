@@ -32,13 +32,13 @@ class EntryViewSet(viewsets.ModelViewSet):
             user_author = user.author if hasattr(user, 'author') else user
         except AttributeError:
             # User doesn't have an associated author
-            return Entry.objects.filter(visibility='public').order_by("-created_at")
+            return Entry.objects.filter(visibility='public').exclude(visibility=Entry.DELETED).order_by("-created_at")
         
         # Return user's own entries + public entries from others
         return Entry.objects.filter(
             models.Q(author=user_author) |  # User's own entries
             models.Q(visibility='public')   # Public entries from others
-        ).order_by("-created_at")
+        ).exclude(visibility=Entry.DELETED).order_by("-created_at")
 
     def perform_create(self, serializer):
         """
