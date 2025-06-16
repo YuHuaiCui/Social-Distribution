@@ -106,14 +106,17 @@ class FollowViewSet(viewsets.ModelViewSet):
         For other, uses the default queryset filtering
         """
         obj = get_object_or_404(Follow, pk=self.kwargs["pk"])
+        
         # For accept/reject actions, check if the user is the followed author
         if self.action in ['accept', 'reject']:
             if obj.followed.url != self.request.user.url:
                 raise PermissionDenied(detail='Not authorized to perform this action')
-        # For unfollow action, check if the user is the follower
-        elif self.action == 'unfollow':
+
+        # For unfollow, check if the user is the follower
+        elif self.action == 'destroy':
             if obj.follower.url != self.request.user.url:
                 raise PermissionDenied(detail='Not authorized to unfollow')
+
         # For other actions, use the default queryset filtering
         else:
             obj = get_object_or_404(self.get_queryset(), pk=self.kwargs["pk"])
