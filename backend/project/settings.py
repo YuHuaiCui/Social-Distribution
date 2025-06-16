@@ -12,12 +12,14 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from dotenv import load_dotenv
+from corsheaders.defaults import default_headers
 import os
 
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env") 
 
 
 # Quick-start development settings - unsuitable for production
@@ -230,6 +232,8 @@ REST_FRAMEWORK = {
 
 # Site URL for generating author URLs
 SITE_URL = "http://localhost:8000"
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 os.makedirs(MEDIA_ROOT, exist_ok=True)
+

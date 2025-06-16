@@ -200,7 +200,7 @@ export const HomePage: React.FC = () => {
           className="mb-6"
         >
           <AnimatedButton
-            onClick={openCreatePost}
+            onClick={() => openCreatePost()}
             variant="primary"
             size="lg"
             icon={<Plus size={20} />}

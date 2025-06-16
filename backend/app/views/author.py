@@ -178,13 +178,37 @@ class AuthorViewSet(viewsets.ModelViewSet):
         )
     
 
-    @action(detail=True, methods=["get"], url_path="entries")
+    @action(detail=True, methods=["get", "post"], url_path="entries")
     def public_entries(self, request, pk=None):
-        """List all public entries by the author"""
+        """GET = List public entries, POST = Create a new entry (must be owner)"""
         author = self.get_object()
-        entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC).order_by("-created_at")
-        serializer = EntrySerializer(entries, many=True)
-        return Response(serializer.data)
+
+        if request.method == "GET":
+            entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC).order_by("-created_at")
+            serializer = EntrySerializer(entries, many=True)
+            return Response(serializer.data)
+
+        if request.method == "POST":
+            print("USER DEBUG:", request.user, request.user.id, request.user.is_authenticated, request.user.is_staff)
+
+            # Ensure only the author can post their own entry
+            if not request.user.is_authenticated:
+                return Response({"detail": "Not authorized to create entry for this author."}, status=403)
+
+            author = request.user  # Override to ensure no spoofing
+            data = request.data.copy()
+            data["author"] = str(author.id)  # Set author ID explicitly
+
+            # Optional: auto-set source/origin if needed
+            data["source"] = data.get("source", f"{settings.SITE_URL}/api/authors/{author.id}/entries/")
+            data["origin"] = data.get("origin", data["source"])
+
+            serializer = EntrySerializer(data=data)
+            if serializer.is_valid():
+                entry = serializer.save(author=author)
+                return Response(EntrySerializer(entry).data, status=201)
+            return Response(serializer.errors, status=400)
+
 
     @action(detail=False, methods=["get", "patch"], url_path="me")
     def me(self, request):

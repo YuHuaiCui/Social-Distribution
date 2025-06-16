@@ -1,4 +1,14 @@
 import React, { useState } from 'react';
+import { useAuth } from '../components/context/AuthContext';
+
+function getCookie(name: string): string | null {
+  const cookieValue = document.cookie
+    .split('; ')
+    .find(row => row.startsWith(name + '='))
+    ?.split('=')[1];
+  return cookieValue || null;
+}
+
 
 const CreateEntryForm = () => {
   const [title, setTitle] = useState('');
@@ -6,6 +16,11 @@ const CreateEntryForm = () => {
   const [visibility, setVisibility] = useState('public');
   const [contentType, setContentType] = useState('text/plain');
   const [message, setMessage] = useState('');
+
+  const { user } = useAuth();
+  if (!user) {
+    return <p>Please log in to create an entry.</p>;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,12 +33,13 @@ const CreateEntryForm = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:8000/api/authors/YOUR_AUTHOR_ID/entries/', {
+      const response = await fetch(`http://localhost:8000/api/authors/${user?.id}/entries/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Basic ' + btoa('melrita:melrita'), // for now
+          'X-CSRFToken': getCookie('csrftoken') || '',
         },
+        credentials: 'include', //  to include session cookies
         body: JSON.stringify(entryData),
       });
 
