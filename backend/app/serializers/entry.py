@@ -21,11 +21,25 @@ class EntrySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "url", "author", "source", "origin", "created_at", "updated_at"] # For post related API as well
+        read_only_fields = ["id", "url", "author", "source", "origin", "created_at", "updated_at"]
 
     def create(self, validated_data):
-        # This allows the view to pass in the author via serializer.save(author=author)
-        author = self.context.get("author")
-        if author:
-            validated_data["author"] = author
-        return super().create(validated_data)    
+        # The author will be set by the view's perform_create method
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        """
+        Customize the representation to include author details.
+        """
+        data = super().to_representation(instance)
+        
+        # Include author information
+        if instance.author:
+            data['author'] = {
+                'id': str(instance.author.id),
+                'url': instance.author.url,
+                'username': instance.author.username,
+                'display_name': instance.author.display_name,
+            }
+        
+        return data

@@ -3,24 +3,28 @@
  * Handles post-related API calls including comments
  */
 
-import { BaseApiService } from '../base';
-import type { 
+import { BaseApiService } from "../base";
+import type {
   Entry,
   CreateEntryData,
   UpdateEntryData,
   EntrySearchParams,
   Comment,
   CreateCommentData,
-  PaginatedResponse 
-} from '../../types';
+  PaginatedResponse,
+} from "../../types";
 
 export class EntryService extends BaseApiService {
   /**
    * Get paginated list of entries
    */
-  async getEntries(params?: EntrySearchParams): Promise<PaginatedResponse<Entry>> {
+  async getEntries(
+    params?: EntrySearchParams
+  ): Promise<PaginatedResponse<Entry>> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Entry>>(`/api/entries/${queryString}`);
+    return this.request<PaginatedResponse<Entry>>(
+      `/api/entries/${queryString}`
+    );
   }
 
   /**
@@ -32,29 +36,41 @@ export class EntryService extends BaseApiService {
 
   /**
    * Create a new entry
-   */
-  async createEntry(data: CreateEntryData): Promise<Entry> {
+   */  async createEntry(data: CreateEntryData): Promise<Entry> {
     if (data.image) {
       // Handle image upload
       const formData = new FormData();
-      formData.append('title', data.title);
-      formData.append('content', data.content);
-      formData.append('content_type', data.content_type);
-      formData.append('visibility', data.visibility);
-      if (data.categories) {
-        data.categories.forEach(cat => formData.append('categories', cat));
+      formData.append("title", data.title);
+      formData.append("content", data.content);
+      
+      // Determine the correct content type based on the image file
+      let imageContentType = data.content_type;
+      if (data.content_type === 'image' && data.image) {
+        // Map common image MIME types
+        const mimeType = data.image.type;
+        if (mimeType === 'image/png') {
+          imageContentType = 'image/png';
+        } else if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+          imageContentType = 'image/jpeg';
+        } else {
+          // Default to JPEG if we can't determine
+          imageContentType = 'image/jpeg';
+        }
       }
-      formData.append('image', data.image);
+      
+      formData.append("content_type", imageContentType);
+      formData.append("visibility", data.visibility);
+      if (data.categories) {
+        formData.append("categories", JSON.stringify(data.categories));
+      }
+      formData.append("image", data.image);
 
-      return this.requestFormData<Entry>('/api/entries/', {
-        method: 'POST',
-        body: formData,
-      });
+      return this.requestFormData<Entry>("/api/entries/", formData);
     }
 
     // Regular JSON request
-    return this.request<Entry>('/api/entries/', {
-      method: 'POST',
+    return this.request<Entry>("/api/entries/", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -62,30 +78,31 @@ export class EntryService extends BaseApiService {
   /**
    * Update an existing entry
    */
-  async updateEntry(id: string, data: Partial<CreateEntryData>): Promise<Entry> {
-    if (data.image) {
-      // Handle image upload
+  async updateEntry(
+    id: string,
+    data: Partial<CreateEntryData>
+  ): Promise<Entry> {
+    if (data.image) {      // Handle image upload
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
-        if (key === 'categories' && Array.isArray(value)) {
-          value.forEach(cat => formData.append('categories', cat));
-        } else if (key !== 'image' && value !== undefined) {
+        if (key === "categories" && Array.isArray(value)) {
+          formData.append("categories", JSON.stringify(value));
+        } else if (key !== "image" && value !== undefined) {
           formData.append(key, String(value));
         }
       });
       if (data.image) {
-        formData.append('image', data.image);
+        formData.append("image", data.image);
       }
 
-      return this.requestFormData<Entry>(`/api/entries/${id}/`, {
-        method: 'PATCH',
-        body: formData,
+      return this.requestFormData<Entry>(`/api/entries/${id}/`, formData, {
+        method: "PATCH",
       });
     }
 
     // Regular JSON request
     return this.request<Entry>(`/api/entries/${id}/`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }
@@ -95,37 +112,53 @@ export class EntryService extends BaseApiService {
    */
   async deleteEntry(id: string): Promise<void> {
     await this.request(`/api/entries/${id}/`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
   /**
    * Get entries by author
    */
-  async getEntriesByAuthor(authorId: string, params?: Omit<EntrySearchParams, 'author'>): Promise<PaginatedResponse<Entry>> {
+  async getEntriesByAuthor(
+    authorId: string,
+    params?: Omit<EntrySearchParams, "author">
+  ): Promise<PaginatedResponse<Entry>> {
     return this.getEntries({ ...params, author: authorId });
   }
 
   /**
    * Get user's home feed
    */
-  async getHomeFeed(params?: { page?: number; page_size?: number }): Promise<PaginatedResponse<Entry>> {
+  async getHomeFeed(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedResponse<Entry>> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Entry>>(`/api/entries/feed/${queryString}`);
+    return this.request<PaginatedResponse<Entry>>(
+      `/api/entries/feed/${queryString}`
+    );
   }
 
   /**
    * Get trending entries
    */
-  async getTrendingEntries(params?: { page?: number; page_size?: number }): Promise<PaginatedResponse<Entry>> {
+  async getTrendingEntries(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedResponse<Entry>> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Entry>>(`/api/entries/trending/${queryString}`);
+    return this.request<PaginatedResponse<Entry>>(
+      `/api/entries/trending/${queryString}`
+    );
   }
 
   /**
    * Search entries
    */
-  async searchEntries(query: string, params?: Omit<EntrySearchParams, 'search'>): Promise<PaginatedResponse<Entry>> {
+  async searchEntries(
+    query: string,
+    params?: Omit<EntrySearchParams, "search">
+  ): Promise<PaginatedResponse<Entry>> {
     return this.getEntries({ ...params, search: query });
   }
 
@@ -134,17 +167,25 @@ export class EntryService extends BaseApiService {
   /**
    * Get comments for an entry
    */
-  async getComments(entryId: string, params?: { page?: number; page_size?: number }): Promise<PaginatedResponse<Comment>> {
+  async getComments(
+    entryId: string,
+    params?: { page?: number; page_size?: number }
+  ): Promise<PaginatedResponse<Comment>> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Comment>>(`/api/entries/${entryId}/comments/${queryString}`);
+    return this.request<PaginatedResponse<Comment>>(
+      `/api/entries/${entryId}/comments/${queryString}`
+    );
   }
 
   /**
    * Create a comment on an entry
    */
-  async createComment(entryId: string, data: CreateCommentData): Promise<Comment> {
+  async createComment(
+    entryId: string,
+    data: CreateCommentData
+  ): Promise<Comment> {
     return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -152,11 +193,18 @@ export class EntryService extends BaseApiService {
   /**
    * Update a comment
    */
-  async updateComment(entryId: string, commentId: string, data: Partial<CreateCommentData>): Promise<Comment> {
-    return this.request<Comment>(`/api/entries/${entryId}/comments/${commentId}/`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
+  async updateComment(
+    entryId: string,
+    commentId: string,
+    data: Partial<CreateCommentData>
+  ): Promise<Comment> {
+    return this.request<Comment>(
+      `/api/entries/${entryId}/comments/${commentId}/`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    );
   }
 
   /**
@@ -164,7 +212,7 @@ export class EntryService extends BaseApiService {
    */
   async deleteComment(entryId: string, commentId: string): Promise<void> {
     await this.request(`/api/entries/${entryId}/comments/${commentId}/`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
@@ -172,7 +220,7 @@ export class EntryService extends BaseApiService {
    * Get entry categories
    */
   async getCategories(): Promise<Array<{ name: string; count: number }>> {
-    return this.request('/api/entries/categories/');
+    return this.request("/api/entries/categories/");
   }
 }
 

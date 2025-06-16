@@ -1,118 +1,100 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  FileText, Image as ImageIcon, Save, X, AlertCircle 
-} from 'lucide-react';
-import BackgroundEffects from '../components/ui/BackgroundEffects';
-import AnimatedButton from '../components/ui/AnimatedButton';
-import Card from '../components/ui/Card';
-import Input from '../components/ui/Input';
-import MarkdownEditor from '../components/MarkdownEditor';
-import ImageUploader from '../components/ImageUploader';
-import CategoryTags from '../components/CategoryTags';
-import PrivacySelector from '../components/PrivacySelector';
-import { useAuth } from '../components/context/AuthContext';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  FileText,
+  Image as ImageIcon,
+  Save,
+  X,
+  AlertCircle,
+} from "lucide-react";
+import BackgroundEffects from "../components/ui/BackgroundEffects";
+import AnimatedButton from "../components/ui/AnimatedButton";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import MarkdownEditor from "../components/MarkdownEditor";
+import ImageUploader from "../components/ImageUploader";
+import CategoryTags from "../components/CategoryTags";
+import PrivacySelector from "../components/PrivacySelector";
+import { entryService } from "../services/entry/index";
+import { CreateEntryData } from "../types/entry/index";
 
-
-type ContentType = 'text/plain' | 'text/markdown' | 'image';
-type Visibility = 'public' | 'friends' | 'unlisted';
+type ContentType = "text/plain" | "text/markdown" | "image";
+type Visibility = "public" | "friends" | "unlisted";
 
 export const CreatePostPage: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
+  const [error, setError] = useState("");
+
   // Form state
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [contentType, setContentType] = useState<ContentType>('text/markdown');
-  const [visibility, setVisibility] = useState<Visibility>('public');
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [contentType, setContentType] = useState<ContentType>("text/markdown");
+  const [visibility, setVisibility] = useState<Visibility>("public");
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
 
-  const { user } = useAuth();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Submit triggered");
 
+    if (!title.trim()) {
+      setError("Please enter a title");
+      return;
+    }
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  console.log("Submit triggered");
+    if (!content.trim() && contentType !== "image") {
+      setError("Please enter some content");
+      return;
+    }
 
-  if (!title.trim()) {
-    setError('Please enter a title');
-    return;
-  }
+    if (contentType === "image" && images.length === 0) {
+      setError("Please upload at least one image");
+      return;
+    }
 
-  if (!content.trim() && contentType !== 'image') {
-    setError('Please enter some content');
-    return;
-  }
+    setIsLoading(true);
+    setError("");
 
-  if (contentType === 'image' && images.length === 0) {
-    setError('Please upload at least one image');
-    return;
-  }
+    const entryData: CreateEntryData = {
+      title: title.trim(),
+      content: content.trim(),
+      content_type: contentType,
+      visibility,
+      categories: categories.length > 0 ? categories : undefined,
+      image: images.length > 0 ? images[0] : undefined, // Only send first image if multiple
+    };
 
-  setIsLoading(true);
-  setError('');
+    try {
+      console.log("Sending entry data:", entryData);
 
-  const entryData = {
-    title,
-    content,
-    content_type: contentType,
-    visibility,
-    categories,
+      const response = await entryService.createEntry(entryData);
+      console.log("Post created successfully:", response);
+
+      // Mock success
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Navigate to the new post or home
+      navigate("/home");
+    } catch (err: any) {
+      console.error("Error creating post:", err);
+      setError("Something went wrong.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  try {
-    console.log("Sending entry data:", entryData);
-
-    const response = await fetch(`http://localhost:8000/api/authors/${user?.id}/entries/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(entryData),
-    });
-
-    const result = await response.json();
-    console.log("Backend response:", result);
-
-    if (!response.ok) {
-      const err = result;
-      throw new Error(err.detail || 'Failed to create post');
-    }
-
-    // Handle image uploads if needed
-    if (images.length > 0) {
-      // Upload images and get URLs
-      // This would be handled by your API
-    }
-
-    // Mock success
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Navigate to the new post or home
-    navigate('/home');
-  } catch (err: any) {
-    console.error("Error creating post:", err);
-    setError('Something went wrong.');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
   const contentTypeOptions = [
-    { value: 'text/markdown', label: 'Markdown', icon: FileText },
-    { value: 'text/plain', label: 'Plain Text', icon: FileText },
-    { value: 'image', label: 'Image Post', icon: ImageIcon },
+    { value: "text/markdown", label: "Markdown", icon: FileText },
+    { value: "text/plain", label: "Plain Text", icon: FileText },
+    { value: "image", label: "Image Post", icon: ImageIcon },
   ];
 
   return (
     <div className="min-h-screen py-6">
       <BackgroundEffects />
-      
+
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Header */}
         <motion.div
@@ -137,10 +119,13 @@ const handleSubmit = async (e: React.FormEvent) => {
         {error && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             className="mb-4"
           >
-            <Card variant="main" className="p-4 border-red-500/30 bg-red-500/10">
+            <Card
+              variant="main"
+              className="p-4 border-red-500/30 bg-red-500/10"
+            >
               <div className="flex items-center space-x-2 text-red-500">
                 <AlertCircle size={20} />
                 <span>{error}</span>
@@ -183,28 +168,38 @@ const handleSubmit = async (e: React.FormEvent) => {
                 {contentTypeOptions.map((option) => {
                   const Icon = option.icon;
                   const isSelected = contentType === option.value;
-                  
+
                   return (
                     <motion.button
                       key={option.value}
                       type="button"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => setContentType(option.value as ContentType)}
+                      onClick={() =>
+                        setContentType(option.value as ContentType)
+                      }
                       className={`
                         p-4 rounded-lg border-2 transition-all
-                        ${isSelected 
-                          ? 'border-[var(--primary-violet)] bg-[var(--primary-violet)]/10' 
-                          : 'border-border-1 hover:border-border-2'
+                        ${
+                          isSelected
+                            ? "border-[var(--primary-violet)] bg-[var(--primary-violet)]/10"
+                            : "border-border-1 hover:border-border-2"
                         }
                       `}
                     >
-                      <Icon size={24} className={`mx-auto mb-2 ${
-                        isSelected ? 'text-[var(--primary-violet)]' : 'text-text-2'
-                      }`} />
-                      <span className={`text-sm font-medium ${
-                        isSelected ? 'text-text-1' : 'text-text-2'
-                      }`}>
+                      <Icon
+                        size={24}
+                        className={`mx-auto mb-2 ${
+                          isSelected
+                            ? "text-[var(--primary-violet)]"
+                            : "text-text-2"
+                        }`}
+                      />
+                      <span
+                        className={`text-sm font-medium ${
+                          isSelected ? "text-text-1" : "text-text-2"
+                        }`}
+                      >
                         {option.label}
                       </span>
                     </motion.button>
@@ -221,15 +216,12 @@ const handleSubmit = async (e: React.FormEvent) => {
             transition={{ delay: 0.3 }}
           >
             <Card variant="prominent" className="p-6">
-              {contentType === 'image' ? (
+              {contentType === "image" ? (
                 <div>
                   <label className="block text-sm font-medium text-text-2 mb-4">
                     Upload Images
                   </label>
-                  <ImageUploader
-                    onImagesChange={setImages}
-                    maxImages={10}
-                  />
+                  <ImageUploader onImagesChange={setImages} maxImages={10} />
                   {images.length > 0 && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-text-2 mb-2">
@@ -250,7 +242,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <label className="block text-sm font-medium text-text-2 mb-4">
                     Content
                   </label>
-                  {contentType === 'text/markdown' ? (
+                  {contentType === "text/markdown" ? (
                     <MarkdownEditor
                       value={content}
                       onChange={setContent}
@@ -342,4 +334,3 @@ const handleSubmit = async (e: React.FormEvent) => {
 };
 
 export default CreatePostPage;
-  
