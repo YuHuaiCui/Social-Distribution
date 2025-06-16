@@ -17,7 +17,8 @@ import ImageUploader from "../components/ImageUploader";
 import CategoryTags from "../components/CategoryTags";
 import PrivacySelector from "../components/PrivacySelector";
 import { entryService } from "../services/entry/index";
-import { CreateEntryData } from "../types/entry/index";
+
+import type { CreateEntryData } from "../types/entry/index";
 
 type ContentType = "text/plain" | "text/markdown" | "image";
 type Visibility = "public" | "friends" | "unlisted";

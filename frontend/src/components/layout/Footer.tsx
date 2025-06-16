@@ -68,7 +68,7 @@ export const Footer: React.FC = () => {
               return (
                 <li key={item.label}>
                   <button 
-                    onClick={item.action} 
+                    onClick={() => item.action?.()}
                     className="relative"
                     aria-label={item.label}
                   >

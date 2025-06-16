@@ -109,6 +109,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       };
       if (editingPost) {
         // Update existing post
+        console.log("editingPost:", editingPost);
+        if (!editingPost.id) {
+          console.error("Editing post is missing an ID");
+          setError("Cannot update: missing post ID");
+          return;
+        }
         const updatedPost = await entryService.updateEntry(
           editingPost.id,
           entryData

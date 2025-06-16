@@ -89,7 +89,7 @@ export const HomePage: React.FC = () => {
              'Be the first to create a post!'}
           </p>
           {feed === 'all' && (
-            <AnimatedButton onClick={openCreatePost} icon={<Plus size={18} />}>
+            <AnimatedButton onClick={() => openCreatePost()} icon={<Plus size={18} />}>
               Create Post
             </AnimatedButton>
           )}

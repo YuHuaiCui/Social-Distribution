@@ -90,6 +90,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const handleEdit = () => {
+    console.log("Editing post:", post);
     setShowActions(false);
     openCreatePost(post);
   };
