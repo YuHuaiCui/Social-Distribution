@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Globe, Users, Link, Lock, ChevronDown, 
-  Check, Info, Eye, EyeOff 
-} from 'lucide-react';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Globe,
+  Users,
+  Link,
+  Lock,
+  ChevronDown,
+  Check,
+  Info,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
-type Visibility = 'public' | 'friends' | 'unlisted';
+type Visibility = "public" | "friends" | "unlisted";
 
 interface PrivacyOption {
   value: Visibility;
@@ -25,25 +32,25 @@ interface PrivacySelectorProps {
 
 const privacyOptions: PrivacyOption[] = [
   {
-    value: 'public',
-    label: 'Public',
+    value: "public",
+    label: "Public",
     icon: Globe,
-    description: 'Anyone can see this post',
-    color: 'text-green-500',
+    description: "Anyone can see this post",
+    color: "text-green-500",
   },
   {
-    value: 'friends',
-    label: 'Friends Only',
+    value: "friends",
+    label: "Friends Only",
     icon: Users,
-    description: 'Only your friends can see this post',
-    color: 'text-blue-500',
+    description: "Only your friends can see this post",
+    color: "text-blue-500",
   },
   {
-    value: 'unlisted',
-    label: 'Unlisted',
+    value: "unlisted",
+    label: "Unlisted",
     icon: Link,
-    description: 'Only people with the link can see this post',
-    color: 'text-yellow-500',
+    description: "Only people with the link can see this post",
+    color: "text-yellow-500",
   },
 ];
 
@@ -52,12 +59,13 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
   onChange,
   showDescription = true,
   disabled = false,
-  className = '',
+  className = "",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
-  const selectedOption = privacyOptions.find(opt => opt.value === value) || privacyOptions[0];
+  const selectedOption =
+    privacyOptions.find((opt) => opt.value === value) || privacyOptions[0];
   const Icon = selectedOption.icon;
 
   return (
@@ -72,13 +80,23 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
           w-full flex items-center justify-between px-4 py-3
           bg-input-bg border border-border-1 rounded-lg
           transition-all duration-200
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-[var(--primary-violet)] cursor-pointer'}
-          ${isOpen ? 'ring-2 ring-[var(--primary-violet)] border-transparent' : ''}
+          ${
+            disabled
+              ? "opacity-50 cursor-not-allowed"
+              : "hover:border-[var(--primary-violet)] cursor-pointer"
+          }
+          ${
+            isOpen
+              ? "ring-2 ring-[var(--primary-violet)] border-transparent"
+              : ""
+          }
         `}
       >
         <div className="flex items-center space-x-3">
           <Icon size={18} className={selectedOption.color} />
-          <span className="text-text-1 font-medium">{selectedOption.label}</span>
+          <span className="text-text-1 font-medium">
+            {selectedOption.label}
+          </span>
         </div>
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
@@ -108,20 +126,26 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
               className="fixed inset-0 z-40 md:hidden"
             />
-            
+
             <motion.div
               initial={{ opacity: 0, y: -10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="absolute top-full left-0 right-0 mt-2 glass-card-prominent rounded-lg shadow-xl overflow-hidden z-50"
+              className="absolute top-full left-0 right-0 mt-2 glass-card-prominent rounded-lg shadow-xl z-[60] max-h-[300px] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
             >
               {/* Info Header */}
               <div className="flex items-center justify-between p-3 border-b border-border-1">
-                <span className="text-sm font-medium text-text-2">Post Visibility</span>
+                <span className="text-sm font-medium text-text-2">
+                  Post Visibility
+                </span>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
@@ -137,7 +161,7 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                 {showInfo && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
+                    animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
@@ -148,19 +172,31 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                       <ul className="space-y-1 text-xs text-text-2">
                         <li className="flex items-start space-x-2">
                           <Eye size={14} className="mt-0.5 flex-shrink-0" />
-                          <span><strong>Public:</strong> Visible to everyone on the internet</span>
+                          <span>
+                            <strong>Public:</strong> Visible to everyone on the
+                            internet
+                          </span>
                         </li>
                         <li className="flex items-start space-x-2">
                           <Users size={14} className="mt-0.5 flex-shrink-0" />
-                          <span><strong>Friends:</strong> Only your approved friends can view</span>
+                          <span>
+                            <strong>Friends:</strong> Only your approved friends
+                            can view
+                          </span>
                         </li>
                         <li className="flex items-start space-x-2">
                           <Link size={14} className="mt-0.5 flex-shrink-0" />
-                          <span><strong>Unlisted:</strong> Not shown in feeds, accessible via direct link</span>
+                          <span>
+                            <strong>Unlisted:</strong> Not shown in feeds,
+                            accessible via direct link
+                          </span>
                         </li>
                         <li className="flex items-start space-x-2">
                           <Lock size={14} className="mt-0.5 flex-shrink-0" />
-                          <span><strong>Private:</strong> Draft mode, only you can see it</span>
+                          <span>
+                            <strong>Private:</strong> Draft mode, only you can
+                            see it
+                          </span>
                         </li>
                       </ul>
                     </div>
@@ -173,35 +209,47 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                 {privacyOptions.map((option) => {
                   const OptionIcon = option.icon;
                   const isSelected = value === option.value;
-                  
+
                   return (
                     <motion.button
                       key={option.value}
                       whileHover={{ x: 4 }}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         onChange(option.value);
                         setIsOpen(false);
                       }}
                       className={`
                         w-full flex items-center justify-between px-4 py-3
                         transition-all hover:bg-glass-low
-                        ${isSelected ? 'bg-[var(--primary-violet)]/10' : ''}
+                        ${isSelected ? "bg-[var(--primary-violet)]/10" : ""}
                       `}
                     >
                       <div className="flex items-center space-x-3">
                         <OptionIcon size={20} className={option.color} />
                         <div className="text-left">
-                          <p className="font-medium text-text-1">{option.label}</p>
-                          <p className="text-xs text-text-2">{option.description}</p>
+                          <p className="font-medium text-text-1">
+                            {option.label}
+                          </p>
+                          <p className="text-xs text-text-2">
+                            {option.description}
+                          </p>
                         </div>
                       </div>
                       {isSelected && (
                         <motion.div
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 25,
+                          }}
                         >
-                          <Check size={18} className="text-[var(--primary-violet)]" />
+                          <Check
+                            size={18}
+                            className="text-[var(--primary-violet)]"
+                          />
                         </motion.div>
                       )}
                     </motion.button>
@@ -219,24 +267,25 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
 // Compact variant for inline use
 interface PrivacyBadgeProps {
   value: Visibility;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   showLabel?: boolean;
   className?: string;
 }
 
 export const PrivacyBadge: React.FC<PrivacyBadgeProps> = ({
   value,
-  size = 'md',
+  size = "md",
   showLabel = true,
-  className = '',
+  className = "",
 }) => {
-  const option = privacyOptions.find(opt => opt.value === value) || privacyOptions[0];
+  const option =
+    privacyOptions.find((opt) => opt.value === value) || privacyOptions[0];
   const Icon = option.icon;
 
   const sizeClasses = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-1.5 text-sm',
-    lg: 'px-4 py-2 text-base',
+    sm: "px-2 py-1 text-xs",
+    md: "px-3 py-1.5 text-sm",
+    lg: "px-4 py-2 text-base",
   };
 
   const iconSizes = {
@@ -275,7 +324,7 @@ export const PrivacyToggle: React.FC<PrivacyToggleProps> = ({
   isPublic,
   onChange,
   disabled = false,
-  className = '',
+  className = "",
 }) => {
   return (
     <motion.button
@@ -286,8 +335,16 @@ export const PrivacyToggle: React.FC<PrivacyToggleProps> = ({
       className={`
         relative inline-flex items-center space-x-2 px-4 py-2 rounded-lg
         transition-all duration-200
-        ${isPublic ? 'bg-green-500/20 text-green-500' : 'bg-glass-low text-text-2'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-30 cursor-pointer'}
+        ${
+          isPublic
+            ? "bg-green-500/20 text-green-500"
+            : "bg-glass-low text-text-2"
+        }
+        ${
+          disabled
+            ? "opacity-50 cursor-not-allowed"
+            : "hover:bg-opacity-30 cursor-pointer"
+        }
         ${className}
       `}
     >
