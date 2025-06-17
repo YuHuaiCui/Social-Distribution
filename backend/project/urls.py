@@ -16,8 +16,9 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from app.views import auth
+from app.views.frontend import ReactAppView
 
 from django.conf import settings
 from django.conf.urls.static import static
@@ -36,8 +37,11 @@ urlpatterns = [
     # Django AllAuth URLs - make sure this is included
     path('accounts/', include('allauth.urls')),
     
+    # API endpoints - all other app URLs are API endpoints
+    path("api/", include("app.urls")),
     
-    path("", include("app.urls")),
+    # Catch-all pattern for React app - must be last!
+    re_path(r'^(?!api|admin|accounts|static).*$', ReactAppView.as_view(), name='react-app'),
 ]
 
 # Serve static files in development

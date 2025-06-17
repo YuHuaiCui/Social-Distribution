@@ -2,7 +2,9 @@
  * Base API Service class that provides common functionality for all API services
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// Use relative URLs in production, absolute URLs in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (window.location.hostname === 'localhost' ? "http://localhost:8000" : "");
 
 export interface RequestOptions extends RequestInit {
   skipAuth?: boolean;

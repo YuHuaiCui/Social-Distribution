@@ -1,0 +1,11 @@
+{
+  "name": "s25-project-black",
+  "version": "1.0.0",
+  "description": "Django + React app",
+  "scripts": {
+    "heroku-postbuild": "cd frontend && npm install && npm run build && cd .. && cp -r frontend/dist backend/staticfiles"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
