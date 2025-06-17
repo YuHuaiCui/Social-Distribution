@@ -17,28 +17,43 @@ class EntryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Return entries based on user permissions.
-        Authors can see all their entries, others see only public entries.
-        """
         user = self.request.user
-        
+
         if user.is_staff:
-            # Staff can see all entries
             return Entry.objects.all().order_by("-created_at")
-        
-        # Get the user's author instance
+
         try:
-            user_author = user.author if hasattr(user, 'author') else user
+            user_author = user.author
         except AttributeError:
-            # User doesn't have an associated author
-            return Entry.objects.filter(visibility='public').exclude(visibility=Entry.DELETED).order_by("-created_at")
-        
-        # Return user's own entries + public entries from others
+            return Entry.objects.filter(visibility="public").exclude(visibility=Entry.DELETED)
+
+        # Check if we're viewing a specific author's entries
+        author_id = self.kwargs.get("author_id") or self.request.query_params.get("author")
+        if author_id:
+            try:
+                target_author = Author.objects.get(id=author_id)
+            except Author.DoesNotExist:
+                return Entry.objects.none()
+
+            if user_author.id == target_author.id:
+                # ✅ Viewing your own profile: show all entries except deleted
+                return Entry.objects.filter(
+                    author=target_author
+                ).exclude(visibility=Entry.DELETED).order_by("-created_at")
+
+            # Viewing someone else's profile: only show public entries
+            return Entry.objects.filter(
+                author=target_author,
+                visibility="public"
+            ).exclude(visibility=Entry.DELETED).order_by("-created_at")
+
+        # General feed (not profile)
         return Entry.objects.filter(
-            models.Q(author=user_author) |  # User's own entries
-            models.Q(visibility='public')   # Public entries from others
+            models.Q(author=user_author) | models.Q(visibility="public")
         ).exclude(visibility=Entry.DELETED).order_by("-created_at")
+
+
+        
 
     def perform_create(self, serializer):
         """

@@ -184,7 +184,11 @@ class AuthorViewSet(viewsets.ModelViewSet):
         author = self.get_object()
 
         if request.method == "GET":
-            entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC).order_by("-created_at")
+            if request.user.is_authenticated and str(request.user.id) == str(author.id):
+                entries = Entry.objects.filter(author=author).exclude(visibility=Entry.DELETED)
+            else:
+                entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC)
+
             serializer = EntrySerializer(entries, many=True)
             return Response(serializer.data)
 
