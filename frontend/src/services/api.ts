@@ -230,16 +230,14 @@ class ApiService {
   }
 
 
-  // Like endpoints
+  // Like endpoints - backend completed
   async likeEntry(entryId: string): Promise<Like> {
-    // This endpoint needs to be implemented in backend - done
     return this.request<Like>(`/api/entries/${entryId}/likes/`, {
       method: 'POST',
     });
   }
 
   async unlikeEntry(entryId: string): Promise<void> {
-    // This endpoint needs to be implemented in backend - done
     await this.request(`/api/entries/${entryId}/likes/`, {
       method: 'DELETE',
     });
