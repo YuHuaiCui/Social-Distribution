@@ -22,9 +22,7 @@ DATABASES = {
 
 # Static files
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'staticfiles'),
-]
+# Remove STATICFILES_DIRS since it can't contain STATIC_ROOT
 
 # Whitenoise for static files
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
