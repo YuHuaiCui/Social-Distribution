@@ -1,7 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from app.views import AuthorViewSet
-from app.views.entry import EntryViewSet  # or wherever you put it
+from app.views.entry import EntryViewSet  
+from app.views.like import EntryLikeView
 from app.views.auth import auth_status, github_callback, author_me, logout_view
 
 # namespacing app
@@ -22,6 +23,9 @@ router.register(
 urlpatterns = [
     # Include all router URLs
     path("", include(router.urls)),
+
+    # Nested like endpoint
+    path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
     
     # Auth endpoints
     path('api/auth/status/', auth_status, name='auth-status'),

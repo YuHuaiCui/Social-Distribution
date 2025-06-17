@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   ThumbsUp,
@@ -47,6 +47,20 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [showActions, setShowActions] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    async function fetchLikeData() {
+      try {
+        const data = await api.getEntryLikeStatus(post.id);
+        setLikeCount(data.like_count);
+        console.log("Like status from API:", data);
+        setLiked(data.liked_by_current_user);
+      } catch (error) {
+        console.error("Failed to fetch like data:", error);
+      }
+    }
+    fetchLikeData();
+  }, [post.id]);
+
   // Get author info (handle both object and URL reference)
   const author =
     typeof post.author === "string"
@@ -65,9 +79,11 @@ export const PostCard: React.FC<PostCardProps> = ({
       if (newLikedState) {
         await api.likeEntry(post.id);
         showSuccess("Post liked!");
+        setLiked(true);
       } else {
         await api.unlikeEntry(post.id);
         showInfo("Post unliked");
+        setLiked(false);
       }
       onLike?.(newLikedState);
     } catch {
