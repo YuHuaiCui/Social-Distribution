@@ -4,6 +4,7 @@ from app.views import AuthorViewSet
 from app.views.entry import EntryViewSet  
 from app.views.like import EntryLikeView
 from app.views.auth import auth_status, github_callback, author_me, logout_view
+from app.views.image import ImageUploadView
 
 # namespacing app
 app_name = "social-distribution"
@@ -26,6 +27,8 @@ urlpatterns = [
 
     # Nested like endpoint
     path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
+
+    path('api/upload-image/', ImageUploadView.as_view(), name='upload-image'),
     
     # Auth endpoints
     path('api/auth/status/', auth_status, name='auth-status'),
