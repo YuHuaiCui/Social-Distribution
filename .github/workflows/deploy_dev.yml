@@ -44,9 +44,10 @@ jobs:
           echo "Consider fixing these type issues for better code quality."
         }
         
-        echo "🔨 Building React app..."
+        echo "🔨 Building React app for production..."
         # Build without TypeScript checking (already done above)
-        npx vite build || {
+        # Set VITE_API_URL to empty string to use relative URLs
+        VITE_API_URL="" npx vite build || {
           echo "❌ Build failed!"
           echo "Check the error messages above."
           exit 1
