@@ -71,3 +71,6 @@ jobs:
         heroku_email: ${{ secrets.HEROKU_EMAIL_DEV }}
         buildpack: heroku/python
         dontautocreate: true
+      env:
+        DISABLE_COLLECTSTATIC: 1
+        DJANGO_SETTINGS_MODULE: project.settings_heroku
