@@ -211,6 +211,7 @@ class ApiService {
     });
   }
 
+
   // Comment endpoints (when implemented in backend)
   async getComments(entryId: string): Promise<Comment[]> {
     // This endpoint needs to be implemented in backend
@@ -228,20 +229,29 @@ class ApiService {
     });
   }
 
-  // Like endpoints (when implemented in backend)
+
+  // Like endpoints - backend completed
   async likeEntry(entryId: string): Promise<Like> {
-    // This endpoint needs to be implemented in backend
     return this.request<Like>(`/api/entries/${entryId}/likes/`, {
       method: 'POST',
     });
   }
 
   async unlikeEntry(entryId: string): Promise<void> {
-    // This endpoint needs to be implemented in backend
     await this.request(`/api/entries/${entryId}/likes/`, {
       method: 'DELETE',
     });
   }
+
+  async getEntryLikeStatus(entryId: string): Promise<{ like_count: number; liked_by_current_user: boolean }> {
+    return this.request<{ like_count: number; liked_by_current_user: boolean }>(
+      `/api/entries/${entryId}/likes/`,
+      {
+        method: 'GET',
+      }
+    );
+  }
+
 
   // Follow endpoints (when implemented in backend)
   async followAuthor(authorId: string): Promise<Follow> {
