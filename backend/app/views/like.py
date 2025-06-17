@@ -12,7 +12,7 @@ class EntryLikeView(APIView):
 
     def post(self, request, entry_id):
         entry = get_object_or_404(Entry, id=entry_id)
-        author = request.user.author
+        author = request.user
 
         if Like.objects.filter(author=author, entry=entry).exists():
             return Response({"detail": "Already liked."}, status=status.HTTP_200_OK)
@@ -22,13 +22,14 @@ class EntryLikeView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, entry_id):
+        author = request.user
         entry = get_object_or_404(Entry, id=entry_id)
-        author = request.user.author
 
         like = Like.objects.filter(author=author, entry=entry).first()
         if like:
             like.delete()
             return Response({"detail": "Unliked."}, status=status.HTTP_204_NO_CONTENT)
+
         return Response({"detail": "Like not found."}, status=status.HTTP_404_NOT_FOUND)
 
     def get(self, request, entry_id):
