@@ -23,8 +23,9 @@ ENV/
 .pytype/
 
 # === Django ===
-**/migrations/*.py
-!**/migrations/__init__.py
+# Don't ignore migration files - they need to be committed
+# Only ignore the __pycache__ directories inside migrations
+**/migrations/__pycache__/
 
 # === JavaScript / Node.js ===
 node_modules/
@@ -32,7 +33,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-package-lock.json
+# Ignore root package-lock.json but keep frontend/package-lock.json
+/package-lock.json
 yarn.lock
 pnpm-lock.yaml
 *.tsbuildinfo

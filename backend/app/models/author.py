@@ -42,13 +42,13 @@ class Author(AbstractUser):
 
     # Override username to store full URL for remote authors
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")
-
-    # Profile information
+    url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")    # Profile information
     display_name = models.CharField(max_length=255, blank=True)
     github_username = models.CharField(max_length=255, blank=True)
-    profile_image = models.URLField(blank=True)
+    profile_image = models.URLField(max_length=200, blank=True)
     bio = models.TextField(blank=True)
+    location = models.CharField(max_length=255, blank=True)
+    website = models.URLField(max_length=200, blank=True)
 
     # Node relationship - null for local authors
     node = models.ForeignKey(
@@ -96,7 +96,9 @@ class Author(AbstractUser):
             try:
                 validate_password(self.password, self)
             except ValidationError as e:
-                raise ValidationError({"password": e.messages})
+                raise ValidationError(
+                    {"password": list(e.messages)}
+                )
 
     def get_friends(self):
         """Get all friends of this author"""
