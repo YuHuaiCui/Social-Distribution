@@ -1,44 +1,37 @@
-from rest_framework import viewsets, status, permissions
+from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.decorators import action
-from app.models import Like
+from rest_framework import status, permissions
+from django.shortcuts import get_object_or_404
+
+from app.models import Like, Entry, Comment
 from app.serializers.like import LikeSerializer
 
-class LikeViewSet(viewsets.ModelViewSet):
-    queryset = Like.objects.all()
-    serializer_class = LikeSerializer
+
+class EntryLikeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        """Filter to current user's likes, optionally by entry or comment."""
-        qs = super().get_queryset().filter(author=self.request.user.author)
-        entry = self.request.query_params.get("entry")
-        comment = self.request.query_params.get("comment")
-        if entry:
-            qs = qs.filter(entry=entry)
-        if comment:
-            qs = qs.filter(comment=comment)
-        return qs
+    def post(self, request, entry_id):
+        entry = get_object_or_404(Entry, id=entry_id)
+        author = request.user.author
 
-    def perform_create(self, serializer):
-        author = self.request.user.author
-        entry = self.request.data.get("entry")
-        comment = self.request.data.get("comment")
+        if Like.objects.filter(author=author, entry=entry).exists():
+            return Response({"detail": "Already liked."}, status=status.HTTP_200_OK)
 
-        existing = Like.objects.filter(author=author, entry=entry, comment=comment).first()
-        if existing:
-            raise serializers.ValidationError("Already liked.")
+        like = Like.objects.create(author=author, entry=entry)
+        serializer = LikeSerializer(like)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        serializer.save(author=author)
+    def delete(self, request, entry_id):
+        entry = get_object_or_404(Entry, id=entry_id)
+        author = request.user.author
 
-    @action(detail=False, methods=["get"])
-    def count(self, request):
-        """GET /api/likes/count/?entry=... or ?comment=..."""
-        entry = request.query_params.get("entry")
-        comment = request.query_params.get("comment")
+        like = Like.objects.filter(author=author, entry=entry).first()
+        if like:
+            like.delete()
+            return Response({"detail": "Unliked."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"detail": "Like not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if not entry and not comment:
-            return Response({"detail": "Specify 'entry' or 'comment' in query."}, status=400)
-
-        count = Like.objects.filter(entry=entry) if entry else Like.objects.filter(comment=comment)
-        return Response({"like_count": count.count()})
+    def get(self, request, entry_id):
+        entry = get_object_or_404(Entry, id=entry_id)
+        like_count = Like.objects.filter(entry=entry).count()
+        return Response({"like_count": like_count})

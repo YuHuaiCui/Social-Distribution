@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from app.views import AuthorViewSet
 from app.views.entry import EntryViewSet  
-from app.views.like import LikeViewSet
+from app.views.like import EntryLikeView
 from app.views.auth import auth_status, github_callback, author_me, logout_view
 
 # namespacing app
@@ -11,7 +11,6 @@ app_name = "social-distribution"
 # Create a router and register our viewsets
 router = DefaultRouter()
 router.register(r"api/authors", AuthorViewSet)
-router.register(r"api/likes", LikeViewSet, basename="likes")
 
 # Nested router: /api/authors/<author_id>/entries/
 router.register(
@@ -24,6 +23,9 @@ router.register(
 urlpatterns = [
     # Include all router URLs
     path("", include(router.urls)),
+
+    # Nested like endpoint
+    path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
     
     # Auth endpoints
     path('api/auth/status/', auth_status, name='auth-status'),
