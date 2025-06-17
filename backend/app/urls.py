@@ -10,11 +10,11 @@ app_name = "social-distribution"
 
 # Create a router and register our viewsets
 router = DefaultRouter()
-router.register(r"api/authors", AuthorViewSet)
+router.register(r"authors", AuthorViewSet)
 
-# Nested router: /api/authors/<author_id>/entries/
+# Nested router: /authors/<author_id>/entries/
 router.register(
-    r"api/entries",
+    r"entries",
     EntryViewSet,
     basename="author-entries"
 )
@@ -25,13 +25,13 @@ urlpatterns = [
     path("", include(router.urls)),
 
     # Nested like endpoint
-    path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
+    path("entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
     
-    # Auth endpoints
-    path('api/auth/status/', auth_status, name='auth-status'),
-    path('api/auth/github/callback/', github_callback, name='github-callback'),
-    path('api/authors/me/', author_me, name='author-me'),
-    path('api/auth/logout/', logout_view, name='logout'),
+    # Auth endpoints - these are duplicated in main urls.py, so commenting out
+    # path('auth/status/', auth_status, name='auth-status'),
+    # path('auth/github/callback/', github_callback, name='github-callback'),
+    # path('authors/me/', author_me, name='author-me'),
+    # path('auth/logout/', logout_view, name='logout'),
     
     # Additional API endpoints can be added here
     # path('api/other-endpoint/', other_view, name='other-endpoint'),

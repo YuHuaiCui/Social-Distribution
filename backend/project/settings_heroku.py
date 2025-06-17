@@ -21,12 +21,19 @@ DATABASES = {
 }
 
 # Static files
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-# Remove STATICFILES_DIRS since it can't contain STATIC_ROOT
 
 # Whitenoise for static files
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Serve index.html for React app
+WHITENOISE_INDEX_FILE = True
+WHITENOISE_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Add template directory for serving index.html
+TEMPLATES[0]['DIRS'].append(os.path.join(BASE_DIR, 'staticfiles'))
 
 # Security settings for production
 SECURE_SSL_REDIRECT = True
