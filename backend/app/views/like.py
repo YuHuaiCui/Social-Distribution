@@ -28,9 +28,10 @@ class EntryLikeView(APIView):
         like = Like.objects.filter(author=author, entry=entry).first()
         if like:
             like.delete()
-            return Response({"detail": "Unliked."}, status=status.HTTP_204_NO_CONTENT)
+            return Response({"detail": "Unliked."}, status=status.HTTP_200_OK)
+        # If no like found, just return success anyway
+        return Response({"detail": "Like not found, treated as success."}, status=status.HTTP_204_NO_CONTENT)
 
-        return Response({"detail": "Like not found."}, status=status.HTTP_404_NOT_FOUND)
 
     def get(self, request, entry_id):
         entry = get_object_or_404(Entry, id=entry_id)
