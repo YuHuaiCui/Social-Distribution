@@ -108,18 +108,20 @@ class AuthAPITest(BaseAPITestCase):
         # Test without code
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(len(response.data), 1)  # Should only have 'message' key
+        self.assertEqual(response.data['message'], 'No authorization code provided')
         
         # Test with invalid code (not authenticated)
         response = self.client.post(url, {'code': 'invalid_code'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)  # Should have 'message' and 'pendingAuth' keys
+        self.assertTrue(response.data['pendingAuth'])
+        self.assertEqual(response.data['message'], 'Authentication status pending, check /api/auth/status/')
         
         # Test with authenticated user
         self.user_client.force_authenticate(user=self.regular_user)
         response = self.user_client.post(url, {'code': 'valid_code'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)  # Should have 'success' and 'user' keys
+        self.assertTrue(response.data['success'])
+        self.assertEqual(response.data['user']['username'], 'testuser')
     
     def test_logout(self):
         """Test logout endpoint"""

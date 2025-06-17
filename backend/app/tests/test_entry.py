@@ -5,4 +5,4 @@ from .test_author import BaseAPITestCase
 
 class EntryAPITest(BaseAPITestCase):
     """Test cases for Entry API endpoints"""
-    #TODO: Test Entry API endpoints
+    # TODO: Test the Entry API endpoints
