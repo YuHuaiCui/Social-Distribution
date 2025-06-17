@@ -59,6 +59,10 @@ jobs:
         cp -r frontend/dist/* backend/staticfiles/
         echo "✅ Frontend build copied to backend"
         
+        echo "📋 Preparing files for Heroku deployment..."
+        cp backend/requirements.txt .
+        echo "✅ Requirements.txt copied to root"
+        
     - name: Deploy to Heroku
       uses: akhileshns/heroku-deploy@v3.13.15
       with:
