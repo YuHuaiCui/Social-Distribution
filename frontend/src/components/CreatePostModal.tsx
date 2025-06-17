@@ -7,7 +7,7 @@ import {
   Save,
   ChevronDown,
 } from "lucide-react";
-import { useAuth } from "./context/AuthContext";
+
 import { entryService } from "../services";
 import type { Entry, CreateEntryData } from "../types";
 import AnimatedButton from "./ui/AnimatedButton";
@@ -170,8 +170,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 z-40"
             onClick={handleClose}
-            className="fixed inset-0 bg-black/50 z-modal-backdrop"
           />
 
           {/* Modal */}
@@ -179,7 +180,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-modal overflow-hidden flex flex-col"
+            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-50 overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-1">
@@ -197,8 +199,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <form onSubmit={handleSubmit} className="space-y-4 relative">
                 {/* Title */}
                 <div>
                   <input
@@ -374,7 +376,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   </motion.div>
 
                   {/* Privacy Section */}
-                  <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
+                  <motion.div className="glass-card-subtle rounded-lg overflow-visible">
                     <button
                       type="button"
                       onClick={() =>
