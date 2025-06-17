@@ -172,7 +172,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/50 z-40"
-            onClick={handleClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
           />
 
           {/* Modal */}
@@ -254,11 +257,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setExpandedSection(
                           expandedSection === "content" ? null : "content"
-                        )
-                      }
+                        );
+                      }}
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Content</span>
@@ -330,11 +335,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setExpandedSection(
                           expandedSection === "tags" ? null : "tags"
-                        )
-                      }
+                        );
+                      }}
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Tags</span>
@@ -379,11 +386,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-visible">
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setExpandedSection(
                           expandedSection === "privacy" ? null : "privacy"
-                        )
-                      }
+                        );
+                      }}
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Privacy</span>
@@ -410,6 +419,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="px-4 pb-4"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <PrivacySelector
                             value={visibility}
@@ -447,7 +457,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
               </AnimatedButton>
               <AnimatedButton
                 variant="primary"
-                onClick={handleSubmit}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }}
                 loading={isLoading}
                 icon={!isLoading && <Save size={16} />}
               >

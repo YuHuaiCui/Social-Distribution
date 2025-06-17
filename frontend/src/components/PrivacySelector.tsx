@@ -68,13 +68,27 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
     privacyOptions.find((opt) => opt.value === value) || privacyOptions[0];
   const Icon = selectedOption.icon;
 
+  const handleOptionSelect = (e: React.MouseEvent, optionValue: Visibility) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onChange(optionValue);
+    setIsOpen(false);
+  };
+
   return (
-    <div className={`relative ${className}`}>
+    <div
+      className={`relative ${className}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* Selected Option Button */}
       <motion.button
         whileHover={{ scale: disabled ? 1 : 1.02 }}
         whileTap={{ scale: disabled ? 1 : 0.98 }}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!disabled) setIsOpen(!isOpen);
+        }}
         disabled={disabled}
         className={`
           w-full flex items-center justify-between px-4 py-3
@@ -127,6 +141,7 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 setIsOpen(false);
               }}
@@ -139,7 +154,10 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.2 }}
               className="absolute top-full left-0 right-0 mt-2 glass-card-prominent rounded-lg shadow-xl z-[60] max-h-[300px] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
             >
               {/* Info Header */}
               <div className="flex items-center justify-between p-3 border-b border-border-1">
@@ -149,7 +167,11 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => setShowInfo(!showInfo)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowInfo(!showInfo);
+                  }}
                   className="p-1 rounded hover:bg-glass-low transition-colors"
                 >
                   <Info size={16} className="text-text-2" />
@@ -214,11 +236,7 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                     <motion.button
                       key={option.value}
                       whileHover={{ x: 4 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onChange(option.value);
-                        setIsOpen(false);
-                      }}
+                      onClick={(e) => handleOptionSelect(e, option.value)}
                       className={`
                         w-full flex items-center justify-between px-4 py-3
                         transition-all hover:bg-glass-low
