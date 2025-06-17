@@ -36,4 +36,14 @@ class EntryLikeView(APIView):
     def get(self, request, entry_id):
         entry = get_object_or_404(Entry, id=entry_id)
         like_count = Like.objects.filter(entry=entry).count()
-        return Response({"like_count": like_count})
+
+        # Check if current user liked this entry
+        liked_by_current_user = False
+        
+        if request.user.is_authenticated:
+            liked_by_current_user = Like.objects.filter(author=request.user, entry=entry).exists()
+
+        return Response({
+            "like_count": like_count,
+            "liked_by_current_user": liked_by_current_user
+        })
