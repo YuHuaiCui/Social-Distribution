@@ -2,7 +2,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from app.models import Like
-from serializers.like import LikeSerializer
+from app.serializers.like import LikeSerializer
 
 class LikeViewSet(viewsets.ModelViewSet):
     queryset = Like.objects.all()
