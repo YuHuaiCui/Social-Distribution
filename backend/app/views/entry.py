@@ -8,6 +8,9 @@ from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
 
 class EntryViewSet(viewsets.ModelViewSet):
+    lookup_field = "id"
+    ...
+
     """
     Handles CRUD operations for entries:
     /api/entries/
@@ -15,6 +18,23 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     serializer_class = EntrySerializer
     permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        """
+        Override to avoid visibility-based filtering for retrieve/update.
+        Permissions will still be enforced separately.
+        """
+        queryset = Entry.objects.all()  # no filters here
+        lookup_url_kwarg = self.lookup_field
+        lookup_value = self.kwargs.get(lookup_url_kwarg)
+
+        if lookup_value is None:
+            raise NotFound("No Entry ID provided.")
+
+        obj = queryset.get(id=lookup_value)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
 
     def get_queryset(self):
         user = self.request.user
