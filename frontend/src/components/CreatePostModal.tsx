@@ -52,8 +52,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setContent(editingPost.content);
       setContentType(editingPost.content_type || "text/markdown");
       // Ensure visibility is one of our valid types ('public', 'friends', 'unlisted')
+      const validVisibilities: Visibility[] = ["public", "friends", "unlisted"];
       setVisibility(
-        editingPost.visibility === "deleted" ? "public" : editingPost.visibility
+        validVisibilities.includes(editingPost.visibility as Visibility)
+          ? (editingPost.visibility as Visibility)
+          : "public"
       );
       setCategories(editingPost.categories || []);
     } else {
@@ -114,19 +117,27 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           setError("Cannot update: missing post ID");
           return;
         }
+        const id = editingPost.id.includes("/") ? editingPost.id.split("/").pop() : editingPost.id;
+        console.log("[PATCH] Entry ID used for update:", id);
+        if (!id) {
+          setError("Cannot update: invalid post ID");
+          setIsLoading(false);
+          return;
+        }
         const updatedPost = await entryService.updateEntry(
-          editingPost.id,
+          id,
           entryData
         );
 
         onSuccess?.(updatedPost);
+        handleClose();
+        console.log("Post updated successfully");
       } else {
         // Create new post
         const newPost = await entryService.createEntry(entryData);
 
         onSuccess?.(newPost);
         console.log("Reloading...");
-        window.location.reload();
         handleClose();
       }
     } catch (err: unknown) {

@@ -12,12 +12,33 @@ app_name = "social-distribution"
 
 # Main router
 router = DefaultRouter()
-router.register(r"api/authors", AuthorViewSet)
-router.register(r"api/entries", EntryViewSet, basename="author-entries") 
+router.register(r"authors", AuthorViewSet)
+
+# Nested router: /api/authors/<author_id>/entries/
+#router.register(
+#    r"api/entries",
+#    EntryViewSet,
+#    basename="author-entries"
+#)
+
+entry_list = EntryViewSet.as_view({
+    'get': 'list',
+    'post': 'create',
+})
+entry_detail = EntryViewSet.as_view({
+    'get': 'retrieve',
+    'patch': 'partial_update',
+    'put': 'update',
+    'delete': 'destroy',
+}
+)
+
 
 urlpatterns = [
     # Router-based endpoints
     path("", include(router.urls)),
+    path("api/entries/", entry_list, name="entry-list"),
+    path("api/entries/<uuid:id>/", entry_detail, name="entry-detail"),
 
     # Like endpoint
     path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
