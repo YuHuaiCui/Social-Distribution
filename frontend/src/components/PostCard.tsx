@@ -12,11 +12,12 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { Entry, Author } from "../types/models";
 import { api } from "../services/api";
-import { useAuth } from "./context/AuthContext";
-import { useCreatePost } from "./context/CreatePostContext";
-import { useToast } from "./context/ToastContext";
+import { useAuth } from "../components/context/AuthContext";
+import { useCreatePost } from "../components/context/CreatePostContext";
+import { useToast } from "../components/context/ToastContext";
 import LoadingImage from "./ui/LoadingImage";
 import Card from "./ui/Card";
+import { renderMarkdown } from "../utils/markdown";
 
 import AnimatedGradient from "./ui/AnimatedGradient";
 
@@ -177,20 +178,10 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const renderContent = () => {
     if (post.content_type === "text/markdown") {
-      // Simple markdown rendering - in production, use a proper markdown parser
-      const htmlContent = post.content
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(
-          /\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" class="text-brand-500 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>'
-        )
-        .replace(/\n/g, "<br>");
-
       return (
         <div
           className="prose prose-sm max-w-none text-text-1"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
         />
       );
     }

@@ -2,6 +2,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { routes } from "./routes";
 import { AuthProvider } from "./components/context/AuthContext";
 import { CreatePostProvider } from "./components/context/CreatePostContext";
+import { PostsProvider } from "./components/context/PostsContext";
 import { ToastProvider } from "./components/context/ToastContext";
 import { ThemeProvider } from "./lib/theme";
 
@@ -13,9 +14,11 @@ function App() {
     <ThemeProvider>
       <ToastProvider>
         <AuthProvider>
-          <CreatePostProvider >
-            <RouterProvider router={router} />
-          </CreatePostProvider>
+          <PostsProvider>
+            <CreatePostProvider>
+              <RouterProvider router={router} />
+            </CreatePostProvider>
+          </PostsProvider>
         </AuthProvider>
       </ToastProvider>
     </ThemeProvider>

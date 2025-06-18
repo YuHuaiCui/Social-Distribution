@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Globe, Users, Star, Loader, Plus } from "lucide-react";
 import { useAuth } from "../components/context/AuthContext";
 import { useCreatePost } from "../components/context/CreatePostContext";
+import { usePosts } from "../components/context/PostsContext";
 import type { Entry } from "../types/models";
 import PostCard from "../components/PostCard";
 import AnimatedButton from "../components/ui/AnimatedButton";
@@ -13,14 +14,16 @@ import { entryService } from "../services/entry";
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
   const { openCreatePost } = useCreatePost();
+  const { refreshTrigger } = usePosts();
   const [feed, setFeed] = useState<"all" | "friends" | "liked" | "saved">(
     "all"
   );
   const [posts, setPosts] = useState<Entry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
   useEffect(() => {
     fetchPosts();
-  }, [feed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [feed, refreshTrigger]); // Add refreshTrigger as dependency
 
   const fetchPosts = async () => {
     setIsLoading(true);

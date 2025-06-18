@@ -16,6 +16,7 @@ import ImageUploader from "./ImageUploader";
 import CategoryTags from "./CategoryTags";
 import PrivacySelector from "./PrivacySelector";
 import { useDefaultVisibility, type Visibility } from "../utils/privacy";
+import { usePosts } from "./context/PostsContext";
 
 type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg";
 
@@ -33,6 +34,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   editingPost,
 }) => {
   const defaultVisibility = useDefaultVisibility();
+  const { triggerRefresh } = usePosts();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -145,7 +147,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         const newPost = await entryService.createEntry(entryData);
 
         onSuccess?.(newPost);
-        console.log("Reloading...");
+        triggerRefresh(); // Trigger posts refresh
+        console.log("Post created successfully, refreshing feed...");
         handleClose();
       }
     } catch (err: unknown) {

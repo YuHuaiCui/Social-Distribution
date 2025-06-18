@@ -7,6 +7,7 @@ import Button from './ui/Button';
 import Input from './ui/Input';
 import LoadingImage from './ui/LoadingImage';
 import { useDefaultVisibility, type Visibility } from '../utils/privacy';
+import { renderMarkdown } from '../utils/markdown';
 
 interface NewPostEditorProps {
   onSubmit: (postData: {
@@ -66,16 +67,10 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
 
   const renderPreview = () => {
     if (contentType === 'text/markdown') {
-      const htmlContent = content
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-brand-500 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
-        .replace(/\n/g, '<br>');
-      
       return (
         <div 
           className="prose prose-sm max-w-none text-text-1"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
         />
       );
     }
