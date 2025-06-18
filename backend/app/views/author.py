@@ -4,14 +4,15 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
-from app.models import Author,Entry
+from app.models import Author, Entry, Follow
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
-
+from app.serializers.follow import FollowSerializer
 
 from django.http import HttpResponse
 import base64
 from django.conf import settings
+
 
 class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
     """
@@ -25,11 +26,11 @@ class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
         # Read permissions are allowed for authenticated users
         if request.method in permissions.SAFE_METHODS:
             return request.user.is_authenticated
-        
+
         # For create operations, only admin users
-        if view.action == 'create':
+        if view.action == "create":
             return request.user.is_authenticated and request.user.is_staff
-            
+
         # For other write operations, we'll check object-level permissions
         return request.user.is_authenticated
 
@@ -37,11 +38,11 @@ class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
         # Read permissions for any authenticated user
         if request.method in permissions.SAFE_METHODS:
             return True
-            
+
         # Admin users can edit any author
         if request.user.is_staff:
             return True
-            
+
         # Use UUIDs for comparison or convert to strings if needed
         return str(obj.id) == str(request.user.id)
 
@@ -176,7 +177,109 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 "remote_authors": remote_authors,
             }
         )
-    
+
+    @action(detail=True, methods=["get"])
+    def followers(self, request, pk=None):
+        """Get all followers of this author (accepted follow requests)"""
+        author = self.get_object()
+
+        # Get all accepted follow relationships where this author is followed
+        follows = Follow.objects.filter(followed=author, status=Follow.ACCEPTED)
+        followers = [follow.follower for follow in follows]
+
+        serializer = AuthorListSerializer(followers, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def following(self, request, pk=None):
+        """Get all users this author is following (accepted follow requests)"""
+        author = self.get_object()
+
+        # Get all accepted follow relationships where this author is the follower
+        follows = Follow.objects.filter(follower=author, status=Follow.ACCEPTED)
+        following = [follow.followed for follow in follows]
+
+        serializer = AuthorListSerializer(following, many=True)
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def follow(self, request, pk=None):
+        """Follow or unfollow an author"""
+        author_to_follow = self.get_object()
+        current_user = request.user
+
+        if request.method == "POST":
+            # Check if trying to follow self
+            if current_user.url == author_to_follow.url:
+                return Response(
+                    {"error": "Cannot follow yourself"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Check if follow request already exists
+            existing_follow = Follow.objects.filter(
+                follower=current_user, followed=author_to_follow
+            ).first()
+
+            if existing_follow:
+                return Response(
+                    {"error": "Follow request already exists"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Create follow request
+            follow = Follow.objects.create(
+                follower=current_user, followed=author_to_follow, status=Follow.PENDING
+            )
+
+            # Create inbox item for the followed user
+            from app.models.inbox import Inbox
+
+            Inbox.objects.create(
+                recipient=follow.followed,
+                item_type=Inbox.FOLLOW,
+                follow=follow,
+                raw_data={
+                    "type": "Follow",
+                    "actor": {
+                        "id": follow.follower.url,
+                        "display_name": follow.follower.display_name,
+                        "username": follow.follower.username,
+                        "profile_image": (
+                            follow.follower.profile_image.url
+                            if follow.follower.profile_image
+                            else None
+                        ),
+                    },
+                    "object": follow.followed.url,
+                    "status": follow.status,
+                },
+            )
+
+            serializer = FollowSerializer(follow)
+            return Response(
+                {"success": True, "follow": serializer.data},
+                status=status.HTTP_201_CREATED,
+            )
+
+        elif request.method == "DELETE":
+            # Find and delete the follow relationship
+            follow = Follow.objects.filter(
+                follower=current_user, followed=author_to_follow
+            ).first()
+
+            if not follow:
+                return Response(
+                    {"error": "Follow relationship does not exist"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            follow.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get", "post"], url_path="entries")
     def public_entries(self, request, pk=None):
@@ -185,7 +288,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
         if request.method == "GET":
             if request.user.is_authenticated and str(request.user.id) == str(author.id):
-                entries = Entry.objects.filter(author=author).exclude(visibility=Entry.DELETED)
+                entries = Entry.objects.filter(author=author).exclude(
+                    visibility=Entry.DELETED
+                )
             else:
                 entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC)
 
@@ -193,18 +298,29 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         if request.method == "POST":
-            print("USER DEBUG:", request.user, request.user.id, request.user.is_authenticated, request.user.is_staff)
+            print(
+                "USER DEBUG:",
+                request.user,
+                request.user.id,
+                request.user.is_authenticated,
+                request.user.is_staff,
+            )
 
             # Ensure only the author can post their own entry
             if not request.user.is_authenticated:
-                return Response({"detail": "Not authorized to create entry for this author."}, status=403)
+                return Response(
+                    {"detail": "Not authorized to create entry for this author."},
+                    status=403,
+                )
 
             author = request.user  # Override to ensure no spoofing
             data = request.data.copy()
             data["author"] = str(author.id)  # Set author ID explicitly
 
             # Optional: auto-set source/origin if needed
-            data["source"] = data.get("source", f"{settings.SITE_URL}/api/authors/{author.id}/entries/")
+            data["source"] = data.get(
+                "source", f"{settings.SITE_URL}/api/authors/{author.id}/entries/"
+            )
             data["origin"] = data.get("origin", data["source"])
 
             serializer = EntrySerializer(data=data)
@@ -212,7 +328,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 entry = serializer.save(author=author)
                 return Response(EntrySerializer(entry).data, status=201)
             return Response(serializer.errors, status=400)
-
 
     @action(detail=False, methods=["get", "patch"], url_path="me")
     def me(self, request):
@@ -222,31 +337,34 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """
         try:
             author = Author.objects.get(id=request.user.id)
-        
-            if request.method == 'GET':
+
+            if request.method == "GET":
                 serializer = AuthorSerializer(author)
                 return Response(serializer.data)
-            
-            elif request.method in ['PATCH', 'PUT']:
+
+            elif request.method in ["PATCH", "PUT"]:
                 # Check if there's an uploaded file
-                if 'profile_image_file' in request.FILES:
+                if "profile_image_file" in request.FILES:
                     # Create an image entry for the profile image
-                    image_file = request.FILES['profile_image_file']
+                    image_file = request.FILES["profile_image_file"]
                     content_type = f"image/{image_file.name.split('.')[-1].lower()}"
-                    
+
                     # Create entry
                     from app.models import Entry
+
                     entry = Entry.objects.create(
                         author=author,
                         title="Profile Image",
-                        content=base64.b64encode(image_file.read()).decode('utf-8'),
+                        content=base64.b64encode(image_file.read()).decode("utf-8"),
                         content_type=content_type,
-                        visibility=Entry.UNLISTED  # Make it unlisted
+                        visibility=Entry.UNLISTED,  # Make it unlisted
                     )
-                    
+
                     # Update profile_image to point to the entry's image URL
-                    request.data['profile_image'] = f"{settings.SITE_URL}/api/authors/{author.id}/entries/{entry.id}/image"
-                
+                    request.data["profile_image"] = (
+                        f"{settings.SITE_URL}/api/authors/{author.id}/entries/{entry.id}/image"
+                    )
+
                 # Update the author profile
                 serializer = AuthorSerializer(author, data=request.data, partial=True)
                 if serializer.is_valid():
@@ -254,22 +372,22 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     return Response(serializer.data)
                 else:
                     return Response(serializer.errors, status=400)
-            
+
         except Author.DoesNotExist:
-            return Response({'message': 'Author profile not found'}, status=404)
-    
+            return Response({"message": "Author profile not found"}, status=404)
+
     def update(self, request, *args, **kwargs):
         """Handle PUT/PATCH requests with debugging"""
-        
+
         # Check permission explicitly
         instance = self.get_object()
-        
+
         # Call parent class's update method
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for author updates"""
-        kwargs['partial'] = True
+        kwargs["partial"] = True
         return self.update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
@@ -286,17 +404,17 @@ class AuthorViewSet(viewsets.ModelViewSet):
             # Get the author and entry
             author = self.get_object()
             entry = Entry.objects.get(id=entry_id, author=author)
-            
+
             # Check that this is an image entry
             if not entry.content_type.startswith("image/"):
                 return Response({"detail": "Not an image entry"}, status=400)
-            
+
             # Get the content and decode from base64
             image_data = base64.b64decode(entry.content)
-            
+
             # Return as raw image response
             response = HttpResponse(content=image_data, content_type=entry.content_type)
             return response
-            
+
         except Entry.DoesNotExist:
             return Response({"detail": "Image not found"}, status=404)

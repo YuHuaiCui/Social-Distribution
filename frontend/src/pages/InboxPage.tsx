@@ -8,10 +8,12 @@ import AnimatedButton from '../components/ui/AnimatedButton';
 import Card from '../components/ui/Card';
 import Avatar from '../components/Avatar/Avatar';
 import Loader from '../components/ui/Loader';
+import { inboxService } from '../services/inbox';
+import type { InboxItem as ApiInboxItem } from '../types/inbox';
 
 type InboxItemType = 'follow_request' | 'post_share' | 'like' | 'comment' | 'mention';
 
-interface InboxItem {
+interface FrontendInboxItem {
   id: string;
   type: InboxItemType;
   from_author: {
@@ -63,7 +65,7 @@ const inboxTypeConfig = {
 };
 
 export const InboxPage: React.FC = () => {
-  const [items, setItems] = useState<InboxItem[]>([]);
+  const [items, setItems] = useState<FrontendInboxItem[]>([]);
   const [filter, setFilter] = useState<InboxItemType | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
@@ -75,89 +77,139 @@ export const InboxPage: React.FC = () => {
   const fetchInboxItems = async () => {
     setIsLoading(true);
     try {
-      // Mock data for now
-      const mockItems: InboxItem[] = [
-        {
-          id: '1',
-          type: 'follow_request',
-          from_author: {
-            id: '123',
-            display_name: 'Alice Chen',
-            username: 'alicechen',
-            profile_image: 'https://i.pravatar.cc/150?u=alice',
-          },
-          created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-          is_read: false,
-        },
-        {
-          id: '2',
-          type: 'post_share',
-          from_author: {
-            id: '124',
-            display_name: 'Bob Smith',
-            username: 'bobsmith',
-            profile_image: 'https://i.pravatar.cc/150?u=bob',
-          },
-          created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          is_read: false,
-          data: {
-            post_title: 'Introduction to Distributed Systems',
-          },
-        },
-        {
-          id: '3',
-          type: 'like',
-          from_author: {
-            id: '125',
-            display_name: 'Carol Johnson',
-            username: 'caroljohnson',
-          },
-          created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-          is_read: true,
-          data: {
-            post_title: 'My thoughts on React 18',
-          },
-        },
-        {
-          id: '4',
-          type: 'comment',
-          from_author: {
-            id: '126',
-            display_name: 'David Lee',
-            username: 'davidlee',
-            profile_image: 'https://i.pravatar.cc/150?u=david',
-          },
-          created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-          is_read: true,
-          data: {
-            post_title: 'Understanding TypeScript',
-            comment_text: 'Great article! This really helped me understand generics.',
-          },
-        },
-      ];
+      // Prepare filter parameters
+      const params: any = {};
+      if (filter !== 'all') {
+        // Map frontend filter types to backend content types
+        const typeMapping = {
+          'follow_request': 'follow',
+          'post_share': 'entry_link',
+          'like': 'like',
+          'comment': 'comment',
+          'mention': 'entry' // mentions would be entries that mention the user
+        };
+        params.content_type = typeMapping[filter as keyof typeof typeMapping];
+      }
 
-      const filteredItems = filter === 'all' 
-        ? mockItems 
-        : mockItems.filter(item => item.type === filter);
+      const response = await inboxService.getInbox(params);
+      
+      // Transform API response to frontend format
+      const transformedItems: FrontendInboxItem[] = response.results.map((apiItem: ApiInboxItem) => {
+        let type: InboxItemType;
+        let from_author = {
+          id: '',
+          display_name: 'Unknown',
+          username: 'unknown',
+          profile_image: undefined as string | undefined
+        };
+        let data: any = {};
 
-      setItems(filteredItems);
+        // Map backend content types to frontend types
+        switch (apiItem.content_type) {
+          case 'follow':
+            type = 'follow_request';
+            if (apiItem.content_data?.type === 'follow' && apiItem.sender) {
+              if (typeof apiItem.sender === 'object') {
+                from_author = {
+                  id: apiItem.sender.id || apiItem.sender.url,
+                  display_name: apiItem.sender.display_name || apiItem.sender.username || 'Unknown',
+                  username: apiItem.sender.username || 'unknown',
+                  profile_image: apiItem.sender.profile_image || undefined
+                };
+              }
+            }
+            break;
+          case 'like':
+            type = 'like';
+            if (apiItem.content_data?.type === 'like' && apiItem.sender) {
+              if (typeof apiItem.sender === 'object') {
+                from_author = {
+                  id: apiItem.sender.id || apiItem.sender.url,
+                  display_name: apiItem.sender.display_name || apiItem.sender.username || 'Unknown',
+                  username: apiItem.sender.username || 'unknown',
+                  profile_image: apiItem.sender.profile_image || undefined
+                };
+              }
+            }
+            break;
+          case 'comment':
+            type = 'comment';
+            if (apiItem.content_data?.type === 'comment' && apiItem.sender) {
+              if (typeof apiItem.sender === 'object') {
+                from_author = {
+                  id: apiItem.sender.id || apiItem.sender.url,
+                  display_name: apiItem.sender.display_name || apiItem.sender.username || 'Unknown',
+                  username: apiItem.sender.username || 'unknown',
+                  profile_image: apiItem.sender.profile_image || undefined
+                };
+              }
+              if (apiItem.content_data.data) {
+                data.comment_text = (apiItem.content_data.data as any)?.comment;
+              }
+            }
+            break;
+          case 'entry':
+            type = 'mention';
+            if (apiItem.content_data?.type === 'entry' && apiItem.sender) {
+              if (typeof apiItem.sender === 'object') {
+                from_author = {
+                  id: apiItem.sender.id || apiItem.sender.url,
+                  display_name: apiItem.sender.display_name || apiItem.sender.username || 'Unknown',
+                  username: apiItem.sender.username || 'unknown',
+                  profile_image: apiItem.sender.profile_image || undefined
+                };
+              }
+              if (apiItem.content_data.data) {
+                data.post_title = (apiItem.content_data.data as any)?.title;
+              }
+            }
+            break;
+          case 'entry_link':
+            type = 'post_share';
+            if (apiItem.sender && typeof apiItem.sender === 'object') {
+              from_author = {
+                id: apiItem.sender.id || apiItem.sender.url,
+                display_name: apiItem.sender.display_name || apiItem.sender.username || 'Unknown',
+                username: apiItem.sender.username || 'unknown',
+                profile_image: apiItem.sender.profile_image || undefined
+              };
+            }
+            if (apiItem.content_data?.type === 'entry_link') {
+              data.post_title = (apiItem.content_data.data as any)?.title;
+            }
+            break;
+          default:
+            type = 'mention';
+        }
+
+        return {
+          id: apiItem.id,
+          type,
+          from_author,
+          created_at: apiItem.created_at,
+          is_read: apiItem.read || false,
+          data
+        };
+      });
+
+      setItems(transformedItems);
     } catch (error) {
       console.error('Error fetching inbox:', error);
+      // Fallback to empty array on error
+      setItems([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFollowRequest = async (itemId: string, _accept: boolean) => {
+  const handleFollowRequest = async (itemId: string, accept: boolean) => {
     setProcessingItems(prev => new Set(prev).add(itemId));
     try {
-      // API call would go here
-      // if (accept) {
-      //   await api.acceptFollowRequest(itemId);
-      // } else {
-      //   await api.rejectFollowRequest(itemId);
-      // }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (accept) {
+        await inboxService.acceptFollowRequest(itemId);
+      } else {
+        await inboxService.rejectFollowRequest(itemId);
+      }
       
       // Remove item after processing
       setItems(prev => prev.filter(item => item.id !== itemId));
@@ -174,7 +226,7 @@ export const InboxPage: React.FC = () => {
 
   const markAsRead = async (itemId: string) => {
     try {
-      // API call would go here
+      await inboxService.markItemAsRead(itemId);
       setItems(prev => 
         prev.map(item => 
           item.id === itemId ? { ...item, is_read: true } : item

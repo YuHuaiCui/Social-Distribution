@@ -1,5 +1,4 @@
 from django.db import models
-
 from .author import Author
 
 
@@ -16,7 +15,6 @@ class Follow(models.Model):
         (REJECTED, "Rejected"),
     ]
 
-    # Use URL-based foreign keys for federation
     follower = models.ForeignKey(
         Author, on_delete=models.CASCADE, related_name="following_set", to_field="url"
     )
@@ -30,15 +28,14 @@ class Follow(models.Model):
 
     class Meta:
         unique_together = ["follower", "followed"]
+        ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["follower", "status"]),
             models.Index(fields=["followed", "status"]),
             models.Index(fields=["status"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["updated_at"]),
-            models.Index(
-                fields=["follower", "followed", "status"]
-            ),  # Compound for lookups
+            models.Index(fields=["follower", "followed", "status"]),
         ]
 
     def __str__(self):
