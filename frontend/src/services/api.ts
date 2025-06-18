@@ -214,9 +214,8 @@ class ApiService {
   }
 
 
-  // Comment endpoints (when implemented in backend)
+  // Comment endpoints - backend completed
   async getComments(entryId: string): Promise<Comment[]> {
-    // This endpoint needs to be implemented in backend
     return this.request<Comment[]>(`/api/entries/${entryId}/comments/`);
   }
 
@@ -224,7 +223,6 @@ class ApiService {
     content: string;
     content_type?: string;
   }): Promise<Comment> {
-    // This endpoint needs to be implemented in backend
     return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
       method: 'POST',
       body: JSON.stringify(data),
