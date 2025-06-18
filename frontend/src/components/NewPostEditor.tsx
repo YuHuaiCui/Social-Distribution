@@ -81,7 +81,7 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
   const visibilityOptions = [
     { value: 'public', label: 'Public', icon: Globe, description: 'Anyone can see' },
     { value: 'friends', label: 'Friends', icon: Users, description: 'Only friends' },
-    { value: 'unlisted', label: 'Unlisted', icon: EyeOff, description: 'Only with link' },
+    { value: 'unlisted', label: 'Unlisted', icon: EyeOff, description: 'Followers & friends' },
   ];
 
   return (

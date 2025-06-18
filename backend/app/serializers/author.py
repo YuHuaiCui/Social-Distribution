@@ -18,6 +18,7 @@ class AuthorSerializer(serializers.ModelSerializer):
         required=False,  # Not required for partial updates
         help_text="Must match the password field exactly.",
     )
+    is_following = serializers.SerializerMethodField()
 
     class Meta:
         model = Author
@@ -43,6 +44,7 @@ class AuthorSerializer(serializers.ModelSerializer):
             "updated_at",
             "password",
             "password_confirm",
+            "is_following",
         ]
         read_only_fields = ["id", "url", "created_at", "updated_at"]
         extra_kwargs = {
@@ -100,6 +102,18 @@ class AuthorSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+    def get_is_following(self, obj):
+        """Check if current user is following this author"""
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+
+        from app.models.follow import Follow
+
+        return Follow.objects.filter(
+            follower=request.user, followed=obj, status=Follow.ACCEPTED
+        ).exists()
 
 
 class AuthorListSerializer(serializers.ModelSerializer):

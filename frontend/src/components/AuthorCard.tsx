@@ -51,6 +51,11 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   // Check if the current user is viewing their own profile
   const isOwnProfile = currentUser && currentUser.id === author.id;
 
+  // Sync local follow state with prop changes
+  useEffect(() => {
+    setIsFollowing(author.is_following || false);
+  }, [author.is_following]);
+
   // Fetch real follower/following counts from backend
   useEffect(() => {
     const fetchStats = async () => {
@@ -147,7 +152,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             onClick={handleFollow}
             loading={isLoading}
           >
-            {isFollowing ? 'Following' : 'Follow'}
+            {isFollowing ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </motion.div>
@@ -290,7 +295,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             icon={isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
             className="w-full"
           >
-            {isFollowing ? 'Unfollow' : 'Follow'}
+            {isFollowing ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </div>

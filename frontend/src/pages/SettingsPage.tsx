@@ -724,7 +724,7 @@ export const SettingsPage: React.FC = () => {
                         value: "unlisted",
                         label: "Unlisted",
                         icon: Eye,
-                        desc: "Only people with the link",
+                        desc: "Visible to followers and friends",
                       },
                     ].map((option) => {
                       const Icon = option.icon;
