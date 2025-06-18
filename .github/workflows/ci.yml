@@ -10,6 +10,14 @@ jobs:
   backend-tests:
     runs-on: ubuntu-latest
     
+    # Add environment variables at job level
+    env:
+      DJANGO_SECRET_KEY: "django-insecure-s_xewz!0b-ctg2=3!e^=nfbbscf)8wi%04i@6s9xy70lf_7&+7"
+      DJANGO_SETTINGS_MODULE: "social_distribution.settings"  # Adjust to your actual settings module
+      DEBUG: "True"
+      DATABASE_URL: "sqlite:///:memory:"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+    
     steps:
     - uses: actions/checkout@v4
     
