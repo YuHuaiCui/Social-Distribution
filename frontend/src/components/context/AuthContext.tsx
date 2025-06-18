@@ -42,16 +42,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         const sessionData = localStorage.getItem("sessionData");
         const hasRememberMe = localStorage.getItem("rememberMe") === "true";
         const hasSession = document.cookie.includes("sessionid");
-        const hasStoredToken =
-          localStorage.getItem("authToken") ||
-          sessionStorage.getItem("authToken");
+        // Session authentication is handled by Django cookies
 
         console.log(
           "🔍 AuthContext: Session state -",
           "\n  hasRememberMe:", hasRememberMe,
           "\n  sessionData:", !!sessionData,
           "\n  hasSession cookie:", hasSession,
-          "\n  hasStoredToken:", !!hasStoredToken,
           "\n  lastChecked:", lastChecked,
           "\n  cookies:", document.cookie
         );
@@ -98,7 +95,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         if (
           !hasRememberMe &&
           !hasSession &&
-          !hasStoredToken &&
           !hasValidSession &&
           !mightBeFromGitHub &&
           lastChecked === 0
@@ -129,9 +125,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         setIsAuthenticated(false);
         setUser(null);
 
-        // Clear any stored auth tokens and session data
-        localStorage.removeItem("authToken");
-        sessionStorage.removeItem("authToken");
+        // Clear session data
         localStorage.removeItem("sessionData");
 
         // If auth check fails, also clear rememberMe
@@ -245,12 +239,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       localStorage.removeItem("rememberMe");
       // Clear session data
       localStorage.removeItem("sessionData");
-      // Clear any stored auth tokens
-      localStorage.removeItem("authToken");
-      sessionStorage.removeItem("authToken");
       // Clear auth check flags
       sessionStorage.removeItem("authChecked");
       sessionStorage.removeItem("githubAuthHandled");
+      sessionStorage.removeItem("githubAuthPending");
       // Update lastChecked to trigger the auth check effect
       setLastChecked(Date.now());
     } catch (error) {

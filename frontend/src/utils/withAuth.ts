@@ -16,9 +16,7 @@ export function withAuth<T extends (...args: any[]) => Promise<any>>(
            error.message.includes('Unauthorized') ||
            error.message.includes('Forbidden'))) {
         
-        // Clear auth data
-        localStorage.removeItem('authToken');
-        sessionStorage.removeItem('authToken');
+        // Session will be cleared by Django
         
         // Redirect to login if not already there
         const currentPath = window.location.pathname;
@@ -38,9 +36,8 @@ export function withAuth<T extends (...args: any[]) => Promise<any>>(
  */
 export function usePermission(permission: string): boolean {
   // This can be expanded based on your permission system
-  // For now, we'll just check if user is authenticated
-  const isAuthenticated = localStorage.getItem('authToken') || 
-                         sessionStorage.getItem('authToken');
+  // For now, we'll check if user has a session cookie
+  const hasSession = document.cookie.includes('sessionid');
   
-  return !!isAuthenticated;
+  return hasSession;
 }

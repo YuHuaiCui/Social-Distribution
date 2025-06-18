@@ -22,6 +22,7 @@ import Card from "./ui/Card";
 import { renderMarkdown } from "../utils/markdown";
 
 import AnimatedGradient from "./ui/AnimatedGradient";
+import { extractUUID } from "../utils/extractId";
 
 interface PostCardProps {
   post: Entry;
@@ -47,12 +48,14 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [liked, setLiked] = useState(isLiked);
   const [saved, setSaved] = useState(isSaved);
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
+  const [commentCount, setCommentCount] = useState(post.comments_count || 0);
   const [showActions, setShowActions] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     async function fetchLikeData() {
       try {
-        const data = await api.getEntryLikeStatus(post.id);
+        const extractedId = extractUUID(post.id);
+        const data = await api.getEntryLikeStatus(extractedId);
         setLikeCount(data.like_count);
         console.log("Like status from API:", data);
         setLiked(data.liked_by_current_user);
@@ -60,7 +63,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         console.warn("Failed to fetch like data:", error);
         // Use the data from the post itself as fallback
         setLikeCount(post.likes_count || 0);
-        setLiked(false); // Default to not liked if we can't fetch
+        setLiked(post.is_liked || false); // Use is_liked from post if available
       }
     }
 
@@ -70,9 +73,30 @@ export const PostCard: React.FC<PostCardProps> = ({
     } else {
       // Use fallback data if no valid ID
       setLikeCount(post.likes_count || 0);
-      setLiked(false);
+      setLiked(post.is_liked || false);
     }
-  }, [post.id, post.likes_count]);
+  }, [post.id, post.likes_count, post.is_liked]);
+
+  // Listen for post updates from other components
+  useEffect(() => {
+    const handlePostUpdate = (event: CustomEvent) => {
+      const { postId, updates } = event.detail;
+      if (postId === post.id && updates.comments_count !== undefined) {
+        setCommentCount(updates.comments_count);
+      }
+    };
+
+    window.addEventListener('post-update', handlePostUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('post-update', handlePostUpdate as EventListener);
+    };
+  }, [post.id]);
+
+  // Initialize comment count from post prop
+  useEffect(() => {
+    setCommentCount(post.comments_count || 0);
+  }, [post.comments_count]);
 
   // Get author info (handle both object and URL reference)
   const author =
@@ -84,17 +108,18 @@ export const PostCard: React.FC<PostCardProps> = ({
   const timeAgo = getTimeAgo(date);
 
   const handleLike = async () => {
+    const extractedId = extractUUID(post.id);
     const newLikedState = !liked;
     setLiked(newLikedState);
     setLikeCount((prev) => (newLikedState ? prev + 1 : Math.max(0, prev - 1)));
 
     try {
       if (newLikedState) {
-        await api.likeEntry(post.id);
+        await api.likeEntry(extractedId);
         showSuccess("Post liked!");
         setLiked(true);
       } else {
-        await api.unlikeEntry(post.id);
+        await api.unlikeEntry(extractedId);
         showInfo("Post unliked");
         setLiked(false);
       }
@@ -110,15 +135,16 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const handleSave = async () => {
+    const extractedId = extractUUID(post.id);
     const newSavedState = !saved;
     setSaved(newSavedState);
 
     try {
       if (newSavedState) {
-        await socialService.savePost(post.id);
+        await socialService.savePost(extractedId);
         showSuccess("Post saved to your collection");
       } else {
-        await socialService.unsavePost(post.id);
+        await socialService.unsavePost(extractedId);
         showInfo("Post removed from collection");
       }
       onSave?.(newSavedState);
@@ -312,7 +338,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         </div>
 
         {/* Post title */}
-        <Link to={`/posts/${post.id}`}>
+        <Link to={`/posts/${extractUUID(post.id)}`}>
           <h2 className="text-xl font-semibold mb-3 text-text-1 hover:text-brand-500 transition-colors">
             {post.title}
           </h2>
@@ -421,7 +447,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           </button>
 
           {/* Comment Button */}
-          <Link to={`/posts/${post.id}`} className="flex-1">
+          <Link to={`/posts/${extractUUID(post.id)}`} className="flex-1">
             <button
               className="w-full h-full flex items-center justify-center py-3 relative overflow-hidden group transition-all"
               aria-label="View comments"
@@ -441,7 +467,7 @@ export const PostCard: React.FC<PostCardProps> = ({
               >
                 <MessageCircle size={18} />
                 <span className="text-sm font-medium">
-                  {post.comments_count || 0}
+                  {commentCount}
                 </span>
               </motion.div>
             </button>

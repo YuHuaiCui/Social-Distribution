@@ -177,8 +177,9 @@ export class EntryService extends BaseApiService {
     entryId: string,
     params?: { page?: number; page_size?: number }
   ): Promise<PaginatedResponse<Comment>> {
-    const queryString = this.buildQueryString(params || {});    return this.request<PaginatedResponse<Comment>>(
-      `/entries/${entryId}/comments/${queryString}`
+    const queryString = this.buildQueryString(params || {});
+    return this.request<PaginatedResponse<Comment>>(
+      `/api/entries/${entryId}/comments/${queryString}`
     );
   }
   /**
@@ -191,10 +192,13 @@ export class EntryService extends BaseApiService {
     const commentData = {
       ...data,
       content_type: data.content_type || "text/plain",
-    }; // Log the request for debugging
-    console.log("Creating comment with data:", commentData);    console.log("Request URL:", `/entries/${entryId}/comments/`);
+    };
+    
+    // Log the request for debugging
+    console.log("Creating comment with data:", commentData);
+    console.log("Request URL:", `/api/entries/${entryId}/comments/`);
 
-    return this.request<Comment>(`/entries/${entryId}/comments/`, {
+    return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
       method: "POST",
       body: JSON.stringify(commentData),
     });
@@ -207,8 +211,9 @@ export class EntryService extends BaseApiService {
     entryId: string,
     commentId: string,
     data: Partial<CreateCommentData>
-  ): Promise<Comment> {    return this.request<Comment>(
-      `/entries/${entryId}/comments/${commentId}/`,
+  ): Promise<Comment> {
+    return this.request<Comment>(
+      `/api/entries/${entryId}/comments/${commentId}/`,
       {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -220,7 +225,7 @@ export class EntryService extends BaseApiService {
    * Delete a comment
    */
   async deleteComment(entryId: string, commentId: string): Promise<void> {
-    await this.request(`/entries/${entryId}/comments/${commentId}/`, {
+    await this.request(`/api/entries/${entryId}/comments/${commentId}/`, {
       method: "PATCH",
       body: JSON.stringify({ visibility: "deleted" }),
     });

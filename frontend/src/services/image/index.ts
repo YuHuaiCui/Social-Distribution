@@ -22,7 +22,7 @@ export class ImageService extends BaseApiService {
     formData.append("image", file);
 
     // Use the requestFormData method which handles multipart/form-data requests
-    return this.requestFormData<ImageUploadResponse>("/api/images/", formData);
+    return this.requestFormData<ImageUploadResponse>("/api/upload-image/", formData);
   }
 
   /**
