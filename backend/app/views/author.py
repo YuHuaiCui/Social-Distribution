@@ -203,6 +203,17 @@ class AuthorViewSet(viewsets.ModelViewSet):
         serializer = AuthorListSerializer(following, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["get"])
+    def friends(self, request, pk=None):
+        """Get all friends of this author (mutual follows)"""
+        author = self.get_object()
+
+        # Get friends using the model method
+        friends = author.get_friends()
+
+        serializer = AuthorListSerializer(friends, many=True)
+        return Response(serializer.data)
+
     @action(
         detail=True,
         methods=["post", "delete"],

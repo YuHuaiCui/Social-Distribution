@@ -310,6 +310,10 @@ class ApiService {
     return this.request<Author[]>(`/api/authors/${authorId}/following/`);
   }
 
+  async getFriends(authorId: string): Promise<Author[]> {
+    return this.request<Author[]>(`/api/authors/${authorId}/friends/`);
+  }
+
   // Inbox endpoints (when implemented in backend)
   async getInbox(): Promise<Inbox[]> {
     // This endpoint needs to be implemented in backend
