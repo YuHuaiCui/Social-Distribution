@@ -46,7 +46,6 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
   const [showActions, setShowActions] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     async function fetchLikeData() {
       try {
@@ -55,11 +54,22 @@ export const PostCard: React.FC<PostCardProps> = ({
         console.log("Like status from API:", data);
         setLiked(data.liked_by_current_user);
       } catch (error) {
-        console.error("Failed to fetch like data:", error);
+        console.warn("Failed to fetch like data:", error);
+        // Use the data from the post itself as fallback
+        setLikeCount(post.likes_count || 0);
+        setLiked(false); // Default to not liked if we can't fetch
       }
     }
-    fetchLikeData();
-  }, [post.id]);
+
+    // Only fetch if we have a valid post ID
+    if (post.id) {
+      fetchLikeData();
+    } else {
+      // Use fallback data if no valid ID
+      setLikeCount(post.likes_count || 0);
+      setLiked(false);
+    }
+  }, [post.id, post.likes_count]);
 
   // Get author info (handle both object and URL reference)
   const author =

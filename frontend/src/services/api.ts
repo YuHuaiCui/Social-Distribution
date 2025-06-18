@@ -3,22 +3,23 @@
  * This file is kept for backwards compatibility only.
  */
 
-import type { 
-  Author, 
-  Entry, 
-  Comment, 
-  Like, 
-  Follow, 
+import type {
+  Author,
+  Entry,
+  Comment,
+  Like,
+  Follow,
   InboxItem as Inbox,
   PaginatedResponse,
   LoginCredentials,
   SignupData,
-  AuthResponse
-} from '../types';
+  AuthResponse,
+} from "../types";
 
 // Use relative URLs in production, absolute URLs in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (window.location.hostname === 'localhost' ? "http://localhost:8000" : "");
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (window.location.hostname === "localhost" ? "http://localhost:8000" : "");
 
 /**
  * @deprecated Use individual service classes instead
@@ -32,23 +33,23 @@ class ApiService {
 
   // Helper method for requests
   private async request<T>(
-    endpoint: string, 
+    endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const defaultHeaders: HeadersInit = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     // Get CSRF token from cookie if it exists
     const csrfToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('csrftoken='))
-      ?.split('=')[1];
+      .split("; ")
+      .find((row) => row.startsWith("csrftoken="))
+      ?.split("=")[1];
 
     if (csrfToken) {
-      defaultHeaders['X-CSRFToken'] = csrfToken;
+      defaultHeaders["X-CSRFToken"] = csrfToken;
     }
 
     const config: RequestInit = {
@@ -57,14 +58,18 @@ class ApiService {
         ...defaultHeaders,
         ...options.headers,
       },
-      credentials: 'include', // Always include cookies
+      credentials: "include", // Always include cookies
     };
 
     const response = await fetch(url, config);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        error.message ||
+          error.detail ||
+          `HTTP error! status: ${response.status}`
+      );
     }
 
     return response.json();
@@ -72,35 +77,40 @@ class ApiService {
 
   // Authentication endpoints
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.request<any>('/api/auth/login/', {
-      method: 'POST',
+    const response = await this.request<any>("/api/auth/login/", {
+      method: "POST",
       body: JSON.stringify(credentials),
     });
     return response;
   }
 
   async logout(): Promise<void> {
-    await this.request('/accounts/logout/', {
-      method: 'POST',
+    await this.request("/accounts/logout/", {
+      method: "POST",
     });
   }
 
-  async signup(data: SignupData): Promise<{ success: boolean; user: Author; message: string }> {
-    return this.request<{ success: boolean; user: Author; message: string }>('/api/auth/signup/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async signup(
+    data: SignupData
+  ): Promise<{ success: boolean; user: Author; message: string }> {
+    return this.request<{ success: boolean; user: Author; message: string }>(
+      "/api/auth/signup/",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
   }
 
   async getAuthStatus(): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/api/auth/status/');
+    return this.request<AuthResponse>("/api/auth/status/");
   }
 
   // Author endpoints
   async getAuthors(params?: {
     is_approved?: boolean;
     is_active?: boolean;
-    type?: 'local' | 'remote';
+    type?: "local" | "remote";
     search?: string;
     page?: number;
   }): Promise<PaginatedResponse<Author>> {
@@ -122,38 +132,41 @@ class ApiService {
   }
 
   async getCurrentAuthor(): Promise<Author> {
-    return this.request<Author>('/api/authors/me/');
+    return this.request<Author>("/api/authors/me/");
   }
 
   async updateCurrentAuthor(data: Partial<Author>): Promise<Author> {
     // Convert to snake_case for backend
     const backendData: any = {};
-    if (data.display_name !== undefined) backendData.display_name = data.display_name;
-    if (data.github_username !== undefined) backendData.github_username = data.github_username;
+    if (data.display_name !== undefined)
+      backendData.display_name = data.display_name;
+    if (data.github_username !== undefined)
+      backendData.github_username = data.github_username;
     if (data.bio !== undefined) backendData.bio = data.bio;
-    if (data.profile_image !== undefined) backendData.profile_image = data.profile_image;
+    if (data.profile_image !== undefined)
+      backendData.profile_image = data.profile_image;
     if (data.email !== undefined) backendData.email = data.email;
 
-    return this.request<Author>('/api/authors/me/', {
-      method: 'PATCH',
+    return this.request<Author>("/api/authors/me/", {
+      method: "PATCH",
       body: JSON.stringify(backendData),
     });
   }
 
   async uploadProfileImage(file: File): Promise<Author> {
     const formData = new FormData();
-    formData.append('profile_image_file', file);
+    formData.append("profile_image_file", file);
 
     const csrfToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('csrftoken='))
-      ?.split('=')[1];
+      .split("; ")
+      .find((row) => row.startsWith("csrftoken="))
+      ?.split("=")[1];
 
-    return this.request<Author>('/api/authors/me/', {
-      method: 'PATCH',
+    return this.request<Author>("/api/authors/me/", {
+      method: "PATCH",
       headers: {
         // Don't set Content-Type for FormData
-        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
       },
       body: formData,
     });
@@ -192,8 +205,8 @@ class ApiService {
     categories?: string[];
   }): Promise<Entry> {
     // This endpoint needs to be implemented in backend
-    return this.request<Entry>('/api/entries/', {
-      method: 'POST',
+    return this.request<Entry>("/api/entries/", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -201,7 +214,7 @@ class ApiService {
   async updateEntry(id: string, data: Partial<Entry>): Promise<Entry> {
     // This endpoint needs to be implemented in backend
     return this.request<Entry>(`/api/entries/${id}/`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }
@@ -209,64 +222,64 @@ class ApiService {
   async deleteEntry(id: string): Promise<void> {
     // This endpoint needs to be implemented in backend
     await this.request(`/api/entries/${id}/`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
-
-  // Comment endpoints (when implemented in backend)
+  // Comment endpoints - backend completed
   async getComments(entryId: string): Promise<Comment[]> {
-    // This endpoint needs to be implemented in backend
     return this.request<Comment[]>(`/api/entries/${entryId}/comments/`);
   }
 
-  async createComment(entryId: string, data: {
-    content: string;
-    content_type?: string;
-  }): Promise<Comment> {
-    // This endpoint needs to be implemented in backend
+  async createComment(
+    entryId: string,
+    data: {
+      content: string;
+      content_type?: string;
+    }
+  ): Promise<Comment> {
     return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
 
-
   // Like endpoints - backend completed
   async likeEntry(entryId: string): Promise<Like> {
     return this.request<Like>(`/api/entries/${entryId}/likes/`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
   async unlikeEntry(entryId: string): Promise<void> {
     await this.request(`/api/entries/${entryId}/likes/`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
-  async getEntryLikeStatus(entryId: string): Promise<{ like_count: number; liked_by_current_user: boolean }> {
+  async getEntryLikeStatus(
+    entryId: string
+  ): Promise<{ like_count: number; liked_by_current_user: boolean }> {
     return this.request<{ like_count: number; liked_by_current_user: boolean }>(
       `/api/entries/${entryId}/likes/`,
       {
-        method: 'GET',
+        method: "GET",
       }
     );
   }
-
 
   // Follow endpoints (when implemented in backend)
   async followAuthor(authorId: string): Promise<Follow> {
     // This endpoint needs to be implemented in backend
     return this.request<Follow>(`/api/authors/${authorId}/follow/`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
   async unfollowAuthor(authorId: string): Promise<void> {
     // This endpoint needs to be implemented in backend
     await this.request(`/api/authors/${authorId}/follow/`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
@@ -283,25 +296,27 @@ class ApiService {
   // Inbox endpoints (when implemented in backend)
   async getInbox(): Promise<Inbox[]> {
     // This endpoint needs to be implemented in backend
-    return this.request<Inbox[]>('/api/inbox/');
+    return this.request<Inbox[]>("/api/inbox/");
   }
 
   async markInboxItemRead(id: string): Promise<Inbox> {
     // This endpoint needs to be implemented in backend
     return this.request<Inbox>(`/api/inbox/${id}/read/`, {
-      method: 'POST',
+      method: "POST",
     });
   }
-
   async getAuthorEntries(authorId: string): Promise<Entry[]> {
-  return this.request<Entry[]>(`/api/authors/${authorId}/entries/`);
-}
-
+    const response = await this.request<Entry[]>(
+      `/api/authors/${authorId}/entries/`
+    );
+    // The backend returns the entries directly as an array, not in a results field
+    return response;
+  }
 
   async clearInbox(): Promise<void> {
     // This endpoint needs to be implemented in backend
-    await this.request('/api/inbox/clear/', {
-      method: 'POST',
+    await this.request("/api/inbox/clear/", {
+      method: "POST",
     });
   }
 }

@@ -2,8 +2,8 @@
  * Entry (Post) related types
  */
 
-import type { Author } from '../author';
-import type { ContentType, Visibility, TimestampedModel } from '../common';
+import type { Author } from "../author";
+import type { ContentType, Visibility, TimestampedModel } from "../common";
 
 export interface Entry extends TimestampedModel {
   id: string;
@@ -52,7 +52,8 @@ export interface Comment extends TimestampedModel {
   author: Author | string; // Can be URL reference
   entry: Entry | string; // Can be URL reference
   content: string;
-  content_type: 'text/plain' | 'text/markdown';
+  content_type: "text/plain" | "text/markdown";
+  parent?: Comment | string; // Parent comment (for replies)
   // Frontend computed fields
   likes_count?: number;
   is_liked?: boolean;
@@ -60,5 +61,5 @@ export interface Comment extends TimestampedModel {
 
 export interface CreateCommentData {
   content: string;
-  content_type?: 'text/plain' | 'text/markdown';
+  content_type?: "text/plain" | "text/markdown";
 }

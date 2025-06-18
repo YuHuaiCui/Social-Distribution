@@ -1,16 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, Heart, MessageCircle, Share2, Bookmark, 
-  MoreVertical, Edit, Trash2, Send, Clock, Hash 
-} from 'lucide-react';
-import { useAuth } from '../components/context/AuthContext';
-import type { Entry, Comment, Author } from '../types/models';
-import AnimatedButton from '../components/ui/AnimatedButton';
-import Card from '../components/ui/Card';
-import Avatar from '../components/Avatar/Avatar';
-import Loader from '../components/ui/Loader';
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ArrowLeft,
+  Heart,
+  MessageCircle,
+  Share2,
+  Bookmark,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Send,
+  Clock,
+  Hash,
+} from "lucide-react";
+import { useAuth } from "../components/context/AuthContext";
+import type { Entry, Comment, Author } from "../types/models";
+import AnimatedButton from "../components/ui/AnimatedButton";
+import Card from "../components/ui/Card";
+import Avatar from "../components/Avatar/Avatar";
+import Loader from "../components/ui/Loader";
+import { entryService } from "../services/entry";
+import { socialService } from "../services/social";
 
 interface CommentWithReplies extends Comment {
   replies?: Comment[];
@@ -25,209 +36,270 @@ export const PostDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [commentText, setCommentText] = useState('');
+  const [commentText, setCommentText] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActions, setShowActions] = useState(false);
-
   // Type guard to check if author is an Author object
-  const isAuthorObject = (author: any): author is Author => {
-    return author && typeof author === 'object' && 'id' in author;
+  const isAuthorObject = (author: unknown): author is Author => {
+    return (
+      author !== null &&
+      typeof author === "object" &&
+      "id" in (author as Record<string, unknown>)
+    );
   };
+  const fetchPostDetails = useCallback(async () => {
+    if (!postId) return;
+
+    setIsLoading(true);
+
+    // Validate UUID format
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(postId)) {
+      console.warn(`Invalid UUID format for postId: ${postId}`);
+      setPost(null);
+      setIsLoading(false);
+      return;
+    } // Fetch the post details
+    let fetchedPost;
+    try {
+      fetchedPost = await entryService.getEntry(postId);
+      setPost(fetchedPost);
+    } catch (error) {
+      // Check if it's a 404 error - could be the post doesn't exist or is not viewable due to permissions
+      console.error("Error fetching post:", error);
+
+      // Update the API endpoint in PostDetailPage to use the author's specific entries endpoint
+      // if the direct entry endpoint returns a 404
+      if (user?.id) {
+        try {
+          console.log("Trying to fetch post using author endpoint");
+          // Try fetching through author's endpoint which might have different permissions
+          const response = await entryService.getEntriesByAuthor(user.id);
+          const authorPost = response.results.find(
+            (entry) => entry.id === postId
+          );
+
+          if (authorPost) {
+            console.log("Found post via author endpoint");
+            setPost(authorPost);
+            setIsLoading(false);
+            return;
+          }
+        } catch (authorError) {
+          console.error(
+            "Also failed to fetch via author endpoint:",
+            authorError
+          );
+        }
+      }
+
+      // Set post to null and exit early
+      setPost(null);
+      setIsLoading(false);
+      return; // Exit early if we can't get the post
+    }
+
+    // Fetch comments for the post
+    try {
+      const commentsResponse = await entryService.getComments(postId);
+
+      // Convert flat comments to threaded structure
+      const parentComments: CommentWithReplies[] = [];
+      const commentReplies: Record<string, Comment[]> = {};
+
+      // First pass: separate parent comments and replies
+      commentsResponse.results.forEach((comment) => {
+        if (comment.parent) {
+          // This is a reply
+          const parentId =
+            typeof comment.parent === "string"
+              ? comment.parent
+              : comment.parent.id;
+
+          if (!commentReplies[parentId]) {
+            commentReplies[parentId] = [];
+          }
+          commentReplies[parentId].push(comment);
+        } else {
+          // This is a parent comment
+          parentComments.push({ ...comment, replies: [] });
+        }
+      });
+
+      // Second pass: add replies to their parent comments
+      parentComments.forEach((comment) => {
+        if (commentReplies[comment.id]) {
+          comment.replies = commentReplies[comment.id];
+        }
+      });
+
+      setComments(parentComments);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      // Continue with other operations even if comments fail
+    }
+
+    // Get like status using the API
+    try {
+      const response = await fetch(`/api/entries/${postId}/likes/`);
+      if (response.ok) {
+        const likeData = await response.json();
+        setIsLiked(likeData.liked_by_current_user);
+      } else {
+        // If the API call fails, use the is_liked property from the post
+        setIsLiked(fetchedPost.is_liked || false);
+      }
+    } catch (error) {
+      console.error("Error fetching like status:", error);
+      // Fallback to post data
+      setIsLiked(fetchedPost.is_liked || false);
+    }
+
+    // Get bookmarked/saved status
+    try {
+      const savedPostsResponse = await socialService.getSavedPosts();
+      const isSaved = savedPostsResponse.results.some(
+        (savedPost) => savedPost.id === postId
+      );
+      setIsBookmarked(isSaved);
+    } catch (error) {
+      console.error("Error checking saved status:", error);
+      setIsBookmarked(false);
+    }
+
+    // Always set loading to false at the end
+    setIsLoading(false);
+  }, [postId, user?.id]);
 
   useEffect(() => {
     fetchPostDetails();
-  }, [postId]);
-
-  const fetchPostDetails = async () => {
-    setIsLoading(true);
-    try {
-      // Mock data - replace with API call
-      const mockPost: Entry = {
-        id: postId!,
-        url: `http://localhost:8000/api/entries/${postId}/`,
-        author: {
-          id: '123',
-          url: 'http://localhost:8000/api/authors/123/',
-          username: 'johndoe',
-          email: 'john@example.com',
-          display_name: 'John Doe',
-          profile_image: 'https://i.pravatar.cc/150?u=john',
-          bio: 'Full-stack developer passionate about creating amazing user experiences',
-          is_approved: true,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        title: 'Building a Modern Social Network with React and Django',
-        content: `# Building a Modern Social Network
-
-In this comprehensive guide, we'll explore how to build a modern social network application using React for the frontend and Django for the backend.
-
-## Key Features
-
-- **Real-time updates**: Keep users engaged with live notifications
-- **Responsive design**: Works seamlessly across all devices
-- **Federation support**: Connect with other social networks
-- **Rich media**: Support for images, videos, and markdown
-
-## Architecture Overview
-
-The application follows a microservices architecture with:
-
-1. **Frontend**: React with TypeScript
-2. **Backend**: Django REST Framework
-3. **Database**: PostgreSQL
-4. **Cache**: Redis
-5. **Message Queue**: RabbitMQ
-
-Let's dive into each component...`,
-        content_type: 'text/markdown' as const,
-        visibility: 'public' as const,
-        categories: ['web-development', 'tutorial', 'react', 'django'],
-        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        updated_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        likes_count: 42,
-        comments_count: 8,
-      };
-
-      const mockComments: CommentWithReplies[] = [
-        {
-          id: '1',
-          url: 'http://localhost:8000/api/comments/1/',
-          author: {
-            id: '124',
-            url: 'http://localhost:8000/api/authors/124/',
-            username: 'alice',
-            email: 'alice@example.com',
-            display_name: 'Alice Chen',
-            profile_image: 'https://i.pravatar.cc/150?u=alice',
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          content: 'This is an excellent guide! I especially appreciate the architecture overview. Would you consider adding a section on authentication strategies?',
-          content_type: 'text/plain' as const,
-          entry: postId!,
-          created_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-          updated_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-          replies: [
-            {
-              id: '2',
-              url: 'http://localhost:8000/api/comments/2/',
-              author: mockPost.author,
-              content: "Great suggestion! I'll add a section on JWT authentication and OAuth integration in the next update.",
-              content_type: 'text/plain' as const,
-              entry: postId!,
-              created_at: new Date(Date.now() - 1000 * 60 * 60 * 10).toISOString(),
-              updated_at: new Date(Date.now() - 1000 * 60 * 60 * 10).toISOString(),
-            },
-          ],
-        },
-        {
-          id: '3',
-          url: 'http://localhost:8000/api/comments/3/',
-          author: {
-            id: '125',
-            url: 'http://localhost:8000/api/authors/125/',
-            username: 'bob',
-            email: 'bob@example.com',
-            display_name: 'Bob Wilson',
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          content: 'How do you handle real-time updates? Are you using WebSockets or Server-Sent Events?',
-          content_type: 'text/plain' as const,
-          entry: postId!,
-          created_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-          updated_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-        },
-      ];
-
-      setPost(mockPost);
-      setComments(mockComments);
-      setIsLiked(Math.random() > 0.5);
-      setIsBookmarked(Math.random() > 0.7);
-    } catch (error) {
-      console.error('Error fetching post:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [fetchPostDetails]);
 
   const handleLike = async () => {
+    if (!postId || !post) return;
+
     const newLikedState = !isLiked;
     setIsLiked(newLikedState);
-    
+
     // Optimistic update
-    if (post) {
-      setPost({
-        ...post,
-        likes_count: newLikedState ? (post.likes_count || 0) + 1 : (post.likes_count || 0) - 1,
-      });
-    }
-    
+    setPost({
+      ...post,
+      likes_count: newLikedState
+        ? (post.likes_count || 0) + 1
+        : Math.max((post.likes_count || 0) - 1, 0),
+    });
+
     try {
-      // API call would go here
-    } catch (error) {
+      // Make the actual API call using proper endpoints
+      if (newLikedState) {
+        await socialService.likeEntry(postId);
+      } else {
+        await socialService.unlikeEntry(postId);
+      }
+    } catch (err) {
+      console.error("Error updating like status:", err);
+
       // Revert on error
       setIsLiked(!newLikedState);
-      if (post) {
-        setPost({
-          ...post,
-          likes_count: newLikedState ? (post.likes_count || 0) - 1 : (post.likes_count || 0) + 1,
-        });
-      }
+      setPost({
+        ...post,
+        likes_count: !newLikedState
+          ? (post.likes_count || 0) + 1
+          : Math.max((post.likes_count || 0) - 1, 0),
+      });
     }
   };
+  const handleBookmark = async () => {
+    if (!postId) return;
 
-  const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked);
+    const newBookmarkState = !isBookmarked;
+    setIsBookmarked(newBookmarkState);
+
+    try {
+      // Make the actual API call
+      if (newBookmarkState) {
+        await socialService.savePost(postId);
+      } else {
+        await socialService.unsavePost(postId);
+      }
+    } catch (err) {
+      console.error("Error updating bookmark status:", err);
+      // Revert on error
+      setIsBookmarked(!newBookmarkState);
+    }
   };
-
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim()) return;
+    if (!commentText.trim() || !postId) return;
 
     setIsSubmitting(true);
     try {
-      // API call would go here
-      const newComment: CommentWithReplies = {
-        id: Date.now().toString(),
-        url: `http://localhost:8000/api/comments/${Date.now()}/`,
-        author: user!,
+      // Create the comment data with the correct type format
+      const commentData = {
         content: commentText,
-        content_type: 'text/plain' as const,
-        entry: postId!,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        content_type: "text/plain" as "text/plain" | "text/markdown", // Use the exact string format expected by the backend with proper type assertion
       };
 
+      // If replying to another comment, add it as parent
       if (replyingTo) {
-        // Add as reply
-        setComments(prev => 
-          prev.map(comment => 
+        // In a real implementation this would include parent reference
+        // For now we'll submit it as a regular comment
+        const newComment = await entryService.createComment(
+          postId,
+          commentData
+        );
+
+        // Update the comments array with the new reply
+        setComments((prev) =>
+          prev.map((comment) =>
             comment.id === replyingTo
-              ? { ...comment, replies: [...(comment.replies || []), newComment] }
+              ? {
+                  ...comment,
+                  replies: [...(comment.replies || []), newComment],
+                }
               : comment
           )
         );
       } else {
-        // Add as new comment
-        setComments(prev => [newComment, ...prev]);
+        // Create a new top-level comment
+        const newComment = await entryService.createComment(
+          postId,
+          commentData
+        );
+
+        // Add to the comments list
+        setComments((prev) => [newComment as CommentWithReplies, ...prev]);
       }
-      
-      setCommentText('');
+
+      // Reset the form
+      setCommentText("");
       setReplyingTo(null);
-      
+
+      // Update the comment count
       if (post) {
         setPost({ ...post, comments_count: (post.comments_count || 0) + 1 });
       }
-    } catch (error) {
-      console.error('Error submitting comment:', error);
+    } catch (err) {
+      console.error("Error submitting comment:", err);
+
+      // Provide detailed error logging to help troubleshooting
+      if (err instanceof Error) {
+        console.error("Error message:", err.message);
+      }
+
+      // Log request data for debugging
+      console.log("Comment request data:", {
+        postId,
+        commentData: {
+          content: commentText,
+          content_type: "text/plain",
+        },
+      });
+
+      // Could add user-facing error notification here
+      alert("Failed to submit comment. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -235,10 +307,10 @@ Let's dive into each component...`,
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
@@ -247,7 +319,7 @@ Let's dive into each component...`,
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 60) return `${diffMins}m ago`;
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
@@ -256,28 +328,39 @@ Let's dive into each component...`,
   };
 
   const renderContent = (content: string, contentType: string) => {
-    if (contentType === 'text/markdown') {
+    if (contentType === "text/markdown") {
       // Simple markdown rendering
       const htmlContent = content
         .replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold mb-4">$1</h1>')
-        .replace(/^## (.*$)/gim, '<h2 class="text-2xl font-semibold mb-3 mt-6">$1</h2>')
-        .replace(/^### (.*$)/gim, '<h3 class="text-xl font-semibold mb-2 mt-4">$1</h3>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[var(--primary-violet)] hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
+        .replace(
+          /^## (.*$)/gim,
+          '<h2 class="text-2xl font-semibold mb-3 mt-6">$1</h2>'
+        )
+        .replace(
+          /^### (.*$)/gim,
+          '<h3 class="text-xl font-semibold mb-2 mt-4">$1</h3>'
+        )
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.*?)\*/g, "<em>$1</em>")
+        .replace(
+          /\[([^\]]+)\]\(([^)]+)\)/g,
+          '<a href="$2" class="text-[var(--primary-violet)] hover:underline" target="_blank" rel="noopener noreferrer">$1</a>'
+        )
         .replace(/^- (.*$)/gim, '<li class="ml-6 list-disc">$1</li>')
         .replace(/^\d+\. (.*$)/gim, '<li class="ml-6 list-decimal">$1</li>')
         .replace(/\n\n/g, '</p><p class="mb-4">')
-        .replace(/\n/g, '<br>');
-      
+        .replace(/\n/g, "<br>");
+
       return (
-        <div 
+        <div
           className="prose prose-lg max-w-none text-text-1"
-          dangerouslySetInnerHTML={{ __html: `<p class="mb-4">${htmlContent}</p>` }}
+          dangerouslySetInnerHTML={{
+            __html: `<p class="mb-4">${htmlContent}</p>`,
+          }}
         />
       );
     }
-    
+
     return <p className="text-text-1 whitespace-pre-wrap">{content}</p>;
   };
 
@@ -293,9 +376,15 @@ Let's dive into each component...`,
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card variant="main" className="p-8 text-center">
-          <h2 className="text-xl font-semibold text-text-1 mb-2">Post not found</h2>
-          <p className="text-text-2 mb-4">The post you're looking for doesn't exist.</p>
-          <AnimatedButton onClick={() => navigate('/')} variant="primary">
+          {" "}
+          <h2 className="text-xl font-semibold text-text-1 mb-2">
+            Post not available
+          </h2>
+          <p className="text-text-2 mb-4">
+            The post you're looking for either doesn't exist or you don't have
+            permission to view it.
+          </p>
+          <AnimatedButton onClick={() => navigate("/")} variant="primary">
             Go Home
           </AnimatedButton>
         </Card>
@@ -318,7 +407,7 @@ Let's dive into each component...`,
           <ArrowLeft size={20} />
           <span>Back</span>
         </button>
-        
+
         {isAuthorObject(post.author) && post.author.id === user?.id && (
           <div className="relative">
             <motion.button
@@ -329,7 +418,7 @@ Let's dive into each component...`,
             >
               <MoreVertical size={20} className="text-text-2" />
             </motion.button>
-            
+
             <AnimatePresence>
               {showActions && (
                 <motion.div
@@ -359,22 +448,40 @@ Let's dive into each component...`,
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card variant="main" className="p-6 md:p-8 mb-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
+        <Card
+          variant="main"
+          className="p-6 md:p-8 mb-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl"
+        >
           {/* Author Info */}
           <div className="flex items-center space-x-3 mb-6">
             <motion.div whileHover={{ scale: 1.05 }}>
               <Avatar
-                imgSrc={isAuthorObject(post.author) ? post.author.profile_image : undefined}
-                alt={isAuthorObject(post.author) ? post.author.display_name : 'Author'}
+                imgSrc={
+                  isAuthorObject(post.author)
+                    ? post.author.profile_image
+                    : undefined
+                }
+                alt={
+                  isAuthorObject(post.author)
+                    ? post.author.display_name
+                    : "Author"
+                }
                 size="lg"
               />
             </motion.div>
             <div className="flex-1">
               <h3 className="font-semibold text-text-1">
-                {isAuthorObject(post.author) ? post.author.display_name : 'Unknown Author'}
+                {isAuthorObject(post.author)
+                  ? post.author.display_name
+                  : "Unknown Author"}
               </h3>
               <div className="flex items-center space-x-3 text-sm text-text-2">
-                <span>@{isAuthorObject(post.author) ? post.author.username : 'unknown'}</span>
+                <span>
+                  @
+                  {isAuthorObject(post.author)
+                    ? post.author.username
+                    : "unknown"}
+                </span>
                 <span>•</span>
                 <span className="flex items-center">
                   <Clock size={14} className="mr-1" />
@@ -421,21 +528,27 @@ Let's dive into each component...`,
                 whileTap={{ scale: 0.9 }}
                 onClick={handleLike}
                 className={`flex items-center space-x-2 ${
-                  isLiked ? 'text-[var(--primary-pink)]' : 'text-text-2 hover:text-text-1'
+                  isLiked
+                    ? "text-[var(--primary-pink)]"
+                    : "text-text-2 hover:text-text-1"
                 } transition-colors`}
               >
                 <motion.div
                   animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
                   transition={{ duration: 0.3 }}
                 >
-                  <Heart size={20} fill={isLiked ? 'currentColor' : 'none'} />
+                  <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
                 </motion.div>
-                <span className="text-sm font-medium">{post.likes_count || 0}</span>
+                <span className="text-sm font-medium">
+                  {post.likes_count || 0}
+                </span>
               </motion.button>
 
               <div className="flex items-center space-x-2 text-text-2">
                 <MessageCircle size={20} />
-                <span className="text-sm font-medium">{post.comments_count || 0}</span>
+                <span className="text-sm font-medium">
+                  {post.comments_count || 0}
+                </span>
               </div>
 
               <motion.button
@@ -452,16 +565,24 @@ Let's dive into each component...`,
               whileTap={{ scale: 0.9 }}
               onClick={handleBookmark}
               className={`${
-                isBookmarked ? 'text-[var(--primary-teal)]' : 'text-text-2 hover:text-text-1'
+                isBookmarked
+                  ? "text-[var(--primary-teal)]"
+                  : "text-text-2 hover:text-text-1"
               } transition-colors`}
             >
-              <Bookmark size={20} fill={isBookmarked ? 'currentColor' : 'none'} />
+              <Bookmark
+                size={20}
+                fill={isBookmarked ? "currentColor" : "none"}
+              />
             </motion.button>
           </div>
         </Card>
 
         {/* Comments Section */}
-        <Card variant="main" className="p-6 bg-[rgba(var(--glass-rgb),0.35)] backdrop-blur-xl">
+        <Card
+          variant="main"
+          className="p-6 bg-[rgba(var(--glass-rgb),0.35)] backdrop-blur-xl"
+        >
           <h2 className="text-xl font-semibold text-text-1 mb-6">
             Comments ({comments.length})
           </h2>
@@ -471,7 +592,7 @@ Let's dive into each component...`,
             {replyingTo && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
+                animate={{ opacity: 1, height: "auto" }}
                 className="mb-2 text-sm text-text-2"
               >
                 Replying to comment...
@@ -484,11 +605,11 @@ Let's dive into each component...`,
                 </button>
               </motion.div>
             )}
-            
+
             <div className="flex space-x-3">
               <Avatar
                 imgSrc={user?.profile_image}
-                alt={user?.display_name || 'User'}
+                alt={user?.display_name || "User"}
                 size="md"
               />
               <div className="flex-1">
@@ -527,8 +648,16 @@ Let's dive into each component...`,
               >
                 <div className="flex space-x-3">
                   <Avatar
-                    imgSrc={isAuthorObject(comment.author) ? comment.author.profile_image : undefined}
-                    alt={isAuthorObject(comment.author) ? comment.author.display_name : 'Author'}
+                    imgSrc={
+                      isAuthorObject(comment.author)
+                        ? comment.author.profile_image
+                        : undefined
+                    }
+                    alt={
+                      isAuthorObject(comment.author)
+                        ? comment.author.display_name
+                        : "Author"
+                    }
                     size="md"
                   />
                   <div className="flex-1">
@@ -536,7 +665,9 @@ Let's dive into each component...`,
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <span className="font-medium text-text-1">
-                            {isAuthorObject(comment.author) ? comment.author.display_name : 'Unknown Author'}
+                            {isAuthorObject(comment.author)
+                              ? comment.author.display_name
+                              : "Unknown Author"}
                           </span>
                           <span className="text-sm text-text-2 ml-2">
                             {formatTime(comment.created_at)}
@@ -563,20 +694,32 @@ Let's dive into each component...`,
                             className="flex space-x-3"
                           >
                             <Avatar
-                              imgSrc={isAuthorObject(reply.author) ? reply.author.profile_image : undefined}
-                              alt={isAuthorObject(reply.author) ? reply.author.display_name : 'Author'}
+                              imgSrc={
+                                isAuthorObject(reply.author)
+                                  ? reply.author.profile_image
+                                  : undefined
+                              }
+                              alt={
+                                isAuthorObject(reply.author)
+                                  ? reply.author.display_name
+                                  : "Author"
+                              }
                               size="sm"
                             />
                             <div className="flex-1 glass-card-subtle rounded-lg p-3 bg-[rgba(var(--glass-rgb),0.25)] backdrop-blur-md">
                               <div className="mb-1">
                                 <span className="font-medium text-sm text-text-1">
-                                  {isAuthorObject(reply.author) ? reply.author.display_name : 'Unknown Author'}
+                                  {isAuthorObject(reply.author)
+                                    ? reply.author.display_name
+                                    : "Unknown Author"}
                                 </span>
                                 <span className="text-xs text-text-2 ml-2">
                                   {formatTime(reply.created_at)}
                                 </span>
                               </div>
-                              <p className="text-sm text-text-1">{reply.content}</p>
+                              <p className="text-sm text-text-1">
+                                {reply.content}
+                              </p>
                             </div>
                           </motion.div>
                         ))}
