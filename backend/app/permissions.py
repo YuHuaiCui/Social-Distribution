@@ -1,19 +1,24 @@
 # permissions.py
-from rest_framework import permissions 
+from rest_framework import permissions
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
 class IsAuthorSelfOrReadOnly(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
-        # For nested views, we need to check if the author matches the entry's author
-        print("DEBUG:", request.user, getattr(request.user, "author", None), obj.author_id)
+        # Read permissions are allowed for any request,
+        # so we'll always allow GET, HEAD or OPTIONS requests.
         if request.method in SAFE_METHODS:
             return True
-        author = request.user  # Because request.user *is* the Author
 
-        if not author:
-            return False
-        return obj.author_id == author.url  # compare full URL (foreign key is to_field='url')
-        
-        
-        
+        # Write permissions are only allowed to the owner of the entry.
+        # Get the author from the request user
+        if hasattr(request.user, "author"):
+            author = request.user.author
+        else:
+            # If request.user IS the author (custom user model)
+            author = request.user
+
+        # Compare the author with the entry's author
+        # Since Entry.author is a ForeignKey with to_field='url',
+        # we need to compare the author instances directly
+        return obj.author == author
