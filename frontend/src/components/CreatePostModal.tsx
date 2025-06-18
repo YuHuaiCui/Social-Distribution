@@ -206,7 +206,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-50 overflow-hidden flex flex-col"
+            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-50 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -226,7 +226,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-              <form onSubmit={handleSubmit} className="space-y-4 relative">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Title */}
                 <div>
                   <input

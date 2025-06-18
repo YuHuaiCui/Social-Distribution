@@ -1,17 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  ThumbsUp,
+  Heart,
   MessageCircle,
   Share2,
   MoreHorizontal,
   Bookmark,
   Edit,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Entry, Author } from "../types/models";
 import { api } from "../services/api";
+import { socialService } from "../services/social";
 import { useAuth } from "../components/context/AuthContext";
 import { useCreatePost } from "../components/context/CreatePostContext";
 import { useToast } from "../components/context/ToastContext";
@@ -107,15 +109,23 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newSavedState = !saved;
     setSaved(newSavedState);
-    onSave?.(newSavedState);
 
-    if (newSavedState) {
-      showSuccess("Post saved to your collection");
-    } else {
-      showInfo("Post removed from collection");
+    try {
+      if (newSavedState) {
+        await socialService.savePost(post.id);
+        showSuccess("Post saved to your collection");
+      } else {
+        await socialService.unsavePost(post.id);
+        showInfo("Post removed from collection");
+      }
+      onSave?.(newSavedState);
+    } catch (error) {
+      // Revert on error
+      setSaved(!newSavedState);
+      showError("Failed to update saved status");
     }
   };
 
@@ -303,13 +313,26 @@ export const PostCard: React.FC<PostCardProps> = ({
 
         {/* Post title */}
         <Link to={`/posts/${post.id}`}>
-          <h2 className="text-xl font-semibold mb-2 text-text-1 hover:text-brand-500 transition-colors">
+          <h2 className="text-xl font-semibold mb-3 text-text-1 hover:text-brand-500 transition-colors">
             {post.title}
           </h2>
         </Link>
 
+        {/* Title/Content separator for markdown posts */}
+        {post.content_type === "text/markdown" && (
+          <div className="flex items-center mb-4">
+            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
+            <div className="mx-3 text-text-2">
+              <FileText size={14} className="opacity-50" />
+            </div>
+            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
+          </div>
+        )}
+
         {/* Post content */}
-        <div className="mb-4">{renderContent()}</div>
+        <div className={`mb-4 ${post.content_type === "text/markdown" ? "prose-sm" : ""}`}>
+          {renderContent()}
+        </div>
 
         {/* Post image if it's an image type */}
         {(post.content_type === "image/png" ||
@@ -392,7 +415,7 @@ export const PostCard: React.FC<PostCardProps> = ({
               }
               transition={{ duration: 0.5 }}
             >
-              <ThumbsUp size={18} fill={liked ? "currentColor" : "none"} />
+              <Heart size={18} fill={liked ? "currentColor" : "none"} />
               <span className="text-sm font-medium">{likeCount}</span>
             </motion.div>
           </button>
