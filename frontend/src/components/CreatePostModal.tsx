@@ -140,8 +140,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         );
 
         onSuccess?.(updatedPost);
+        triggerRefresh(); // Trigger posts refresh
         handleClose();
-        console.log("Post updated successfully");
+        console.log("Post updated successfully, refreshing feed...");
       } else {
         // Create new post
         const newPost = await entryService.createEntry(entryData);
