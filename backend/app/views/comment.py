@@ -31,7 +31,10 @@ class CommentListCreateView(generics.ListCreateAPIView):
         if serializer.validated_data.get('content_type') not in [Entry.TEXT_PLAIN, Entry.TEXT_MARKDOWN]:
             serializer.validated_data['content_type'] = Entry.TEXT_PLAIN
             
-        serializer.save(author=self.request.user, entry=entry)
+        # Pass the author's URL (not the User object) since the FK uses to_field="url"
+        # request.user IS the Author instance (Author extends AbstractUser)
+        author_url = self.request.user.url
+        serializer.save(author_id=author_url, entry_id=entry.url)
 
 class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """

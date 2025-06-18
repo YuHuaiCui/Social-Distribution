@@ -36,11 +36,7 @@ export class AuthService extends BaseApiService {
       }
     );
 
-    // Store token if provided
-    if (response.token) {
-      const storage = credentials.remember_me ? localStorage : sessionStorage;
-      storage.setItem("authToken", response.token);
-    }
+    // Session authentication is handled by Django - no token storage needed
 
     // Transform backend response to match AuthResponse interface
     return {
@@ -59,9 +55,7 @@ export class AuthService extends BaseApiService {
         method: "POST",
       });
     } finally {
-      // Clear auth tokens regardless of API response
-      localStorage.removeItem("authToken");
-      sessionStorage.removeItem("authToken");
+      // Session will be cleared by Django
     }
   }
 
@@ -166,11 +160,7 @@ export class AuthService extends BaseApiService {
       }
     );
 
-    // Store token if provided
-    if (response.token) {
-      localStorage.setItem("authToken", response.token);
-    }
-
+    // Session authentication is handled by Django
     return response;
   }
 }

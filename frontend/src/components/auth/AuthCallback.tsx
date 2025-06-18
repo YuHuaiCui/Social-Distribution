@@ -77,13 +77,30 @@ export default function AuthCallback() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 text-xl">Authentication Error</div>
-          <p className="mt-4 text-gray-600">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg-1">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+            <svg
+              className="w-8 h-8 text-red-600 dark:text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-text-1 mb-2">
+            Authentication Failed
+          </h2>
+          <p className="text-text-2 mb-6">{error}</p>
           <button
             onClick={() => navigate("/", { replace: true })}
-            className="mt-4 px-4 py-2 bg-black text-white rounded-lg"
+            className="px-6 py-2 bg-[var(--primary-purple)] text-white rounded-lg hover:bg-[var(--primary-purple)]/90 transition-colors"
           >
             Return to Login
           </button>
@@ -93,10 +110,18 @@ export default function AuthCallback() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-bg-1">
       <div className="text-center">
-        <div className="text-xl mb-4">Processing authentication...</div>
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-black mx-auto"></div>
+        <div className="mb-6">
+          <div className="w-16 h-16 mx-auto relative">
+            <div className="absolute inset-0 rounded-full border-4 border-[var(--border-1)]"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-[var(--primary-purple)] border-t-transparent animate-spin"></div>
+          </div>
+        </div>
+        <h2 className="text-xl font-semibold text-text-1 mb-2">
+          Authenticating with GitHub
+        </h2>
+        <p className="text-text-2">Please wait while we complete your login...</p>
       </div>
     </div>
   );

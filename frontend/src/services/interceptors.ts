@@ -22,9 +22,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
       
       // Don't redirect if already on public routes
       if (!PUBLIC_ROUTES.includes(currentPath)) {
-        // Clear any auth data
-        localStorage.removeItem('authToken');
-        sessionStorage.removeItem('authToken');
+        // Session will be cleared by Django on logout
         
         // Force a page reload to trigger auth check and redirect
         window.location.href = '/';

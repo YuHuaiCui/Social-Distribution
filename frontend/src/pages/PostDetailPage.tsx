@@ -17,6 +17,8 @@ import {
   AlignLeft,
 } from "lucide-react";
 import { useAuth } from "../components/context/AuthContext";
+import { useToast } from "../components/context/ToastContext";
+import { triggerNotificationUpdate } from "../components/context/NotificationContext";
 import type { Entry, Comment, Author } from "../types/models";
 import AnimatedButton from "../components/ui/AnimatedButton";
 import Card from "../components/ui/Card";
@@ -25,6 +27,7 @@ import Loader from "../components/ui/Loader";
 import { entryService } from "../services/entry";
 import { socialService } from "../services/social";
 import { renderMarkdown } from "../utils/markdown";
+import { extractUUID } from "../utils/extractId";
 
 interface CommentWithReplies extends Comment {
   replies?: Comment[];
@@ -34,6 +37,7 @@ export const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showError } = useToast();
   const [post, setPost] = useState<Entry | null>(null);
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,18 +61,31 @@ export const PostDetailPage: React.FC = () => {
 
     setIsLoading(true);
 
+    // Extract UUID if postId is a full URL
+    let extractedId = postId;
+    if (postId.includes('/')) {
+      // Extract the UUID from the URL (last segment)
+      const segments = postId.split('/');
+      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+    }
+
     // Validate UUID format
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(postId)) {
-      console.warn(`Invalid UUID format for postId: ${postId}`);
+    if (!uuidRegex.test(extractedId)) {
+      console.warn(`Invalid UUID format for postId: ${extractedId} (original: ${postId})`);
       setPost(null);
       setIsLoading(false);
       return;
-    } // Fetch the post details
+    }
+    
+    // Use the extracted UUID for all API calls
+    const validPostId = extractedId;
+    
+    // Fetch the post details
     let fetchedPost;
     try {
-      fetchedPost = await entryService.getEntry(postId);
+      fetchedPost = await entryService.getEntry(validPostId);
       setPost(fetchedPost);
     } catch (error) {
       // Check if it's a 404 error - could be the post doesn't exist or is not viewable due to permissions
@@ -82,7 +99,7 @@ export const PostDetailPage: React.FC = () => {
           // Try fetching through author's endpoint which might have different permissions
           const response = await entryService.getEntriesByAuthor(user.id);
           const authorPost = response.results.find(
-            (entry) => entry.id === postId
+            (entry) => entry.id === validPostId
           );
 
           if (authorPost) {
@@ -107,7 +124,7 @@ export const PostDetailPage: React.FC = () => {
 
     // Fetch comments for the post
     try {
-      const commentsResponse = await entryService.getComments(postId);
+      const commentsResponse = await entryService.getComments(validPostId);
 
       // Convert flat comments to threaded structure
       const parentComments: CommentWithReplies[] = [];
@@ -147,7 +164,7 @@ export const PostDetailPage: React.FC = () => {
 
     // Get like status using the API
     try {
-      const response = await fetch(`/api/entries/${postId}/likes/`);
+      const response = await fetch(`/api/entries/${validPostId}/likes/`);
       if (response.ok) {
         const likeData = await response.json();
         setIsLiked(likeData.liked_by_current_user);
@@ -165,7 +182,7 @@ export const PostDetailPage: React.FC = () => {
     try {
       const savedPostsResponse = await socialService.getSavedPosts();
       const isSaved = savedPostsResponse.results.some(
-        (savedPost) => savedPost.id === postId
+        (savedPost) => savedPost.id === validPostId
       );
       setIsBookmarked(isSaved);
     } catch (error) {
@@ -184,6 +201,9 @@ export const PostDetailPage: React.FC = () => {
   const handleLike = async () => {
     if (!postId || !post) return;
 
+    // Extract UUID from postId if it's a URL
+    const extractedId = extractUUID(postId);
+
     const newLikedState = !isLiked;
     setIsLiked(newLikedState);
 
@@ -198,9 +218,9 @@ export const PostDetailPage: React.FC = () => {
     try {
       // Make the actual API call using proper endpoints
       if (newLikedState) {
-        await socialService.likeEntry(postId);
+        await socialService.likeEntry(extractedId);
       } else {
-        await socialService.unlikeEntry(postId);
+        await socialService.unlikeEntry(extractedId);
       }
     } catch (err) {
       console.error("Error updating like status:", err);
@@ -218,15 +238,18 @@ export const PostDetailPage: React.FC = () => {
   const handleBookmark = async () => {
     if (!postId) return;
 
+    // Extract UUID from postId if it's a URL
+    const extractedId = extractUUID(postId);
+
     const newBookmarkState = !isBookmarked;
     setIsBookmarked(newBookmarkState);
 
     try {
       // Make the actual API call
       if (newBookmarkState) {
-        await socialService.savePost(postId);
+        await socialService.savePost(extractedId);
       } else {
-        await socialService.unsavePost(postId);
+        await socialService.unsavePost(extractedId);
       }
     } catch (err) {
       console.error("Error updating bookmark status:", err);
@@ -237,6 +260,17 @@ export const PostDetailPage: React.FC = () => {
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim() || !postId) return;
+
+    // Extract UUID from postId if it's a URL
+    let extractedId = postId;
+    if (postId.includes('/')) {
+      const segments = postId.split('/');
+      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+    }
+
+    console.log("Submitting comment for post ID:", extractedId, "(original:", postId, ")");
+    console.log("Current user:", user);
+    console.log("Session cookie:", document.cookie);
 
     setIsSubmitting(true);
     try {
@@ -251,7 +285,7 @@ export const PostDetailPage: React.FC = () => {
         // In a real implementation this would include parent reference
         // For now we'll submit it as a regular comment
         const newComment = await entryService.createComment(
-          postId,
+          extractedId,
           commentData
         );
 
@@ -269,7 +303,7 @@ export const PostDetailPage: React.FC = () => {
       } else {
         // Create a new top-level comment
         const newComment = await entryService.createComment(
-          postId,
+          extractedId,
           commentData
         );
 
@@ -283,7 +317,16 @@ export const PostDetailPage: React.FC = () => {
 
       // Update the comment count
       if (post) {
-        setPost({ ...post, comments_count: (post.comments_count || 0) + 1 });
+        const newCommentCount = (post.comments_count || 0) + 1;
+        setPost({ ...post, comments_count: newCommentCount });
+        
+        // Dispatch custom event to update comment count in other components
+        window.dispatchEvent(new CustomEvent('post-update', {
+          detail: { postId: post.id, updates: { comments_count: newCommentCount } }
+        }));
+        
+        // Trigger notification update in case the post author receives a notification
+        triggerNotificationUpdate();
       }
     } catch (err) {
       console.error("Error submitting comment:", err);
@@ -302,8 +345,8 @@ export const PostDetailPage: React.FC = () => {
         },
       });
 
-      // Could add user-facing error notification here
-      alert("Failed to submit comment. Please try again.");
+      // Show user-friendly error message
+      showError("Failed to submit comment. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

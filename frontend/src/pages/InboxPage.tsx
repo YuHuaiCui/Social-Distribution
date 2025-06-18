@@ -261,7 +261,7 @@ export const InboxPage: React.FC = () => {
   const unreadCount = items.filter(item => !item.is_read).length;
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-5xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -269,8 +269,8 @@ export const InboxPage: React.FC = () => {
         className="flex items-center justify-between mb-6"
       >
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-full gradient-secondary flex items-center justify-center">
-            <Inbox className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-pink)] flex items-center justify-center shadow-lg">
+            <Inbox className="w-6 h-6 text-white" strokeWidth={2} />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-text-1">Inbox</h1>
@@ -329,139 +329,8 @@ export const InboxPage: React.FC = () => {
           </motion.button>
         ))}
         
-        {/* Stats and Bulk Actions Toggle */}
-        <div className="ml-auto flex gap-2">
-          <motion.button
-            onClick={() => setShowStats(!showStats)}
-            className="px-4 py-2 rounded-lg glass-card-subtle text-text-2 hover:text-text-1 transition-all flex items-center gap-2"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <BarChart3 size={16} />
-            <span className="text-sm font-medium">Stats</span>
-          </motion.button>
-          
-          {items.length > 0 && (
-            <motion.button
-              onClick={() => {
-                setShowBulkActions(!showBulkActions);
-                if (showBulkActions) {
-                  setSelectedItems(new Set());
-                }
-              }}
-              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
-                showBulkActions 
-                  ? 'bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]'
-                  : 'glass-card-subtle text-text-2 hover:text-text-1'
-              }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <CheckSquare size={16} />
-              <span className="text-sm font-medium">Select</span>
-            </motion.button>
-          )}
-        </div>
       </motion.div>
 
-      {/* Stats Panel */}
-      <AnimatePresence>
-        {showStats && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-6"
-          >
-            <Card variant="prominent" className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
-              <h3 className="text-lg font-semibold text-text-1 mb-4 flex items-center gap-2">
-                <BarChart3 size={20} className="text-[var(--primary-violet)]" />
-                Inbox Statistics
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-text-1">{stats.total}</div>
-                  <div className="text-sm text-text-2">Total</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[var(--primary-violet)]">{stats.unread}</div>
-                  <div className="text-sm text-text-2">Unread</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[var(--primary-purple)]">{stats.followRequests}</div>
-                  <div className="text-sm text-text-2">Follows</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[var(--primary-pink)]">{stats.likes}</div>
-                  <div className="text-sm text-text-2">Likes</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[var(--primary-blue)]">{stats.comments}</div>
-                  <div className="text-sm text-text-2">Comments</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-[var(--primary-teal)]">{stats.shares}</div>
-                  <div className="text-sm text-text-2">Shares</div>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Bulk Actions Bar */}
-      <AnimatePresence>
-        {showBulkActions && selectedItems.size > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="mb-6"
-          >
-            <Card variant="prominent" className="p-4 bg-[var(--primary-violet)]/10 border border-[var(--primary-violet)]/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={selectAllItems}
-                    className="flex items-center gap-2 text-text-1 hover:text-[var(--primary-violet)] transition-colors"
-                  >
-                    {selectedItems.size === items.length ? (
-                      <CheckSquare size={18} className="text-[var(--primary-violet)]" />
-                    ) : (
-                      <Square size={18} />
-                    )}
-                    <span className="text-sm font-medium">
-                      {selectedItems.size === items.length ? 'Deselect All' : 'Select All'}
-                    </span>
-                  </button>
-                  <span className="text-sm text-text-2">
-                    {selectedItems.size} item{selectedItems.size !== 1 ? 's' : ''} selected
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <AnimatedButton
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleBulkMarkAsRead}
-                    icon={<CheckCircle2 size={16} />}
-                  >
-                    Mark as Read
-                  </AnimatedButton>
-                  <AnimatedButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleBulkDelete}
-                    icon={<Trash2 size={16} />}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    Delete
-                  </AnimatedButton>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Inbox Items */}
       {isLoading ? (
@@ -474,8 +343,8 @@ export const InboxPage: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           className="text-center py-12"
         >
-          <Card variant="main" className="inline-block p-12 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
-            <Inbox className="w-16 h-16 text-text-2 mx-auto mb-4" />
+          <Card variant="main" className="w-full p-12 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
+            <Inbox className="w-16 h-16 text-text-2 mx-auto mb-4" strokeWidth={1.5} />
             <h3 className="text-lg font-medium text-text-1 mb-2">No notifications</h3>
             <p className="text-text-2">
               {filter === 'all' 
