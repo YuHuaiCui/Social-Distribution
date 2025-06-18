@@ -6,6 +6,8 @@ import {
   Image as ImageIcon,
   Save,
   ChevronDown,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 import { entryService } from "../services";
