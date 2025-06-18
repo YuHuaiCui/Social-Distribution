@@ -1,0 +1,523 @@
+# Frontend Documentation
+
+## Table of Contents
+1. [Project Overview](#project-overview)
+2. [Tech Stack](#tech-stack)
+3. [Project Structure](#project-structure)
+4. [Core Features](#core-features)
+5. [Component Library](#component-library)
+6. [State Management](#state-management)
+7. [API Integration](#api-integration)
+8. [Routing and Navigation](#routing-and-navigation)
+9. [Authentication Flow](#authentication-flow)
+10. [UI/UX Patterns](#uiux-patterns)
+11. [Development Setup](#development-setup)
+12. [Environment Variables](#environment-variables)
+13. [Testing Approach](#testing-approach)
+14. [Build and Deployment](#build-and-deployment)
+15. [Code Conventions](#code-conventions)
+16. [Future Improvements](#future-improvements)
+
+## Project Overview
+
+The Social Distribution frontend is a modern React-based single-page application that provides a distributed social networking platform. Built with TypeScript and Vite, it offers a rich user interface for creating and sharing posts, following other users, managing friendships, and interacting with content across federated nodes.
+
+### Architecture
+
+The application follows a component-based architecture with:
+- **React 19** for UI components and state management
+- **TypeScript** for type safety and better developer experience
+- **Vite** for fast development and optimized production builds
+- **Context API** for global state management
+- **React Router** for client-side routing
+- **Service-based API layer** for backend communication
+
+## Tech Stack
+
+### Core Technologies
+- **React 19.1.0** - UI library with React Compiler optimization
+- **TypeScript 5.8.3** - Static typing for JavaScript
+- **Vite 6.3.5** - Build tool and development server
+- **React Router DOM 7.6.1** - Client-side routing
+
+### UI and Styling
+- **Tailwind CSS 4.1.8** - Utility-first CSS framework with Vite integration
+- **Framer Motion 12.18.1** - Animation library
+- **Lucide React** - Icon library
+
+### Additional Libraries
+- **React Hot Toast 2.5.2** - Toast notifications
+- **Sonner 2.0.5** - Alternative toast system
+- **liquid-glass-react** - Apple-style liquid glass effects
+- **Playwright** - E2E testing framework
+
+### Development Tools
+- **ESLint 9.25.0** - Code linting
+- **PostCSS & Autoprefixer** - CSS processing
+- **React Compiler Plugin** - Performance optimization
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── components/          # Reusable UI components
+│   │   ├── auth/           # Authentication components
+│   │   ├── context/        # Context providers
+│   │   ├── layout/         # Layout components
+│   │   ├── loader/         # Loading components
+│   │   ├── protected/      # Route protection components
+│   │   └── ui/             # Base UI components
+│   ├── layouts/            # Page layouts
+│   ├── lib/                # Utilities and helpers
+│   ├── pages/              # Page components
+│   ├── services/           # API service layer
+│   │   ├── auth/          # Authentication services
+│   │   ├── author/        # Author/user services
+│   │   ├── entry/         # Post/entry services
+│   │   ├── follow/        # Follow relationship services
+│   │   ├── image/         # Image upload services
+│   │   ├── inbox/         # Inbox/notification services
+│   │   └── social/        # Social interaction services
+│   ├── types/              # TypeScript type definitions
+│   ├── utils/              # Utility functions
+│   ├── App.tsx             # Root component
+│   ├── main.tsx            # Application entry point
+│   ├── routes.tsx          # Route configuration
+│   └── globals.css         # Global styles
+├── public/                  # Static assets
+├── dist/                    # Production build output
+└── Configuration files
+```
+
+## Core Features
+
+### 1. User Authentication
+- Login/Signup with email and password
+- Remember me functionality with 30-day persistence
+- Session management with 24-hour expiry
+- Password reset capability
+- Protected routes for authenticated users
+
+### 2. Content Creation
+- Rich text editor with Markdown support
+- Image upload and embedding
+- Privacy controls (Public, Friends-only, Unlisted)
+- Category tagging
+- Draft saving
+
+### 3. Social Interactions
+- Follow/Unfollow users
+- Friend requests and management
+- Like posts
+- Comment on posts
+- Share posts to inbox
+
+### 4. Content Discovery
+- Home feed with posts from followed users
+- Explore page for discovering new content
+- Search functionality for users and posts
+- Profile pages with user posts
+- Saved posts collection
+
+### 5. Inbox System
+- Notifications for likes, comments, and follows
+- Friend request management
+- Shared post notifications
+- Mark as read functionality
+
+### 6. User Profiles
+- Customizable display name and bio
+- Profile image upload
+- GitHub integration
+- Location and website fields
+- Activity feed
+
+## Component Library
+
+### Core UI Components
+
+#### Button Component
+```typescript
+// components/ui/Button.tsx
+interface ButtonProps {
+  variant?: 'primary' | 'secondary' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  loading?: boolean;
+  onClick?: () => void;
+}
+```
+
+#### Card Component
+```typescript
+// components/ui/Card.tsx
+// Provides consistent card styling with shadow and rounded corners
+```
+
+#### Input Component
+```typescript
+// components/ui/Input.tsx
+// Styled form inputs with error state support
+```
+
+### Feature Components
+
+#### PostCard
+- Displays individual posts with author info
+- Supports different content types (text, markdown, images)
+- Interactive elements (like, comment, share)
+- Privacy indicators
+
+#### AuthorCard
+- User profile display
+- Follow/unfollow actions
+- Quick stats (posts, followers, following)
+
+#### CreatePostModal
+- Modal-based post creation
+- Real-time preview
+- Privacy selection
+- Category management
+
+## State Management
+
+The application uses React Context API for global state management:
+
+### AuthContext
+```typescript
+interface AuthContextType {
+  isAuthenticated: boolean;
+  user: Author | null;
+  login: (rememberMe?: boolean, userData?: Author) => Promise<void>;
+  logout: () => void;
+  loading: boolean;
+  updateUser: (user: Author) => void;
+}
+```
+
+### PostsContext
+- Manages global posts state
+- Handles post CRUD operations
+- Provides optimistic updates
+
+### CreatePostContext
+- Controls post creation modal state
+- Manages draft state
+- Handles form submission
+
+### ToastContext
+- Centralized toast notification system
+- Success/error/info message display
+
+### ThemeProvider
+- Dark/light mode management
+- System preference detection
+- Persistent theme selection
+
+## API Integration
+
+### Service Architecture
+
+The application uses a service-based architecture for API communication:
+
+```typescript
+// services/base.ts
+class BaseService {
+  protected async request<T>(
+    endpoint: string,
+    options?: RequestInit
+  ): Promise<T>
+```
+
+### Key Services
+
+1. **AuthService** - Authentication operations
+2. **AuthorService** - User management
+3. **EntryService** - Post CRUD operations
+4. **FollowService** - Follow relationships
+5. **InboxService** - Notifications
+6. **SocialService** - Likes and comments
+
+### API Error Handling
+- Centralized error interceptors
+- Automatic retry logic
+- User-friendly error messages
+- Network status detection
+
+## Routing and Navigation
+
+### Route Structure
+
+```typescript
+// Protected routes
+/home              - User home feed
+/explore           - Discover new content
+/inbox             - Notifications
+/friends           - Friend management
+/profile/:id       - User profiles
+/posts/:id         - Post detail view
+/settings          - User settings
+/create            - Create new post
+
+// Public routes
+/                  - Login page
+/signup            - Registration
+/forgot-password   - Password reset
+```
+
+### Route Protection
+
+- `Protected` component wraps authenticated routes
+- `PublicOnly` component redirects logged-in users
+- Automatic redirect to login for unauthenticated access
+
+## Authentication Flow
+
+### Login Process
+1. User enters credentials
+2. API validation
+3. Session cookie set
+4. User data stored in context
+5. Optional "Remember Me" for extended session
+6. Redirect to home page
+
+### Session Management
+- 24-hour default session
+- 30-day extended session with "Remember Me"
+- Automatic session refresh
+- Logout clears all auth data
+
+### Security Features
+- CSRF token management
+- Secure cookie handling
+- Password strength validation
+- Rate limiting awareness
+
+## UI/UX Patterns
+
+### Design System
+
+#### Liquid Glass Effects
+- Apple-style glassmorphism using `liquid-glass-react` library
+- Three variants: `default`, `subtle`, `prominent`
+- Applied to major UI components:
+  - PostCard and AuthorCard
+  - SearchBar and SearchModal results
+  - Profile and notification dropdowns
+  - Floating menus
+- Wrapper components:
+  - `LiquidGlassCard`: General purpose wrapper
+  - `LiquidGlassSearchBar`: Optimized for search inputs
+  - `LiquidGlassFloatingMenu`: For dropdown menus
+
+#### Color Palette
+- Dynamic theme support (light/dark)
+- CSS variables for consistency
+- Tailwind utility classes
+
+#### Typography
+- System font stack
+- Responsive sizing
+- Consistent spacing
+
+#### Components
+- Consistent border radius
+- Shadow depths
+- Interactive states
+- Loading skeletons
+
+### Responsive Design
+- Mobile-first approach
+- Breakpoints: sm (640px), md (768px), lg (1024px), xl (1280px)
+- Touch-friendly interactions
+- Adaptive layouts
+
+### Animations
+- Framer Motion for complex animations
+- CSS transitions for simple effects
+- Loading states
+- Page transitions
+
+## Development Setup
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+- Git
+
+### Installation
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run linting
+npm run lint
+```
+
+### Development Server
+- Runs on http://localhost:5173
+- Hot Module Replacement enabled
+- Fast refresh for React components
+- Overlay disabled for better UX
+
+## Environment Variables
+
+Create a `.env` file in the frontend directory:
+
+```env
+# API Configuration
+VITE_API_URL=http://localhost:8000
+
+# Feature Flags
+VITE_ENABLE_GITHUB_ACTIVITY=true
+VITE_ENABLE_MARKDOWN_PREVIEW=true
+
+# External Services
+VITE_GITHUB_API_URL=https://api.github.com
+```
+
+## Testing Approach
+
+### Unit Testing Strategy
+- Component testing with React Testing Library
+- Service layer testing with mocked APIs
+- Utility function testing
+
+### E2E Testing
+- Playwright for end-to-end tests
+- Critical user flows covered
+- Cross-browser testing
+
+### Test Structure
+```
+tests/
+├── unit/
+│   ├── components/
+│   ├── services/
+│   └── utils/
+└── e2e/
+    ├── auth.spec.ts
+    ├── posts.spec.ts
+    └── social.spec.ts
+```
+
+## Build and Deployment
+
+### Build Process
+
+```bash
+# Production build
+npm run build
+
+# Output in dist/ directory
+dist/
+├── index.html
+├── assets/
+│   ├── index-[hash].js
+│   └── index-[hash].css
+└── [other static assets]
+```
+
+### Optimization
+- Code splitting by route
+- Tree shaking
+- Minification
+- Asset optimization
+- React Compiler for performance
+
+### Deployment Options
+1. **Static hosting** (Netlify, Vercel)
+2. **Traditional server** with nginx
+3. **Docker container**
+4. **Heroku** (configured)
+
+## Code Conventions
+
+### TypeScript Guidelines
+- Strict mode enabled
+- Explicit return types
+- Interface over type for objects
+- Proper null checking
+
+### React Best Practices
+- Functional components only
+- Custom hooks for logic reuse
+- Memoization where appropriate
+- Proper dependency arrays
+
+### File Naming
+- PascalCase for components
+- camelCase for utilities
+- kebab-case for CSS modules
+- Index files for clean imports
+
+### Code Style
+- ESLint configuration enforced
+- Prettier for formatting
+- Import order conventions
+- Comments for complex logic
+
+## Future Improvements
+
+### Performance Enhancements
+- [ ] Implement virtual scrolling for long feeds
+- [ ] Add service worker for offline support
+- [ ] Optimize bundle size with dynamic imports
+- [ ] Implement image lazy loading
+- [ ] Add request caching layer
+
+### Feature Additions
+- [ ] Real-time notifications with WebSockets
+- [ ] Rich text editor improvements
+- [ ] Video content support
+- [ ] Direct messaging system
+- [ ] Advanced search filters
+- [ ] User blocking functionality
+- [ ] Content moderation tools
+
+### Technical Debt
+- [ ] Migrate deprecated API service
+- [ ] Add comprehensive test coverage
+- [ ] Implement error boundaries
+- [ ] Add performance monitoring
+- [ ] Improve accessibility (ARIA)
+- [ ] Add internationalization (i18n)
+
+### Developer Experience
+- [ ] Add Storybook for component documentation
+- [ ] Implement visual regression testing
+- [ ] Add commit hooks for code quality
+- [ ] Create component generator scripts
+- [ ] Improve TypeScript types coverage
+
+### Infrastructure
+- [ ] Set up CI/CD pipeline
+- [ ] Add environment-specific builds
+- [ ] Implement feature flags system
+- [ ] Add analytics integration
+- [ ] Set up error tracking (Sentry)
+
+---
+
+## Contributing
+
+Please refer to the main project README for contribution guidelines. Ensure all code follows the established conventions and passes linting before submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file in the root directory for details.

@@ -13,6 +13,8 @@ import {
   Send,
   Clock,
   Hash,
+  FileText,
+  AlignLeft,
 } from "lucide-react";
 import { useAuth } from "../components/context/AuthContext";
 import type { Entry, Comment, Author } from "../types/models";
@@ -38,6 +40,7 @@ export const PostDetailPage: React.FC = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [commentContentType, setCommentContentType] = useState<"text/plain" | "text/markdown">("text/plain");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActions, setShowActions] = useState(false);
@@ -240,7 +243,7 @@ export const PostDetailPage: React.FC = () => {
       // Create the comment data with the correct type format
       const commentData = {
         content: commentText,
-        content_type: "text/plain" as "text/plain" | "text/markdown", // Use the exact string format expected by the backend with proper type assertion
+        content_type: commentContentType,
       };
 
       // If replying to another comment, add it as parent
@@ -295,7 +298,7 @@ export const PostDetailPage: React.FC = () => {
         postId,
         commentData: {
           content: commentText,
-          content_type: "text/plain",
+          content_type: commentContentType,
         },
       });
 
@@ -590,13 +593,49 @@ export const PostDetailPage: React.FC = () => {
                 size="md"
               />
               <div className="flex-1">
+                {/* Content Type Toggle */}
+                <div className="flex items-center space-x-2 mb-2">
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setCommentContentType("text/plain")}
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                      commentContentType === "text/plain"
+                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                        : "text-text-2 hover:text-text-1 border border-transparent"
+                    }`}
+                  >
+                    <AlignLeft size={14} />
+                    <span>Plain</span>
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setCommentContentType("text/markdown")}
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                      commentContentType === "text/markdown"
+                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                        : "text-text-2 hover:text-text-1 border border-transparent"
+                    }`}
+                  >
+                    <FileText size={14} />
+                    <span>Markdown</span>
+                  </motion.button>
+                </div>
                 <textarea
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Write a comment..."
-                  className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none"
+                  placeholder={commentContentType === "text/markdown" ? "Write a comment in Markdown..." : "Write a comment..."}
+                  className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none font-mono"
                   rows={3}
                 />
+                {commentContentType === "text/markdown" && (
+                  <p className="text-xs text-text-2 mt-1">
+                    Supports **bold**, *italic*, [links](url), and more
+                  </p>
+                )}
                 <div className="flex justify-end mt-2">
                   <AnimatedButton
                     type="submit"
@@ -657,7 +696,14 @@ export const PostDetailPage: React.FC = () => {
                           Reply
                         </button>
                       </div>
-                      <p className="text-text-1">{comment.content}</p>
+                      {comment.content_type === "text/markdown" ? (
+                        <div
+                          className="prose prose-sm max-w-none text-text-1"
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(comment.content) }}
+                        />
+                      ) : (
+                        <p className="text-text-1">{comment.content}</p>
+                      )}
                     </div>
 
                     {/* Replies */}
@@ -694,9 +740,16 @@ export const PostDetailPage: React.FC = () => {
                                   {formatTime(reply.created_at)}
                                 </span>
                               </div>
-                              <p className="text-sm text-text-1">
-                                {reply.content}
-                              </p>
+                              {reply.content_type === "text/markdown" ? (
+                                <div
+                                  className="prose prose-sm max-w-none text-text-1 text-sm"
+                                  dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.content) }}
+                                />
+                              ) : (
+                                <p className="text-sm text-text-1">
+                                  {reply.content}
+                                </p>
+                              )}
                             </div>
                           </motion.div>
                         ))}

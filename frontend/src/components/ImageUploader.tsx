@@ -5,6 +5,8 @@ import {
   Check, Loader2, Plus 
 } from 'lucide-react';
 import LoadingImage from './ui/LoadingImage';
+import { imageService, type ImageUploadResponse } from '../services/image';
+import { useToast } from './context/ToastContext';
 
 interface UploadedImage {
   id: string;
@@ -13,28 +15,34 @@ interface UploadedImage {
   progress: number;
   error?: string;
   uploaded?: boolean;
+  uploadedData?: ImageUploadResponse;
 }
 
 interface ImageUploaderProps {
   onImagesChange: (images: File[]) => void;
+  onImagesUploaded?: (images: ImageUploadResponse[]) => void;
   maxImages?: number;
   maxSizeInMB?: number;
   acceptedFormats?: string[];
   className?: string;
   disabled?: boolean;
+  uploadToServer?: boolean;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImagesChange,
+  onImagesUploaded,
   maxImages = 4,
   maxSizeInMB = 5,
   acceptedFormats = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
   className = '',
   disabled = false,
+  uploadToServer = false,
 }) => {
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showError } = useToast();
 
   const handleFiles = useCallback((files: FileList) => {
     const newImages: UploadedImage[] = [];
@@ -73,17 +81,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         
         setImages(prev => [...prev, uploadedImage]);
         
-        // Simulate upload progress
-        simulateUpload(uploadedImage.id);
+        // Upload to server or simulate
+        if (uploadToServer) {
+          uploadImageToServer(uploadedImage.id, file);
+        } else {
+          simulateUpload(uploadedImage.id);
+        }
       };
       reader.readAsDataURL(file);
     });
 
     if (errors.length > 0) {
       // In a real app, show these errors in a toast
-      console.error('Upload errors:', errors);
+      errors.forEach(error => showError(error));
     }
-  }, [images.length, maxImages, acceptedFormats, maxSizeInMB]);
+  }, [images.length, maxImages, acceptedFormats, maxSizeInMB, uploadToServer, showError]);
 
   const simulateUpload = (imageId: string) => {
     let progress = 0;
@@ -106,6 +118,35 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         ));
       }
     }, 500);
+  };
+
+  const uploadImageToServer = async (imageId: string, file: File) => {
+    try {
+      // Show initial progress
+      setImages(prev => prev.map(img => 
+        img.id === imageId 
+          ? { ...img, progress: 10 }
+          : img
+      ));
+
+      // Upload to server
+      const response = await imageService.uploadImage(file);
+
+      // Update with success
+      setImages(prev => prev.map(img => 
+        img.id === imageId 
+          ? { ...img, progress: 100, uploaded: true, uploadedData: response }
+          : img
+      ));
+    } catch (error) {
+      console.error('Upload error:', error);
+      setImages(prev => prev.map(img => 
+        img.id === imageId 
+          ? { ...img, error: 'Upload failed', progress: 0 }
+          : img
+      ));
+      showError(`Failed to upload ${file.name}`);
+    }
   };
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -151,7 +192,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   React.useEffect(() => {
     const uploadedImages = images.filter(img => img.uploaded);
     onImagesChange(uploadedImages.map(img => img.file));
-  }, [images, onImagesChange]);
+    
+    // Also notify about uploaded image data if callback provided
+    if (onImagesUploaded && uploadToServer) {
+      const uploadedData = uploadedImages
+        .filter(img => img.uploadedData)
+        .map(img => img.uploadedData!);
+      onImagesUploaded(uploadedData);
+    }
+  }, [images, onImagesChange, onImagesUploaded, uploadToServer]);
 
   return (
     <div className={className}>

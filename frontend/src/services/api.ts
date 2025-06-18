@@ -340,6 +340,23 @@ class ApiService {
       method: "POST",
     });
   }
+
+  async getLikedEntries(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedResponse<Entry>> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    return this.request<PaginatedResponse<Entry>>(
+      `/api/entries/liked/?${queryParams.toString()}`
+    );
+  }
 }
 
 // Export a singleton instance

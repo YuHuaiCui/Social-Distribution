@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, UserPlus, UserCheck, Search, Loader } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Users, UserPlus, UserCheck, Search, Loader, Bell, ArrowRight } from "lucide-react";
 import type { Author } from "../types/models";
 import { api } from "../services/api";
+import { socialService } from "../services/social";
 import { useAuth } from "../components/context/AuthContext";
 import AuthorCard from "../components/AuthorCard";
 import Input from "../components/ui/Input";
@@ -20,6 +22,7 @@ export const FriendsPage: React.FC = () => {
   const [friendsCount, setFriendsCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followersCount, setFollowersCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   useEffect(() => {
     if (currentUser) {
@@ -32,15 +35,17 @@ export const FriendsPage: React.FC = () => {
     if (!currentUser) return;
     
     try {
-      const [friends, following, followers] = await Promise.all([
+      const [friends, following, followers, pendingRequests] = await Promise.all([
         api.getFriends(currentUser.id),
         api.getFollowing(currentUser.id),
         api.getFollowers(currentUser.id),
+        socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
       ]);
       
       setFriendsCount(friends.length);
       setFollowingCount(following.length);
       setFollowersCount(followers.length);
+      setPendingRequestsCount(pendingRequests.count || 0);
     } catch (error) {
       console.error("Error loading counts:", error);
     }
@@ -237,6 +242,46 @@ export const FriendsPage: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Follow Requests Notification */}
+      {pendingRequestsCount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <Link to="/follow-requests">
+            <Card
+              variant="prominent"
+              className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
+                         border border-[var(--primary-violet)]/20 hover:border-[var(--primary-violet)]/40 
+                         transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
+                    <Bell size={20} className="text-[var(--primary-violet)]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-text-1">
+                      {pendingRequestsCount} pending follow {pendingRequestsCount === 1 ? 'request' : 'requests'}
+                    </h3>
+                    <p className="text-sm text-text-2">
+                      Review and manage who can follow you
+                    </p>
+                  </div>
+                </div>
+                <motion.div
+                  animate={{ x: [0, 5, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <ArrowRight size={20} className="text-[var(--primary-violet)]" />
+                </motion.div>
+              </div>
+            </Card>
+          </Link>
+        </motion.div>
+      )}
 
       {/* Content */}
       {isLoading ? (

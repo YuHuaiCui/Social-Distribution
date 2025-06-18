@@ -504,6 +504,27 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Username (Read-only) */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-text-2 mb-2">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      value={user?.username || ""}
+                      disabled={true}
+                      className="pr-10"
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                      <Lock size={16} className="text-text-2" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-text-2 mt-1">
+                    Username cannot be changed
+                  </p>
+                </div>
+
                 {/* Display Name */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-text-2 mb-2">
