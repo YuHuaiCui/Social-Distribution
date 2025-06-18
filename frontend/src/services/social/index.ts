@@ -1,4 +1,4 @@
-  /**
+/**
  * Social Service
  * Handles social interactions: likes, follows, friendships
  */
@@ -13,7 +13,6 @@ import type {
   FriendshipStats,
   Author,
   PaginatedResponse,
-  Entry,
 } from "../../types";
 
 export class SocialService extends BaseApiService {
@@ -22,7 +21,7 @@ export class SocialService extends BaseApiService {
   /**
    * Like an entry
    */ async likeEntry(entryId: string): Promise<Like> {
-    return this.request<Like>(`/entries/${entryId}/likes/`, {
+    return this.request<Like>(`/api/entries/${entryId}/likes/`, {
       method: "POST",
     });
   }
@@ -31,7 +30,7 @@ export class SocialService extends BaseApiService {
    * Unlike an entry
    */
   async unlikeEntry(entryId: string): Promise<void> {
-    await this.request(`/entries/${entryId}/likes/`, {
+    await this.request(`/api/entries/${entryId}/likes/`, {
       method: "DELETE",
     });
   }
@@ -40,7 +39,7 @@ export class SocialService extends BaseApiService {
    * Like a comment
    */
   async likeComment(commentId: string): Promise<Like> {
-    return this.request<Like>(`/comments/${commentId}/likes/`, {
+    return this.request<Like>(`/api/comments/${commentId}/likes/`, {
       method: "POST",
     });
   }
@@ -49,7 +48,7 @@ export class SocialService extends BaseApiService {
    * Unlike a comment
    */
   async unlikeComment(commentId: string): Promise<void> {
-    await this.request(`/comments/${commentId}/likes/`, {
+    await this.request(`/api/comments/${commentId}/likes/`, {
       method: "DELETE",
     });
   }
@@ -197,30 +196,20 @@ export class SocialService extends BaseApiService {
 
   /**
    * Save a post
-   */  async savePost(entryId: string): Promise<void> {
-    // Try with direct endpoint first    try {
-      await this.request(`/entries/${entryId}/save/`, {
-        method: "POST",
-      });
-    } catch (error) {
-      console.error("Error saving post with save endpoint:", error);
-      // Fallback to liking the post as a save mechanism
-      await this.likeEntry(entryId);
-    }
+   */
+  async savePost(entryId: string): Promise<void> {
+    await this.request(`/api/entries/${entryId}/save/`, {
+      method: "POST",
+    });
   }
+
   /**
    * Unsave a post
    */
   async unsavePost(entryId: string): Promise<void> {
-    try {
-      await this.request(`/entries/${entryId}/save/`, {
-        method: "DELETE",
-      });
-    } catch (error) {
-      console.error("Error unsaving post with save endpoint:", error);
-      // Fallback to unliking the post
-      await this.unlikeEntry(entryId);
-    }
+    await this.request(`/api/entries/${entryId}/save/`, {
+      method: "DELETE",
+    });
   }
 
   /**
@@ -230,18 +219,8 @@ export class SocialService extends BaseApiService {
     page?: number;
     page_size?: number;
   }): Promise<PaginatedResponse<Entry>> {
-    const queryString = this.buildQueryString(params || {});    try {
-      return await this.request(`/entries/saved/${queryString}`);
-    } catch (error) {
-      console.error("Error fetching saved posts:", error);
-      // Return empty result for now
-      return {
-        count: 0,
-        next: null,
-        previous: null,
-        results: []
-      };
-    }
+    const queryString = this.buildQueryString(params || {});
+    return this.request(`/api/entries/saved/${queryString}`);
   }
 }
 
