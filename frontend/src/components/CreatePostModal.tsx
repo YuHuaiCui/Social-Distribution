@@ -15,9 +15,9 @@ import MarkdownEditor from "./MarkdownEditor";
 import ImageUploader from "./ImageUploader";
 import CategoryTags from "./CategoryTags";
 import PrivacySelector from "./PrivacySelector";
+import { useDefaultVisibility, type Visibility } from "../utils/privacy";
 
 type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg";
-type Visibility = "public" | "friends" | "unlisted";
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -32,6 +32,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onSuccess,
   editingPost,
 }) => {
+  const defaultVisibility = useDefaultVisibility();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -39,7 +40,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState<ContentType>("text/markdown");
-  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [expandedSection, setExpandedSection] = useState<
@@ -64,11 +65,18 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setTitle("");
       setContent("");
       setContentType("text/markdown");
-      setVisibility("public");
+      setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
     }
-  }, [editingPost]);
+  }, [editingPost, defaultVisibility]);
+
+  // Update visibility when default changes for new posts
+  React.useEffect(() => {
+    if (!editingPost) {
+      setVisibility(defaultVisibility);
+    }
+  }, [defaultVisibility, editingPost]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +165,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setTitle("");
       setContent("");
       setContentType("text/markdown");
-      setVisibility("public");
+      setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
       setError("");

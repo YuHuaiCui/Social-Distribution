@@ -6,6 +6,7 @@ import Card from './ui/Card';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import LoadingImage from './ui/LoadingImage';
+import { useDefaultVisibility, type Visibility } from '../utils/privacy';
 
 interface NewPostEditorProps {
   onSubmit: (postData: {
@@ -25,12 +26,18 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
   isLoading = false 
 }) => {
   const { user } = useAuth();
+  const defaultVisibility = useDefaultVisibility();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [contentType, setContentType] = useState<'text/plain' | 'text/markdown'>('text/plain');
-  const [visibility, setVisibility] = useState<'public' | 'friends' | 'unlisted'>('public');
+  const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+
+  // Update visibility when default changes
+  React.useEffect(() => {
+    setVisibility(defaultVisibility);
+  }, [defaultVisibility]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +61,7 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
     setTitle('');
     setContent('');
     setCategories('');
+    setVisibility(defaultVisibility);
   };
 
   const renderPreview = () => {

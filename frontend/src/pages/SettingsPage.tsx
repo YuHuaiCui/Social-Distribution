@@ -30,6 +30,7 @@ import Loader from "../components/ui/Loader";
 import Toggle from "../components/ui/Toggle";
 import type { Author } from "../types/models";
 import { api } from "../services/api";
+import { notifyPrivacySettingsChanged } from "../utils/privacy";
 
 type SettingsTab = "profile" | "account" | "privacy" | "node" | "appearance";
 
@@ -279,6 +280,8 @@ export const SettingsPage: React.FC = () => {
     try {
       // Save to localStorage for now
       localStorage.setItem("privacySettings", JSON.stringify(privacySettings));
+      // Notify components that privacy settings have changed
+      notifyPrivacySettingsChanged();
       await new Promise((resolve) => setTimeout(resolve, 500));
       setSaveMessage({ type: "success", text: "Privacy settings saved!" });
     } catch (error) {
