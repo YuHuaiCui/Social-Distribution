@@ -7,7 +7,7 @@ import {
   Save,
   ChevronDown,
 } from "lucide-react";
-import { useAuth } from "./context/AuthContext";
+
 import { entryService } from "../services";
 import type { Entry, CreateEntryData } from "../types";
 import AnimatedButton from "./ui/AnimatedButton";
@@ -52,8 +52,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setContent(editingPost.content);
       setContentType(editingPost.content_type || "text/markdown");
       // Ensure visibility is one of our valid types ('public', 'friends', 'unlisted')
+      const validVisibilities: Visibility[] = ["public", "friends", "unlisted"];
       setVisibility(
-        editingPost.visibility === "deleted" ? "public" : editingPost.visibility
+        validVisibilities.includes(editingPost.visibility as Visibility)
+          ? (editingPost.visibility as Visibility)
+          : "public"
       );
       setCategories(editingPost.categories || []);
     } else {
@@ -114,19 +117,27 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           setError("Cannot update: missing post ID");
           return;
         }
+        const id = editingPost.id.includes("/") ? editingPost.id.split("/").pop() : editingPost.id;
+        console.log("[PATCH] Entry ID used for update:", id);
+        if (!id) {
+          setError("Cannot update: invalid post ID");
+          setIsLoading(false);
+          return;
+        }
         const updatedPost = await entryService.updateEntry(
-          editingPost.id,
+          id,
           entryData
         );
 
         onSuccess?.(updatedPost);
+        handleClose();
+        console.log("Post updated successfully");
       } else {
         // Create new post
         const newPost = await entryService.createEntry(entryData);
 
         onSuccess?.(newPost);
         console.log("Reloading...");
-        window.location.reload();
         handleClose();
       }
     } catch (err: unknown) {
@@ -170,8 +181,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={handleClose}
-            className="fixed inset-0 bg-black/50 z-modal-backdrop"
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
           />
 
           {/* Modal */}
@@ -179,7 +194,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-modal overflow-hidden flex flex-col"
+            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-50 overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border-1">
@@ -197,8 +213,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <form onSubmit={handleSubmit} className="space-y-4 relative">
                 {/* Title */}
                 <div>
                   <input
@@ -252,11 +268,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setExpandedSection(
                           expandedSection === "content" ? null : "content"
-                        )
-                      }
+                        );
+                      }}
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Content</span>
@@ -328,11 +346,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setExpandedSection(
                           expandedSection === "tags" ? null : "tags"
-                        )
-                      }
+                        );
+                      }}
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Tags</span>
@@ -374,14 +394,16 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   </motion.div>
 
                   {/* Privacy Section */}
-                  <motion.div className="glass-card-subtle rounded-lg overflow-hidden">
+                  <motion.div className="glass-card-subtle rounded-lg overflow-visible">
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setExpandedSection(
                           expandedSection === "privacy" ? null : "privacy"
-                        )
-                      }
+                        );
+                      }}
                       className="w-full px-4 py-3 flex items-center justify-between hover:bg-glass-low transition-colors"
                     >
                       <span className="font-medium text-text-1">Privacy</span>
@@ -408,6 +430,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="px-4 pb-4"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <PrivacySelector
                             value={visibility}
@@ -445,7 +468,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
               </AnimatedButton>
               <AnimatedButton
                 variant="primary"
-                onClick={handleSubmit}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }}
                 loading={isLoading}
                 icon={!isLoading && <Save size={16} />}
               >

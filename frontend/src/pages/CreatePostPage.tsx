@@ -108,7 +108,10 @@ export const CreatePostPage: React.FC = () => {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate(-1)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(-1);
+              }}
               className="p-2 rounded-lg hover:bg-glass-low transition-colors"
             >
               <X size={24} className="text-text-2" />
@@ -289,16 +292,16 @@ export const CreatePostPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            <Card variant="prominent" className="p-6">
+            <Card variant="prominent" className="p-6 overflow-visible">
               <label className="block text-sm font-medium text-text-2 mb-4">
                 Post Visibility
               </label>
-              <PrivacySelector
-                value={visibility}
-                onChange={(value) => {
-                  setVisibility(value);
-                }}
-              />
+              <div className="relative z-10">
+                <PrivacySelector
+                  value={visibility}
+                  onChange={(value) => setVisibility(value)}
+                />
+              </div>
             </Card>
           </motion.div>
 
@@ -307,13 +310,16 @@ export const CreatePostPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="flex items-center justify-end space-x-4"
+            className="flex items-center justify-end space-x-4 relative z-0"
           >
             <AnimatedButton
               type="button"
               variant="ghost"
               size="lg"
-              onClick={() => navigate(-1)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(-1);
+              }}
               disabled={isLoading}
             >
               Cancel
