@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from django.db import models
 from app.models import Entry, Author
 from app.serializers.entry import EntrySerializer
@@ -165,3 +166,85 @@ class EntryViewSet(viewsets.ModelViewSet):
         return Response(
             {"detail": "Entry soft-deleted."}, status=status.HTTP_204_NO_CONTENT
         )
+
+    @action(detail=False, methods=["get"], url_path="saved")
+    def saved_entries(self, request):
+        """Get the current user's saved entries"""
+        from app.models import Like  # Assuming we use Likes to track saved status
+
+        # Get the current user's author
+        user = request.user
+
+        try:  # Get entries that this user has saved (liked)
+            liked_entry_ids = Like.objects.filter(
+                author=user,  # User is already an Author object
+            ).values_list("entry__id", flat=True)
+
+            entries = Entry.objects.filter(id__in=liked_entry_ids).order_by(
+                "-created_at"
+            )
+
+            # Paginate the results
+            page = self.paginate_queryset(entries)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(entries, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Could not retrieve saved entries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post", "delete"], url_path="save")
+    def save_entry(self, request, id=None):
+        """Save or unsave a post (same as liking but for saving)"""
+        from app.models import Like
+
+        entry = self.get_object()
+        user = request.user
+
+        try:
+            # Check if entry is already saved
+            existing_save = Like.objects.filter(
+                author=user.author,
+                entry=entry,
+                is_save=True,  # Add this field to the Like model
+            ).first()
+
+            if request.method == "POST":
+                # Save the entry
+                if existing_save:
+                    return Response(
+                        {"detail": "Entry already saved"}, status=status.HTTP_200_OK
+                    )
+
+                # Create a new saved entry record
+                Like.objects.create(author=user.author, entry=entry, is_save=True)
+                return Response(
+                    {"detail": "Entry saved successfully"},
+                    status=status.HTTP_201_CREATED,
+                )
+
+            elif request.method == "DELETE":
+                # Unsave the entry
+                if not existing_save:
+                    return Response(
+                        {"detail": "Entry was not saved"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+                existing_save.delete()
+                return Response(
+                    {"detail": "Entry unsaved successfully"},
+                    status=status.HTTP_204_NO_CONTENT,
+                )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Could not save/unsave entry: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
