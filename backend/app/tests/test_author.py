@@ -51,6 +51,13 @@ class BaseAPITestCase(APITestCase):
             content='This is a private entry',
             visibility='friends'
         )
+
+        self.private_entry_2 = Entry.objects.create(
+            author=self.another_user,
+            title='Private Entry 2',
+            content='This is a private entry 2',
+            visibility='friends'
+        )
         
         # Set up API clients
         self.client = APIClient()
