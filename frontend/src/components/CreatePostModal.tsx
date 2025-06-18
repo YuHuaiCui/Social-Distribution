@@ -213,14 +213,28 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className={`fixed ${
-              isFullscreen 
-                ? "inset-0 w-full h-full max-w-none max-h-none rounded-none" 
-                : "left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] rounded-lg"
-            } glass-card-prominent shadow-xl z-50 flex flex-col transition-all duration-300`}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ 
+              opacity: 1, 
+              scale: 1,
+              // Animate the style properties
+              left: isFullscreen ? "0%" : "50%",
+              top: isFullscreen ? "0%" : "50%",
+              x: isFullscreen ? "0%" : "-50%",
+              y: isFullscreen ? "0%" : "-50%",
+              width: isFullscreen ? "100vw" : "min(48rem, 100vw)",
+              height: isFullscreen ? "100vh" : "auto",
+              maxHeight: isFullscreen ? "100vh" : "100vh",
+              borderRadius: isFullscreen ? "0px" : "8px",
+            }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 300,
+              damping: 30,
+              mass: 0.8,
+            }}
+            className="fixed glass-card-prominent shadow-xl z-50 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

@@ -39,9 +39,12 @@ export class BaseApiService {
     const url = `${this.baseUrl}${endpoint}`;
     const { skipAuth = false, ...fetchOptions } = options;
 
-    const defaultHeaders: HeadersInit = {
-      "Content-Type": "application/json",
-    };
+    const defaultHeaders: HeadersInit = {};
+
+    // Only set Content-Type if not FormData
+    if (!(fetchOptions.body instanceof FormData)) {
+      defaultHeaders["Content-Type"] = "application/json";
+    }
 
     // Add CSRF token if available
     const csrfToken = this.getCsrfToken();
