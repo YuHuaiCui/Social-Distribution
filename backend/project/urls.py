@@ -16,28 +16,39 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from app.views import auth
+from app.views.frontend import ReactAppView
 
 from django.conf import settings
 from django.conf.urls.static import static
+from app.views.follow import FollowViewSet
+from app.views.inbox import InboxViewSet
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r"api/follows", FollowViewSet, basename="follow")
+router.register(r"api/inbox", InboxViewSet, basename="inbox")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     # Auth endpoints
-    path('api/auth/status/', auth.auth_status, name='auth-status'),
-    path('api/auth/signup/', auth.signup, name='signup'),
-    path('api/auth/login/', auth.login_view, name='login'),
-    path('api/auth/github/callback/', auth.github_callback, name='github-callback'),
-    path('api/author/me/', auth.author_me, name='author-me'),
-    path('accounts/logout/', auth.logout_view, name='logout'),
- 
-    
+    path("api/auth/status/", auth.auth_status, name="auth-status"),
+    path("api/auth/signup/", auth.signup, name="signup"),
+    path("api/auth/login/", auth.login_view, name="login"),
+    path("api/auth/github/callback/", auth.github_callback, name="github-callback"),
+    path("api/author/me/", auth.author_me, name="author-me"),
+    path("accounts/logout/", auth.logout_view, name="logout"),
     # Django AllAuth URLs - make sure this is included
-    path('accounts/', include('allauth.urls')),
-    
-    
-    path("", include("app.urls")),
+    path("accounts/", include("allauth.urls")),
+    # API endpoints - all other app URLs are API endpoints
+    path("api/", include("app.urls")),
+    # Follow endpoints via router
+    path("", include(router.urls)),
+    # Catch-all pattern for React app - must be last!
+    re_path(
+        r"^(?!api|admin|accounts|static).*$", ReactAppView.as_view(), name="react-app"
+    ),
 ]
 
 # Serve static files in development

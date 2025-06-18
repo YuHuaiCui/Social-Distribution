@@ -16,7 +16,9 @@ import type {
   AuthResponse
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Use relative URLs in production, absolute URLs in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (window.location.hostname === 'localhost' ? "http://localhost:8000" : "");
 
 /**
  * @deprecated Use individual service classes instead
@@ -212,9 +214,8 @@ class ApiService {
   }
 
 
-  // Comment endpoints (when implemented in backend)
+  // Comment endpoints - backend completed
   async getComments(entryId: string): Promise<Comment[]> {
-    // This endpoint needs to be implemented in backend
     return this.request<Comment[]>(`/api/entries/${entryId}/comments/`);
   }
 
@@ -222,7 +223,6 @@ class ApiService {
     content: string;
     content_type?: string;
   }): Promise<Comment> {
-    // This endpoint needs to be implemented in backend
     return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
       method: 'POST',
       body: JSON.stringify(data),
