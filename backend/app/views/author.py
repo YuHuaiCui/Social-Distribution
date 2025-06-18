@@ -306,17 +306,26 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get", "post"], url_path="entries")
-    def public_entries(self, request, pk=None):
-        """GET = List public entries, POST = Create a new entry (must be owner)"""
+    def entries(self, request, pk=None):
+        """GET = List entries visible to current user, POST = Create a new entry (must be owner)"""
         author = self.get_object()
 
         if request.method == "GET":
             if request.user.is_authenticated and str(request.user.id) == str(author.id):
+                # Viewing your own profile: show all entries except deleted
                 entries = Entry.objects.filter(author=author).exclude(
                     visibility=Entry.DELETED
                 )
             else:
-                entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC)
+                # Viewing someone else's profile: use proper visibility logic
+                # Get entries by this author that are visible to the current user
+                if hasattr(request.user, "author"):
+                    user_author = request.user.author
+                else:
+                    user_author = request.user
+
+                visible_entries = Entry.objects.visible_to_author(user_author)
+                entries = visible_entries.filter(author=author)
 
             serializer = EntrySerializer(entries, many=True)
             return Response(serializer.data)
