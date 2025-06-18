@@ -48,6 +48,7 @@ The application follows a component-based architecture with:
 ### Additional Libraries
 - **React Hot Toast 2.5.2** - Toast notifications
 - **Sonner 2.0.5** - Alternative toast system
+- **liquid-glass-react** - Apple-style liquid glass effects
 - **Playwright** - E2E testing framework
 
 ### Development Tools
@@ -296,6 +297,19 @@ class BaseService {
 ## UI/UX Patterns
 
 ### Design System
+
+#### Liquid Glass Effects
+- Apple-style glassmorphism using `liquid-glass-react` library
+- Three variants: `default`, `subtle`, `prominent`
+- Applied to major UI components:
+  - PostCard and AuthorCard
+  - SearchBar and SearchModal results
+  - Profile and notification dropdowns
+  - Floating menus
+- Wrapper components:
+  - `LiquidGlassCard`: General purpose wrapper
+  - `LiquidGlassSearchBar`: Optimized for search inputs
+  - `LiquidGlassFloatingMenu`: For dropdown menus
 
 #### Color Palette
 - Dynamic theme support (light/dark)

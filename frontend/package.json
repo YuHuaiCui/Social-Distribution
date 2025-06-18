@@ -15,6 +15,7 @@
     "@tanstack/react-router": "^1.121.12",
     "babel-plugin-react-compiler": "^19.1.0-rc.2",
     "framer-motion": "^12.18.1",
+    "liquid-glass-react": "^1.1.1",
     "lucide-react": "^0.515.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
