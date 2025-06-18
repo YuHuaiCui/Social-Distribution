@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, serializers
 from rest_framework.exceptions import NotFound
 from app.models.comment import Comment
 from app.models.entry import Entry
@@ -22,9 +22,16 @@ class CommentListCreateView(generics.ListCreateAPIView):
         try:
             entry = Entry.objects.get(id=entry_id)
         except Entry.DoesNotExist:
-            raise NotFound("Entry not found")
-
-        serializer.save(author=self.request.user.author, entry=entry)
+            raise NotFound(f"Entry with ID {entry_id} not found")
+            
+        # Ensure required fields are present
+        if not serializer.validated_data.get('content'):
+            raise serializers.ValidationError({"content": "Content field is required"})
+              # Make sure content_type is valid
+        if serializer.validated_data.get('content_type') not in [Entry.TEXT_PLAIN, Entry.TEXT_MARKDOWN]:
+            serializer.validated_data['content_type'] = Entry.TEXT_PLAIN
+            
+        serializer.save(author=self.request.user, entry=entry)
 
 class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """

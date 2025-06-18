@@ -3,7 +3,6 @@
  * Handles post-related API calls including comments
  */
 
-
 import { BaseApiService } from "../base";
 import type {
   Entry,
@@ -37,28 +36,28 @@ export class EntryService extends BaseApiService {
 
   /**
    * Create a new entry
-   */  async createEntry(data: CreateEntryData): Promise<Entry> {
+   */ async createEntry(data: CreateEntryData): Promise<Entry> {
     if (data.image) {
       // Handle image upload
       const formData = new FormData();
       formData.append("title", data.title);
       formData.append("content", data.content);
-      
+
       // Determine the correct content type based on the image file
       let imageContentType = data.content_type;
-      if (data.content_type === 'image' && data.image) {
+      if (data.content_type === "image" && data.image) {
         // Map common image MIME types
         const mimeType = data.image.type;
-        if (mimeType === 'image/png') {
-          imageContentType = 'image/png';
-        } else if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
-          imageContentType = 'image/jpeg';
+        if (mimeType === "image/png") {
+          imageContentType = "image/png";
+        } else if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
+          imageContentType = "image/jpeg";
         } else {
           // Default to JPEG if we can't determine
-          imageContentType = 'image/jpeg';
+          imageContentType = "image/jpeg";
         }
       }
-      
+
       formData.append("content_type", imageContentType);
       formData.append("visibility", data.visibility);
       if (data.categories) {
@@ -83,7 +82,8 @@ export class EntryService extends BaseApiService {
     id: string,
     data: Partial<CreateEntryData>
   ): Promise<Entry> {
-    if (data.image) {      // Handle image upload
+    if (data.image) {
+      // Handle image upload
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
         if (key === "categories" && Array.isArray(value)) {
@@ -113,16 +113,15 @@ export class EntryService extends BaseApiService {
    */
   async deleteEntry(id: string): Promise<boolean> {
     try {
-    await this.request(`/api/entries/${id}/`, {
-      method: "DELETE",
-    });
-    return true; // ✅ success
-  } catch (error) {
-    console.error("Failed to delete post:", error);
-    return false; // ❌ failure
+      await this.request(`/api/entries/${id}/`, {
+        method: "DELETE",
+      });
+      return true;
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      return false;
+    }
   }
-}
-    
 
   /**
    * Get entries by author
@@ -174,27 +173,30 @@ export class EntryService extends BaseApiService {
 
   /**
    * Get comments for an entry
-   */
-  async getComments(
+   */  async getComments(
     entryId: string,
     params?: { page?: number; page_size?: number }
   ): Promise<PaginatedResponse<Comment>> {
-    const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Comment>>(
-      `/api/entries/${entryId}/comments/${queryString}`
+    const queryString = this.buildQueryString(params || {});    return this.request<PaginatedResponse<Comment>>(
+      `/entries/${entryId}/comments/${queryString}`
     );
   }
-
   /**
    * Create a comment on an entry
-   */
-  async createComment(
+   */  async createComment(
     entryId: string,
     data: CreateCommentData
   ): Promise<Comment> {
-    return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
+    // Ensure content_type is set if not provided
+    const commentData = {
+      ...data,
+      content_type: data.content_type || "text/plain",
+    }; // Log the request for debugging
+    console.log("Creating comment with data:", commentData);    console.log("Request URL:", `/entries/${entryId}/comments/`);
+
+    return this.request<Comment>(`/entries/${entryId}/comments/`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(commentData),
     });
   }
 
@@ -205,9 +207,8 @@ export class EntryService extends BaseApiService {
     entryId: string,
     commentId: string,
     data: Partial<CreateCommentData>
-  ): Promise<Comment> {
-    return this.request<Comment>(
-      `/api/entries/${entryId}/comments/${commentId}/`,
+  ): Promise<Comment> {    return this.request<Comment>(
+      `/entries/${entryId}/comments/${commentId}/`,
       {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -219,7 +220,7 @@ export class EntryService extends BaseApiService {
    * Delete a comment
    */
   async deleteComment(entryId: string, commentId: string): Promise<void> {
-    await this.request(`/api/entries/${entryId}/comments/${commentId}/`, {
+    await this.request(`/entries/${entryId}/comments/${commentId}/`, {
       method: "PATCH",
       body: JSON.stringify({ visibility: "deleted" }),
     });

@@ -1,20 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Compass, Search, TrendingUp, Users, Hash, 
-  Grid3X3, List, Filter as FilterIcon, Sparkles 
-} from 'lucide-react';
-import type { Entry, Author } from '../types/models';
-import PostCard from '../components/PostCard';
-import AnimatedButton from '../components/ui/AnimatedButton';
-import AnimatedGradient from '../components/ui/AnimatedGradient';
-import Card from '../components/ui/Card';
-import Input from '../components/ui/Input';
-import Avatar from '../components/Avatar/Avatar';
-import Loader from '../components/ui/Loader';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Compass,
+  Search,
+  TrendingUp,
+  Users,
+  Hash,
+  Grid3X3,
+  List,
+  Filter as FilterIcon,
+  Sparkles,
+} from "lucide-react";
+import type { Entry, Author } from "../types/models";
+import PostCard from "../components/PostCard";
+import AnimatedButton from "../components/ui/AnimatedButton";
+import AnimatedGradient from "../components/ui/AnimatedGradient";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Avatar from "../components/Avatar/Avatar";
+import Loader from "../components/ui/Loader";
 
-type ViewMode = 'grid' | 'list';
-type ExploreTab = 'trending' | 'authors' | 'categories' | 'recent';
+type ViewMode = "grid" | "list";
+type ExploreTab = "trending" | "authors" | "categories" | "recent";
 
 interface TrendingAuthor extends Author {
   follower_count: number;
@@ -29,29 +36,30 @@ interface Category {
 }
 
 export const ExplorePage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ExploreTab>('trending');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<ExploreTab>("trending");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [searchQuery, setSearchQuery] = useState("");
   const [posts, setPosts] = useState<Entry[]>([]);
   const [authors, setAuthors] = useState<TrendingAuthor[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [followingAuthors, setFollowingAuthors] = useState<Set<string>>(new Set());
-
+  const [followingAuthors, setFollowingAuthors] = useState<Set<string>>(
+    new Set()
+  );
   useEffect(() => {
     fetchExploreData();
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Utility to get consistent color for categories
-  const getCategoryColor = (categoryName: string, index: number) => {
+  const getCategoryColor = (_categoryName: string, index: number) => {
     const colors = [
-      'var(--primary-blue)',
-      'var(--primary-purple)',
-      'var(--primary-teal)',
-      'var(--primary-pink)',
-      'var(--primary-coral)',
-      'var(--primary-violet)',
-      'var(--primary-yellow)'
+      "var(--primary-blue)",
+      "var(--primary-purple)",
+      "var(--primary-teal)",
+      "var(--primary-pink)",
+      "var(--primary-coral)",
+      "var(--primary-violet)",
+      "var(--primary-yellow)",
     ];
     return colors[index % colors.length];
   };
@@ -60,53 +68,54 @@ export const ExplorePage: React.FC = () => {
     setIsLoading(true);
     try {
       // Mock data - replace with API calls
-      if (activeTab === 'trending') {
+      if (activeTab === "trending") {
         const mockPosts: Entry[] = [
           {
-            id: '1',
-            url: 'http://localhost:8000/api/entries/1/',
+            id: "e1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
+            url: "http://localhost:8000/api/entries/e1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6/",
             author: {
-              id: '201',
-              url: 'http://localhost:8000/api/authors/201/',
-              username: 'techexplorer',
-              email: 'tech@example.com',
-              display_name: 'Tech Explorer',
-              profile_image: 'https://i.pravatar.cc/150?u=tech',
+              id: "a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
+              url: "http://localhost:8000/api/authors/a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6/",
+              username: "techexplorer",
+              email: "tech@example.com",
+              display_name: "Tech Explorer",
+              profile_image: "https://i.pravatar.cc/150?u=tech",
               is_approved: true,
               is_active: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
-            title: 'The Future of Web Development in 2024',
-            content: 'An in-depth look at emerging technologies shaping the web...',
-            content_type: 'text/markdown' as const,
-            visibility: 'public' as const,
-            categories: ['technology', 'web-development'],
+            title: "The Future of Web Development in 2024",
+            content:
+              "An in-depth look at emerging technologies shaping the web...",
+            content_type: "text/markdown" as const,
+            visibility: "public" as const,
+            categories: ["technology", "web-development"],
             created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
             updated_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
             likes_count: 156,
             comments_count: 42,
           },
           {
-            id: '2',
-            url: 'http://localhost:8000/api/entries/2/',
+            id: "f2g3h4i5-6j7k-8l9m-0n1o-p2q3r4s5t6u7",
+            url: "http://localhost:8000/api/entries/f2g3h4i5-6j7k-8l9m-0n1o-p2q3r4s5t6u7/",
             author: {
-              id: '202',
-              url: 'http://localhost:8000/api/authors/202/',
-              username: 'designpro',
-              email: 'design@example.com',
-              display_name: 'Design Pro',
-              profile_image: 'https://i.pravatar.cc/150?u=design',
+              id: "b2c3d4e5-6f7g-8h9i-0j1k-l2m3n4o5p6q7",
+              url: "http://localhost:8000/api/authors/b2c3d4e5-6f7g-8h9i-0j1k-l2m3n4o5p6q7/",
+              username: "designpro",
+              email: "design@example.com",
+              display_name: "Design Pro",
+              profile_image: "https://i.pravatar.cc/150?u=design",
               is_approved: true,
               is_active: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
-            title: 'Creating Beautiful Gradients with CSS',
-            content: 'Learn how to create stunning gradient effects...',
-            content_type: 'text/markdown' as const,
-            visibility: 'public' as const,
-            categories: ['design', 'css'],
+            title: "Creating Beautiful Gradients with CSS",
+            content: "Learn how to create stunning gradient effects...",
+            content_type: "text/markdown" as const,
+            visibility: "public" as const,
+            categories: ["design", "css"],
             created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
             updated_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
             likes_count: 89,
@@ -114,16 +123,16 @@ export const ExplorePage: React.FC = () => {
           },
         ];
         setPosts(mockPosts);
-      } else if (activeTab === 'authors') {
+      } else if (activeTab === "authors") {
         const mockAuthors: TrendingAuthor[] = [
           {
-            id: '201',
-            url: 'http://localhost:8000/api/authors/201/',
-            username: 'techexplorer',
-            email: 'tech@example.com',
-            display_name: 'Tech Explorer',
-            profile_image: 'https://i.pravatar.cc/150?u=tech',
-            bio: 'Exploring the latest in technology and sharing insights',
+            id: "c3d4e5f6-7g8h-9i0j-1k2l-m3n4o5p6q7r8",
+            url: "http://localhost:8000/api/authors/c3d4e5f6-7g8h-9i0j-1k2l-m3n4o5p6q7r8/",
+            username: "techexplorer",
+            email: "tech@example.com",
+            display_name: "Tech Explorer",
+            profile_image: "https://i.pravatar.cc/150?u=tech",
+            bio: "Exploring the latest in technology and sharing insights",
             follower_count: 1234,
             post_count: 45,
             is_approved: true,
@@ -132,13 +141,13 @@ export const ExplorePage: React.FC = () => {
             updated_at: new Date().toISOString(),
           },
           {
-            id: '202',
-            url: 'http://localhost:8000/api/authors/202/',
-            username: 'designpro',
-            email: 'design@example.com',
-            display_name: 'Design Pro',
-            profile_image: 'https://i.pravatar.cc/150?u=design',
-            bio: 'UI/UX designer passionate about creating beautiful experiences',
+            id: "d4e5f6g7-8h9i-0j1k-2l3m-n4o5p6q7r8s9",
+            url: "http://localhost:8000/api/authors/d4e5f6g7-8h9i-0j1k-2l3m-n4o5p6q7r8s9/",
+            username: "designpro",
+            email: "design@example.com",
+            display_name: "Design Pro",
+            profile_image: "https://i.pravatar.cc/150?u=design",
+            bio: "UI/UX designer passionate about creating beautiful experiences",
             follower_count: 892,
             post_count: 32,
             is_approved: true,
@@ -147,12 +156,12 @@ export const ExplorePage: React.FC = () => {
             updated_at: new Date().toISOString(),
           },
           {
-            id: '203',
-            url: 'http://localhost:8000/api/authors/203/',
-            username: 'codemaster',
-            email: 'code@example.com',
-            display_name: 'Code Master',
-            bio: 'Full-stack developer sharing coding tips and tricks',
+            id: "e5f6g7h8-9i0j-1k2l-3m4n-o5p6q7r8s9t0",
+            url: "http://localhost:8000/api/authors/e5f6g7h8-9i0j-1k2l-3m4n-o5p6q7r8s9t0/",
+            username: "codemaster",
+            email: "code@example.com",
+            display_name: "Code Master",
+            bio: "Full-stack developer sharing coding tips and tricks",
             follower_count: 567,
             post_count: 28,
             is_approved: true,
@@ -162,51 +171,51 @@ export const ExplorePage: React.FC = () => {
           },
         ];
         setAuthors(mockAuthors);
-      } else if (activeTab === 'categories') {
+      } else if (activeTab === "categories") {
         const mockCategories: Category[] = [
-          { name: 'Technology', count: 156, color: 'var(--primary-blue)' },
-          { name: 'Design', count: 123, color: 'var(--primary-purple)' },
-          { name: 'Programming', count: 98, color: 'var(--primary-teal)' },
-          { name: 'AI/ML', count: 76, color: 'var(--primary-pink)' },
-          { name: 'Web Development', count: 65, color: 'var(--primary-coral)' },
-          { name: 'Mobile Dev', count: 54, color: 'var(--primary-violet)' },
-          { name: 'Data Science', count: 45, color: 'var(--primary-yellow)' },
+          { name: "Technology", count: 156, color: "var(--primary-blue)" },
+          { name: "Design", count: 123, color: "var(--primary-purple)" },
+          { name: "Programming", count: 98, color: "var(--primary-teal)" },
+          { name: "AI/ML", count: 76, color: "var(--primary-pink)" },
+          { name: "Web Development", count: 65, color: "var(--primary-coral)" },
+          { name: "Mobile Dev", count: 54, color: "var(--primary-violet)" },
+          { name: "Data Science", count: 45, color: "var(--primary-yellow)" },
         ];
         // Ensure all categories have colors
         const categoriesWithColors = mockCategories.map((cat, index) => ({
           ...cat,
-          color: cat.color || getCategoryColor(cat.name, index)
+          color: cat.color || getCategoryColor(cat.name, index),
         }));
         setCategories(categoriesWithColors);
       }
-      
+
       // Apply search filter
       if (searchQuery) {
         // Filter logic here
       }
     } catch (error) {
-      console.error('Error fetching explore data:', error);
+      console.error("Error fetching explore data:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleFollowAuthor = async (authorId: string) => {
-    setFollowingAuthors(prev => new Set(prev).add(authorId));
+    setFollowingAuthors((prev) => new Set(prev).add(authorId));
     try {
       // API call would go here
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // Update UI to show following
-      setAuthors(prev => 
-        prev.map(author => 
+      setAuthors((prev) =>
+        prev.map((author) =>
           author.id === authorId ? { ...author, is_following: true } : author
         )
       );
     } catch (error) {
-      console.error('Error following author:', error);
+      console.error("Error following author:", error);
     } finally {
-      setFollowingAuthors(prev => {
+      setFollowingAuthors((prev) => {
         const newSet = new Set(prev);
         newSet.delete(authorId);
         return newSet;
@@ -215,10 +224,30 @@ export const ExplorePage: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'trending', label: 'Trending', icon: TrendingUp, gradientColors: ['var(--primary-purple)', 'var(--primary-pink)'] },
-    { id: 'authors', label: 'Authors', icon: Users, gradientColors: ['var(--primary-teal)', 'var(--primary-blue)'] },
-    { id: 'categories', label: 'Categories', icon: Hash, gradientColors: ['var(--primary-yellow)', 'var(--primary-coral)'] },
-    { id: 'recent', label: 'Recent', icon: Sparkles, gradientColors: ['var(--primary-violet)', 'var(--primary-purple)'] },
+    {
+      id: "trending",
+      label: "Trending",
+      icon: TrendingUp,
+      gradientColors: ["var(--primary-purple)", "var(--primary-pink)"],
+    },
+    {
+      id: "authors",
+      label: "Authors",
+      icon: Users,
+      gradientColors: ["var(--primary-teal)", "var(--primary-blue)"],
+    },
+    {
+      id: "categories",
+      label: "Categories",
+      icon: Hash,
+      gradientColors: ["var(--primary-yellow)", "var(--primary-coral)"],
+    },
+    {
+      id: "recent",
+      label: "Recent",
+      icon: Sparkles,
+      gradientColors: ["var(--primary-violet)", "var(--primary-purple)"],
+    },
   ];
 
   return (
@@ -232,7 +261,13 @@ export const ExplorePage: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <div className="flex items-center space-x-3 mb-4 md:mb-0">
             <AnimatedGradient
-              gradientColors={['var(--primary-purple)', 'var(--primary-pink)', 'var(--primary-teal)', 'var(--primary-violet)', 'var(--primary-yellow)']}
+              gradientColors={[
+                "var(--primary-purple)",
+                "var(--primary-pink)",
+                "var(--primary-teal)",
+                "var(--primary-violet)",
+                "var(--primary-yellow)",
+              ]}
               className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
               textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
               duration={15}
@@ -241,7 +276,9 @@ export const ExplorePage: React.FC = () => {
             </AnimatedGradient>
             <div>
               <h1 className="text-2xl font-bold text-text-1">Explore</h1>
-              <p className="text-sm text-text-2">Discover amazing content and people</p>
+              <p className="text-sm text-text-2">
+                Discover amazing content and people
+              </p>
             </div>
           </div>
 
@@ -277,7 +314,7 @@ export const ExplorePage: React.FC = () => {
           {tabs.map((tab, index) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
-            
+
             return isActive ? (
               <motion.div
                 key={`${tab.id}-active`}
@@ -321,21 +358,21 @@ export const ExplorePage: React.FC = () => {
             className="ml-auto flex items-center space-x-2"
           >
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => setViewMode("grid")}
               className={`p-2 rounded-lg transition-all ${
-                viewMode === 'grid' 
-                  ? 'bg-[var(--primary-violet)]/20 text-[var(--primary-violet)]' 
-                  : 'text-text-2 hover:text-text-1'
+                viewMode === "grid"
+                  ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)]"
+                  : "text-text-2 hover:text-text-1"
               }`}
             >
               <Grid3X3 size={18} />
             </button>
             <button
-              onClick={() => setViewMode('list')}
+              onClick={() => setViewMode("list")}
               className={`p-2 rounded-lg transition-all ${
-                viewMode === 'list' 
-                  ? 'bg-[var(--primary-violet)]/20 text-[var(--primary-violet)]' 
-                  : 'text-text-2 hover:text-text-1'
+                viewMode === "list"
+                  ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)]"
+                  : "text-text-2 hover:text-text-1"
               }`}
             >
               <List size={18} />
@@ -352,13 +389,17 @@ export const ExplorePage: React.FC = () => {
       ) : (
         <AnimatePresence mode="wait">
           {/* Trending Posts */}
-          {activeTab === 'trending' && (
+          {activeTab === "trending" && (
             <motion.div
               key="trending"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'space-y-4'}
+              className={
+                viewMode === "grid"
+                  ? "grid grid-cols-1 md:grid-cols-2 gap-6"
+                  : "space-y-4"
+              }
             >
               {posts.map((post, index) => (
                 <motion.div
@@ -374,7 +415,7 @@ export const ExplorePage: React.FC = () => {
           )}
 
           {/* Authors Grid */}
-          {activeTab === 'authors' && (
+          {activeTab === "authors" && (
             <motion.div
               key="authors"
               initial={{ opacity: 0, y: 20 }}
@@ -389,49 +430,56 @@ export const ExplorePage: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card variant="main" hoverable className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
+                  <Card
+                    variant="main"
+                    hoverable
+                    className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl"
+                  >
                     <div className="flex flex-col items-center text-center">
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        className="mb-4"
-                      >
+                      <motion.div whileHover={{ scale: 1.05 }} className="mb-4">
                         <Avatar
                           imgSrc={author.profile_image}
                           alt={author.display_name}
                           size="xl"
                         />
                       </motion.div>
-                      
+
                       <h3 className="font-semibold text-lg text-text-1 mb-1">
                         {author.display_name}
                       </h3>
-                      <p className="text-sm text-text-2 mb-3">@{author.username}</p>
-                      
+                      <p className="text-sm text-text-2 mb-3">
+                        @{author.username}
+                      </p>
+
                       {author.bio && (
                         <p className="text-sm text-text-2 mb-4 line-clamp-2">
                           {author.bio}
                         </p>
                       )}
-                      
+
                       <div className="flex items-center space-x-4 mb-4 text-sm">
                         <div>
-                          <span className="font-semibold text-text-1">{author.follower_count}</span>
+                          <span className="font-semibold text-text-1">
+                            {author.follower_count}
+                          </span>
                           <span className="text-text-2 ml-1">followers</span>
                         </div>
                         <div>
-                          <span className="font-semibold text-text-1">{author.post_count}</span>
+                          <span className="font-semibold text-text-1">
+                            {author.post_count}
+                          </span>
                           <span className="text-text-2 ml-1">posts</span>
                         </div>
                       </div>
-                      
+
                       <AnimatedButton
                         size="sm"
-                        variant={author.is_following ? 'secondary' : 'primary'}
+                        variant={author.is_following ? "secondary" : "primary"}
                         onClick={() => handleFollowAuthor(author.id)}
                         loading={followingAuthors.has(author.id)}
                         className="w-full"
                       >
-                        {author.is_following ? 'Following' : 'Follow'}
+                        {author.is_following ? "Following" : "Follow"}
                       </AnimatedButton>
                     </div>
                   </Card>
@@ -441,7 +489,7 @@ export const ExplorePage: React.FC = () => {
           )}
 
           {/* Categories */}
-          {activeTab === 'categories' && (
+          {activeTab === "categories" && (
             <motion.div
               key="categories"
               initial={{ opacity: 0, y: 20 }}

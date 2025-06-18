@@ -15,11 +15,11 @@ router = DefaultRouter()
 router.register(r"authors", AuthorViewSet)
 
 # Nested router: /api/authors/<author_id>/entries/
-#router.register(
-#    r"api/entries",
+# router.register(
+#    r"entries",
 #    EntryViewSet,
 #    basename="author-entries"
-#)
+# )
 
 entry_list = EntryViewSet.as_view({
     'get': 'list',
@@ -34,25 +34,25 @@ entry_detail = EntryViewSet.as_view({
 )
 
 
-urlpatterns = [
-    # Router-based endpoints
+urlpatterns = [    # Router-based endpoints
     path("", include(router.urls)),
-    path("api/entries/", entry_list, name="entry-list"),
-    path("api/entries/<uuid:id>/", entry_detail, name="entry-detail"),
-
+    # Entry endpoints (note: api/ prefix is added at project-level urls.py)
+    path("entries/", entry_list, name="entry-list"),
+    path("entries/<uuid:id>/", entry_detail, name="entry-detail"),    
+    
     # Like endpoint
-    path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
+    path("entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
 
-    # Manual comment endpoints
-    path("api/entries/<uuid:entry_id>/comments/", CommentListCreateView.as_view(), name="entry-comments"),
-    path("api/entries/<uuid:entry_id>/comments/<uuid:pk>/", CommentDetailView.as_view(), name="entry-comment-detail"),
+    # Comment endpoints
+    path("entries/<uuid:entry_id>/comments/", CommentListCreateView.as_view(), name="entry-comments"),
+    path("entries/<uuid:entry_id>/comments/<uuid:pk>/", CommentDetailView.as_view(), name="entry-comment-detail"),
 
     # Image upload
-    path('api/upload-image/', ImageUploadView.as_view(), name='upload-image'),
+    path('upload-image/', ImageUploadView.as_view(), name='upload-image'),
 
     # Auth endpoints
     path('api/auth/status/', auth_status, name='auth-status'),
     path('api/auth/github/callback/', github_callback, name='github-callback'),
-    path('api/authors/me/', author_me, name='author-me'),
+    path('authors/me/', author_me, name='author-me'),
     path('api/auth/logout/', logout_view, name='logout'),
 ]
