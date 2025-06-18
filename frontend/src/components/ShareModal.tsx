@@ -6,6 +6,7 @@ import {
   Globe, Lock, UserCheck, Send, Search
 } from 'lucide-react';
 import type { Entry, Author } from '../types/models';
+import { api } from '../services/api';
 import AnimatedButton from './ui/AnimatedButton';
 import Input from './ui/Input';
 import Avatar from './Avatar/Avatar';
@@ -57,23 +58,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const searchUsers = async () => {
     setIsSearching(true);
     try {
-      // Mock user search - replace with API call
-      const mockUsers: Author[] = Array.from({ length: 5 }, (_, i) => ({
-        id: `user-${i}`,
-        url: `http://localhost:8000/api/authors/user-${i}/`,
-        username: `user${i}`,
-        email: `user${i}@example.com`,
-        display_name: `${searchQuery} User ${i}`,
-        profile_image: `https://i.pravatar.cc/150?u=${searchQuery}${i}`,
+      const response = await api.getAuthors({
+        search: searchQuery,
         is_approved: true,
         is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-      
-      setUsers(mockUsers);
+      });
+      console.log('ShareModal user search response:', response);
+      // Handle both paginated and direct array responses
+      setUsers(response.results || response || []);
     } catch (error) {
       console.error('Error searching users:', error);
+      setUsers([]);
     } finally {
       setIsSearching(false);
     }

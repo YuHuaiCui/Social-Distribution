@@ -88,12 +88,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         elif author_type == "remote":
             queryset = queryset.filter(node__isnull=False)
 
-        # Search by username or display name
+        # Search by username, display name, github username, or email
         search = self.request.query_params.get("search", None)
         if search:
             queryset = queryset.filter(
                 Q(username__icontains=search)
                 | Q(display_name__icontains=search)
+                | Q(github_username__icontains=search)
                 | Q(email__icontains=search)
             )
 

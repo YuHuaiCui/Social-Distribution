@@ -6,6 +6,7 @@ import {
   Loader2 
 } from 'lucide-react';
 import type { Entry, Author } from '../types/models';
+import { api } from '../services/api';
 import PostCard from '../components/PostCard';
 import AuthorCard from '../components/AuthorCard';
 import AnimatedButton from '../components/ui/AnimatedButton';
@@ -46,57 +47,43 @@ export const SearchResultsPage: React.FC = () => {
   const performSearch = async () => {
     setIsLoading(true);
     try {
-      // Mock search results - replace with API calls
-      const mockResults: SearchResults = {
-        posts: searchType === 'all' || searchType === 'posts' ? [
-          {
-            id: '1',
-            url: 'http://localhost:8000/api/entries/1/',
-            author: {
-              id: '123',
-              url: 'http://localhost:8000/api/authors/123/',
-              username: 'user1',
-              email: 'user1@example.com',
-              display_name: 'Search Result User',
-              is_approved: true,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            title: `Post about ${query || tag}`,
-            content: `This is a post containing **${query || tag}** in the content.`,
-            content_type: 'text/markdown',
-            visibility: 'public',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            likes_count: 10,
-            comments_count: 3,
-            categories: tag ? [tag] : [],
-          },
-        ] : [],
-        authors: searchType === 'all' || searchType === 'authors' ? [
-          {
-            id: 'author1',
-            url: 'http://localhost:8000/api/authors/author1/',
-            username: query || 'searchuser',
-            email: 'search@example.com',
-            display_name: `${query} User`,
-            profile_image: `https://i.pravatar.cc/150?u=${query}`,
-            bio: `Bio mentioning ${query}`,
+      const searchQuery = query || tag || '';
+      
+      let searchResults: SearchResults = {
+        posts: [],
+        authors: [],
+        tags: [],
+      };
+
+      // Search authors if needed
+      if ((searchType === 'all' || searchType === 'authors') && searchQuery) {
+        try {
+          const authorsResponse = await api.getAuthors({
+            search: searchQuery,
             is_approved: true,
             is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ] : [],
-        tags: searchType === 'all' || searchType === 'tags' ? [
-          { name: query || tag || 'react', count: 25 },
-          { name: 'typescript', count: 18 },
-          { name: 'web-development', count: 15 },
-        ] : [],
-      };
+          });
+          console.log('Authors search response:', authorsResponse);
+          // Handle both paginated and direct array responses
+          searchResults.authors = authorsResponse.results || authorsResponse || [];
+        } catch (error) {
+          console.error('Error searching authors:', error);
+        }
+      }
+
+      // Search posts (entries) - TODO: implement when backend entry search is available
+      if ((searchType === 'all' || searchType === 'posts') && searchQuery) {
+        // For now, leaving posts empty until entry search is implemented in backend
+        searchResults.posts = [];
+      }
+
+      // Search tags - TODO: implement when tag search is available
+      if ((searchType === 'all' || searchType === 'tags') && searchQuery) {
+        // For now, leaving tags empty until tag search is implemented
+        searchResults.tags = [];
+      }
       
-      setResults(mockResults);
+      setResults(searchResults);
     } catch (error) {
       console.error('Search error:', error);
     } finally {

@@ -28,6 +28,8 @@ import Input from "../components/ui/Input";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
 import Toggle from "../components/ui/Toggle";
+import type { Author } from "../types/models";
+import { api } from "../services/api";
 
 type SettingsTab = "profile" | "account" | "privacy" | "node" | "appearance";
 
@@ -66,9 +68,13 @@ export const SettingsPage: React.FC = () => {
   // Profile settings
   const [displayName, setDisplayName] = useState(user?.display_name || "");
   const [bio, setBio] = useState(user?.bio || "");
+  const [location, setLocation] = useState(user?.location || "");
+  const [website, setWebsite] = useState(user?.website || "");
+  const [githubUsername, setGithubUsername] = useState(user?.github_username || "");
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(
     null
   );
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
 
   // Account settings
   const [email, setEmail] = useState(user?.email || "");
@@ -108,6 +114,18 @@ export const SettingsPage: React.FC = () => {
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    // Update form fields when user data changes
+    if (user) {
+      setDisplayName(user.display_name || "");
+      setBio(user.bio || "");
+      setLocation(user.location || "");
+      setWebsite(user.website || "");
+      setGithubUsername(user.github_username || "");
+      setEmail(user.email || "");
+    }
+  }, [user]);
+
   const loadSettings = async () => {
     setIsLoading(true);
     try {
@@ -136,7 +154,9 @@ export const SettingsPage: React.FC = () => {
   const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Store file in state when we need to upload it
+      // Store the actual file for upload
+      setProfileImageFile(file);
+      // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfileImagePreview(reader.result as string);
@@ -150,25 +170,55 @@ export const SettingsPage: React.FC = () => {
     setSaveMessage(null);
 
     try {
-      // API call would go here
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      let updatedUser: Author;
+
+      // First, upload profile image if there's a new one
+      if (profileImageFile) {
+        updatedUser = await api.uploadProfileImage(profileImageFile);
+        // Then update other profile fields if needed
+        if (displayName !== user?.display_name || 
+            bio !== user?.bio || 
+            location !== user?.location || 
+            website !== user?.website || 
+            githubUsername !== user?.github_username) {
+          updatedUser = await api.updateCurrentAuthor({
+            display_name: displayName,
+            bio: bio,
+            location: location,
+            website: website,
+            github_username: githubUsername,
+          });
+        }
+      } else {
+        // Update other profile fields
+        updatedUser = await api.updateCurrentAuthor({
+          display_name: displayName,
+          bio: bio,
+          location: location,
+          website: website,
+          github_username: githubUsername,
+        });
+      }
 
       // Update user context
       if (updateUser) {
-        updateUser({
-          ...user!,
-          display_name: displayName,
-          bio: bio,
-          profile_image: profileImagePreview || user?.profile_image,
-        });
+        updateUser(updatedUser);
       }
+
+      // Clear the profile image file after successful upload
+      setProfileImageFile(null);
+      setProfileImagePreview(null);
 
       setSaveMessage({
         type: "success",
         text: "Profile updated successfully!",
       });
     } catch (error) {
-      setSaveMessage({ type: "error", text: "Failed to update profile" });
+      console.error('Profile update error:', error);
+      setSaveMessage({ 
+        type: "error", 
+        text: `Failed to update profile: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
     } finally {
       setIsSaving(false);
     }
@@ -184,18 +234,38 @@ export const SettingsPage: React.FC = () => {
     setSaveMessage(null);
 
     try {
-      // API call would go here
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setSaveMessage({ type: "success", text: "Account settings updated!" });
+      let updatedUser: Author;
 
-      // Clear password fields
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      // Handle password change
+      if (newPassword && currentPassword) {
+        updatedUser = await api.changePassword({
+          password: newPassword,
+          password_confirm: confirmPassword,
+        });
+
+        // Clear password fields after successful change
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else if (email !== user?.email) {
+        // Handle email change only
+        updatedUser = await api.updateCurrentAuthor({ email });
+      } else {
+        setSaveMessage({ type: "error", text: "No changes to save" });
+        return;
+      }
+
+      // Update user context if we have new user data
+      if (updateUser && updatedUser) {
+        updateUser(updatedUser);
+      }
+
+      setSaveMessage({ type: "success", text: "Account settings updated!" });
     } catch (error) {
+      console.error('Account update error:', error);
       setSaveMessage({
         type: "error",
-        text: "Failed to update account settings",
+        text: `Failed to update account settings: ${error instanceof Error ? error.message : 'Unknown error'}`,
       });
     } finally {
       setIsSaving(false);
@@ -461,6 +531,45 @@ export const SettingsPage: React.FC = () => {
                   </p>
                 </div>
 
+                {/* Location */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-text-2 mb-2">
+                    Location
+                  </label>
+                  <Input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Your location"
+                  />
+                </div>
+
+                {/* Website */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-text-2 mb-2">
+                    Website
+                  </label>
+                  <Input
+                    type="url"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="Your website"
+                  />
+                </div>
+
+                {/* GitHub Username */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-text-2 mb-2">
+                    GitHub Username
+                  </label>
+                  <Input
+                    type="text"
+                    value={githubUsername}
+                    onChange={(e) => setGithubUsername(e.target.value)}
+                    placeholder="Your GitHub username"
+                  />
+                </div>
+
                 <AnimatedButton
                   onClick={handleSaveProfile}
                   variant="primary"
@@ -676,7 +785,8 @@ export const SettingsPage: React.FC = () => {
                     {
                       key: "requireApprovalToFollow",
                       label: "Require approval for follow requests",
-                      desc: "You must approve each follower manually",
+                      desc: "All follow requests require approval (always enabled)",
+                      disabled: true,
                     },
                     {
                       key: "hideFollowerCount",
@@ -696,11 +806,17 @@ export const SettingsPage: React.FC = () => {
                   ].map((setting) => (
                     <motion.div
                       key={setting.key}
-                      whileHover={{ x: 4 }}
-                      className="flex items-center justify-between p-4 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] border border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)] transition-all"
+                      whileHover={setting.disabled ? {} : { x: 4 }}
+                      className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+                        setting.disabled 
+                          ? "bg-[rgba(var(--glass-rgb),0.2)] border-[var(--border-1)]/50 opacity-60" 
+                          : "bg-[rgba(var(--glass-rgb),0.3)] border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)]"
+                      }`}
                     >
                       <div className="flex-1 pr-4">
-                        <p className="font-medium text-text-1 mb-1">
+                        <p className={`font-medium mb-1 ${
+                          setting.disabled ? "text-text-2" : "text-text-1"
+                        }`}>
                           {setting.label}
                         </p>
                         <p className="text-xs text-text-2">{setting.desc}</p>
@@ -708,16 +824,19 @@ export const SettingsPage: React.FC = () => {
                       <div className="flex items-center">
                         <Toggle
                           checked={
-                            privacySettings[
-                              setting.key as keyof PrivacySettings
-                            ] as boolean
+                            setting.disabled 
+                              ? true 
+                              : (privacySettings[
+                                  setting.key as keyof PrivacySettings
+                                ] as boolean)
                           }
-                          onChange={(checked) =>
+                          onChange={setting.disabled ? () => {} : (checked) =>
                             setPrivacySettings({
                               ...privacySettings,
                               [setting.key]: checked,
                             })
                           }
+                          disabled={setting.disabled}
                           className="ml-4"
                         />
                       </div>

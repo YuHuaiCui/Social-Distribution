@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, UserPlus, UserCheck, Search, Loader } from "lucide-react";
 import type { Author } from "../types/models";
+import { api } from "../services/api";
 import AuthorCard from "../components/AuthorCard";
 import Input from "../components/ui/Input";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
@@ -137,7 +138,8 @@ export const FriendsPage: React.FC = () => {
   const filteredAuthors = authors.filter(
     (author) =>
       author.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      author.username.toLowerCase().includes(searchQuery.toLowerCase())
+      author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (author.github_username && author.github_username.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const getEmptyMessage = () => {

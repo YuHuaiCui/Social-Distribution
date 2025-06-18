@@ -15,6 +15,8 @@ export interface Author extends TimestampedModel {
   github_username?: string;
   profile_image?: string;
   bio?: string;
+  location?: string;
+  website?: string;
   node?: Node | null;
   is_approved: boolean;
   is_active: boolean;
@@ -33,6 +35,8 @@ export interface AuthorUpdateData {
   display_name?: string;
   github_username?: string;
   bio?: string;
+  location?: string;
+  website?: string;
   profile_image?: string;
   email?: string;
 }
