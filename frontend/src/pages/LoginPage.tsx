@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Lock, Github } from "lucide-react";
@@ -19,6 +19,7 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const { showSuccess, showError } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isGithubLoading, setIsGithubLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState({
     username: "",
@@ -28,6 +29,106 @@ export const LoginPage: React.FC = () => {
     username: "",
     password: "",
   });
+
+  // Check if we're coming back from GitHub OAuth
+  useEffect(() => {
+    const checkGitHubAuth = async () => {
+      console.log("🔐 LoginPage: Checking for GitHub auth...");
+      
+      // Check if we have a session cookie from Django
+      const hasSession = document.cookie.includes("sessionid");
+      
+      // Check if URL contains GitHub OAuth callback indicators
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasCode = urlParams.has('code');
+      const hasState = urlParams.has('state');
+      
+      console.log("🔐 LoginPage: Auth indicators -",
+        "\n  hasSession:", hasSession,
+        "\n  hasCode:", hasCode,
+        "\n  hasState:", hasState,
+        "\n  cookies:", document.cookie,
+        "\n  URL:", window.location.href
+      );
+      
+      // Check if we already handled this (to prevent loops)
+      const handled = sessionStorage.getItem('githubAuthHandled');
+      
+      if (handled === 'true') {
+        console.log("🔐 LoginPage: Already handled GitHub auth, skipping");
+        sessionStorage.removeItem('githubAuthHandled');
+        return;
+      }
+      
+      // Check if we just came from GitHub OAuth (has params) OR if we need to check existing session
+      const githubAuthPending = sessionStorage.getItem('githubAuthPending') === 'true';
+      const shouldCheckAuth = (hasCode && hasState) || 
+                            (hasSession && !sessionStorage.getItem('authChecked')) ||
+                            (!sessionStorage.getItem('authChecked') && document.referrer.includes('github.com')) ||
+                            (githubAuthPending && !sessionStorage.getItem('authChecked'));
+      
+      console.log("🔐 LoginPage: GitHub auth pending:", githubAuthPending);
+      
+      if (shouldCheckAuth) {
+        console.log("🔐 LoginPage: Should check auth, checking with backend...");
+        try {
+          // Mark as checked to prevent repeated checks
+          sessionStorage.setItem('authChecked', 'true');
+          
+          // Add a small delay for GitHub OAuth to ensure Django has processed the auth
+          if (hasCode && hasState) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          // Check if we're now authenticated
+          const response = await api.getAuthStatus();
+          console.log("🔐 LoginPage: Backend auth response:", response);
+          
+          if (response.isAuthenticated) {
+            console.log("🔐 LoginPage: User authenticated! Logging in...");
+            // Mark as handled and clear pending flag
+            sessionStorage.setItem('githubAuthHandled', 'true');
+            sessionStorage.removeItem('githubAuthPending');
+            
+            showSuccess("Welcome back!");
+            
+            // Ensure login completes before navigating
+            await login(true, response.user || undefined);
+            
+            // Clear the URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            // Small delay to ensure state updates propagate
+            setTimeout(() => {
+              console.log("🔐 LoginPage: Navigating to /home");
+              navigate("/home");
+            }, 100);
+          } else {
+            console.log("🔐 LoginPage: User not authenticated");
+            // Clear the pending flag if auth failed
+            sessionStorage.removeItem('githubAuthPending');
+            
+            // If we have GitHub params but not authenticated, Django might still be processing
+            if (hasCode && hasState) {
+              console.log("🔐 LoginPage: Has GitHub params but not authenticated yet, clearing params");
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          }
+        } catch (error) {
+          console.error("🔐 LoginPage: Auth check failed:", error);
+        }
+      } else {
+        console.log("🔐 LoginPage: No auth check needed");
+      }
+    };
+
+    checkGitHubAuth();
+    
+    // Cleanup function to clear authChecked when component unmounts
+    return () => {
+      sessionStorage.removeItem('authChecked');
+    };
+  }, []);
 
   const validateForm = () => {
     const newErrors = {
@@ -84,9 +185,18 @@ export const LoginPage: React.FC = () => {
   };
 
   const handleGithubLogin = () => {
-    window.location.href = `${
-      import.meta.env.VITE_API_URL
-    }/accounts/github/login/`;
+    setIsGithubLoading(true);
+    showSuccess("Redirecting to GitHub...");
+    
+    // Set a flag to indicate GitHub auth is pending
+    sessionStorage.setItem('githubAuthPending', 'true');
+    
+    // Add a small delay to show the loading state
+    setTimeout(() => {
+      window.location.href = `${
+        import.meta.env.VITE_API_URL
+      }/accounts/github/login/`;
+    }, 500);
   };
 
   return (
@@ -226,9 +336,11 @@ export const LoginPage: React.FC = () => {
                 size="lg"
                 icon={<Github size={20} />}
                 onClick={handleGithubLogin}
+                disabled={isGithubLoading}
+                loading={isGithubLoading}
                 className="w-full btn-github"
               >
-                Sign in with GitHub
+                {isGithubLoading ? "Redirecting..." : "Sign in with GitHub"}
               </Button>
 
               <p className="text-center mt-6 text-text-2">
