@@ -49,7 +49,7 @@ const privacyOptions: PrivacyOption[] = [
     value: "unlisted",
     label: "Unlisted",
     icon: Link,
-    description: "Only people with the link can see this post",
+    description: "Visible to followers and friends, not shown in public feeds",
     color: "text-yellow-500",
   },
 ];
@@ -209,8 +209,8 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                         <li className="flex items-start space-x-2">
                           <Link size={14} className="mt-0.5 flex-shrink-0" />
                           <span>
-                            <strong>Unlisted:</strong> Not shown in feeds,
-                            accessible via direct link
+                            <strong>Unlisted:</strong> Visible to followers and friends,
+                            not shown in public feeds
                           </span>
                         </li>
                         <li className="flex items-start space-x-2">

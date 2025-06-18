@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, UserPlus, UserCheck, Search, Loader } from "lucide-react";
 import type { Author } from "../types/models";
+import { api } from "../services/api";
+import { useAuth } from "../components/context/AuthContext";
 import AuthorCard from "../components/AuthorCard";
 import Input from "../components/ui/Input";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
@@ -9,135 +11,82 @@ import Card from "../components/ui/Card";
 
 type FilterType = "friends" | "following" | "followers";
 
-// Mock data for demonstration
-const generateMockAuthors = (): Author[] => {
-  const names = [
-    "Alice Chen",
-    "Bob Smith",
-    "Carol Johnson",
-    "David Lee",
-    "Emma Wilson",
-    "Frank Brown",
-    "Grace Davis",
-    "Henry Martinez",
-    "Iris Taylor",
-    "Jack Anderson",
-    "Katie Moore",
-    "Liam Jackson",
-  ];
-
-  return names.map((name, index) => ({
-    id: `author-${index}`,
-    url: `http://localhost:8000/api/authors/author-${index}/`,
-    username: name.toLowerCase().replace(" ", ""),
-    email: `${name.toLowerCase().replace(" ", "")}@example.com`,
-    display_name: name,
-    bio: `Hi, I'm ${name}. I love sharing my thoughts on technology and innovation.`,
-    profile_image: `https://i.pravatar.cc/150?u=${name}`,
-    is_approved: true,
-    is_active: true,
-    created_at: new Date(
-      Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
-    ).toISOString(),
-    updated_at: new Date().toISOString(),
-  }));
-};
-
 export const FriendsPage: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [filter, setFilter] = useState<FilterType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
-  const [followerIds, setFollowerIds] = useState<Set<string>>(new Set());
+  const [friendsCount, setFriendsCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
 
   useEffect(() => {
-    fetchAuthors();
-  }, [filter]);
+    if (currentUser) {
+      fetchAuthors();
+      loadAllCounts();
+    }
+  }, [filter, currentUser]);
+
+  const loadAllCounts = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const [friends, following, followers] = await Promise.all([
+        api.getFriends(currentUser.id),
+        api.getFollowing(currentUser.id),
+        api.getFollowers(currentUser.id),
+      ]);
+      
+      setFriendsCount(friends.length);
+      setFollowingCount(following.length);
+      setFollowersCount(followers.length);
+    } catch (error) {
+      console.error("Error loading counts:", error);
+    }
+  };
 
   const fetchAuthors = async () => {
+    if (!currentUser) return;
+    
     setIsLoading(true);
     try {
-      // Mock data - replace with API calls
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const allAuthors = generateMockAuthors();
-
-      // Mock following/follower relationships
-      const mockFollowingIds = new Set([
-        "author-0",
-        "author-1",
-        "author-2",
-        "author-3",
-        "author-4",
-      ]);
-      const mockFollowerIds = new Set([
-        "author-1",
-        "author-2",
-        "author-5",
-        "author-6",
-        "author-7",
-      ]);
-
-      setFollowingIds(mockFollowingIds);
-      setFollowerIds(mockFollowerIds);
-
-      // Filter based on selected tab
-      let filteredAuthors: Author[] = [];
+      let fetchedAuthors: Author[] = [];
 
       switch (filter) {
         case "friends":
-          // Friends are mutual followers
-          filteredAuthors = allAuthors.filter(
-            (author) =>
-              mockFollowingIds.has(author.id) && mockFollowerIds.has(author.id)
-          );
+          fetchedAuthors = await api.getFriends(currentUser.id);
           break;
         case "following":
-          filteredAuthors = allAuthors.filter((author) =>
-            mockFollowingIds.has(author.id)
-          );
+          fetchedAuthors = await api.getFollowing(currentUser.id);
           break;
         case "followers":
-          filteredAuthors = allAuthors.filter((author) =>
-            mockFollowerIds.has(author.id)
-          );
+          fetchedAuthors = await api.getFollowers(currentUser.id);
           break;
       }
 
-      setAuthors(filteredAuthors);
+      setAuthors(fetchedAuthors);
     } catch (error) {
       console.error("Error fetching authors:", error);
+      setAuthors([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFollowToggle = async (authorId: string) => {
-    try {
-      if (followingIds.has(authorId)) {
-        // Unfollow
-        const newFollowingIds = new Set(followingIds);
-        newFollowingIds.delete(authorId);
-        setFollowingIds(newFollowingIds);
-      } else {
-        // Follow
-        const newFollowingIds = new Set(followingIds);
-        newFollowingIds.add(authorId);
-        setFollowingIds(newFollowingIds);
-      }
-
-      // In real implementation, make API call here
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    } catch (error) {
-      console.error("Error toggling follow:", error);
-    }
+  const handleFollowToggle = async (isFollowing: boolean) => {
+    // Refresh the current list and counts after follow/unfollow action
+    await Promise.all([
+      fetchAuthors(),
+      loadAllCounts(),
+    ]);
   };
 
   const filteredAuthors = authors.filter(
     (author) =>
       author.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      author.username.toLowerCase().includes(searchQuery.toLowerCase())
+      author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (author.github_username && author.github_username.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const getEmptyMessage = () => {
@@ -189,11 +138,7 @@ export const FriendsPage: React.FC = () => {
               <span className="font-medium">Friends</span>
               {!isLoading && (
                 <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                  {
-                    authors.filter(
-                      (a) => followingIds.has(a.id) && followerIds.has(a.id)
-                    ).length
-                  }
+                  {friendsCount}
                 </span>
               )}
             </AnimatedGradient>
@@ -208,11 +153,7 @@ export const FriendsPage: React.FC = () => {
               <span className="font-medium">Friends</span>
               {!isLoading && (
                 <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                  {
-                    authors.filter(
-                      (a) => followingIds.has(a.id) && followerIds.has(a.id)
-                    ).length
-                  }
+                  {friendsCount}
                 </span>
               )}
             </motion.div>
@@ -233,7 +174,7 @@ export const FriendsPage: React.FC = () => {
               <UserPlus size={18} />
               <span className="font-medium">Following</span>
               <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                {followingIds.size}
+                {followingCount}
               </span>
             </AnimatedGradient>
           ) : (
@@ -246,7 +187,7 @@ export const FriendsPage: React.FC = () => {
               <UserPlus size={18} />
               <span className="font-medium">Following</span>
               <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followingIds.size}
+                {followingCount}
               </span>
             </motion.div>
           )}
@@ -266,7 +207,7 @@ export const FriendsPage: React.FC = () => {
               <UserCheck size={18} />
               <span className="font-medium">Followers</span>
               <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                {followerIds.size}
+                {followersCount}
               </span>
             </AnimatedGradient>
           ) : (
@@ -279,7 +220,7 @@ export const FriendsPage: React.FC = () => {
               <UserCheck size={18} />
               <span className="font-medium">Followers</span>
               <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followerIds.size}
+                {followersCount}
               </span>
             </motion.div>
           )}
@@ -334,14 +275,11 @@ export const FriendsPage: React.FC = () => {
               >
                 <AuthorCard
                   author={author}
-                  isFollowing={followingIds.has(author.id)}
-                  isFriend={
-                    followingIds.has(author.id) && followerIds.has(author.id)
-                  }
-                  showFollowButton={
-                    filter !== "followers" || !followingIds.has(author.id)
-                  }
-                  onFollowToggle={() => handleFollowToggle(author.id)}
+                  variant="default"
+                  showStats={true}
+                  showBio={true}
+                  showActions={true}
+                  onFollow={handleFollowToggle}
                 />
               </motion.div>
             ))}

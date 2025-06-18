@@ -88,12 +88,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         elif author_type == "remote":
             queryset = queryset.filter(node__isnull=False)
 
-        # Search by username or display name
+        # Search by username, display name, github username, or email
         search = self.request.query_params.get("search", None)
         if search:
             queryset = queryset.filter(
                 Q(username__icontains=search)
                 | Q(display_name__icontains=search)
+                | Q(github_username__icontains=search)
                 | Q(email__icontains=search)
             )
 
@@ -108,7 +109,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         author = serializer.save()
 
         # Return the created author data
-        response_serializer = AuthorListSerializer(author)
+        response_serializer = AuthorListSerializer(author, context={"request": request})
         return Response(
             {
                 "message": "Author created successfully",
@@ -127,7 +128,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "message": f"Author {author.username} has been approved",
-                "author": AuthorListSerializer(author).data,
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
             }
         )
 
@@ -141,7 +144,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "message": f"Author {author.username} has been deactivated",
-                "author": AuthorListSerializer(author).data,
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
             }
         )
 
@@ -155,7 +160,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "message": f"Author {author.username} has been activated",
-                "author": AuthorListSerializer(author).data,
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
             }
         )
 
@@ -187,7 +194,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         follows = Follow.objects.filter(followed=author, status=Follow.ACCEPTED)
         followers = [follow.follower for follow in follows]
 
-        serializer = AuthorListSerializer(followers, many=True)
+        serializer = AuthorListSerializer(
+            followers, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
@@ -199,7 +208,22 @@ class AuthorViewSet(viewsets.ModelViewSet):
         follows = Follow.objects.filter(follower=author, status=Follow.ACCEPTED)
         following = [follow.followed for follow in follows]
 
-        serializer = AuthorListSerializer(following, many=True)
+        serializer = AuthorListSerializer(
+            following, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def friends(self, request, pk=None):
+        """Get all friends of this author (mutual follows)"""
+        author = self.get_object()
+
+        # Get friends using the model method
+        friends = author.get_friends()
+
+        serializer = AuthorListSerializer(
+            friends, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     @action(

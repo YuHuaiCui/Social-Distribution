@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -11,6 +11,7 @@ import Avatar from './Avatar/Avatar';
 import AnimatedButton from './ui/AnimatedButton';
 import Card from './ui/Card';
 import { api } from '../services/api';
+import { useAuth } from './context/AuthContext';
 
 interface AuthorCardProps {
   author: Author & {
@@ -39,9 +40,48 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   onFollow,
   className = '',
 }) => {
+  const { user: currentUser } = useAuth();
   const [isFollowing, setIsFollowing] = useState(author.is_following || false);
   const [isLoading, setIsLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [followerCount, setFollowerCount] = useState(author.follower_count || 0);
+  const [followingCount, setFollowingCount] = useState(author.following_count || 0);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // Check if the current user is viewing their own profile
+  const isOwnProfile = currentUser && currentUser.id === author.id;
+
+  // Sync local follow state with prop changes
+  useEffect(() => {
+    setIsFollowing(author.is_following || false);
+  }, [author.is_following]);
+
+  // Fetch real follower/following counts from backend
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!showStats) return;
+      
+      setStatsLoading(true);
+      try {
+        const [followers, following] = await Promise.all([
+          api.getFollowers(author.id),
+          api.getFollowing(author.id),
+        ]);
+        
+        setFollowerCount(followers.length);
+        setFollowingCount(following.length);
+      } catch (error) {
+        console.error('Error fetching author stats:', error);
+        // Fall back to provided counts or 0
+        setFollowerCount(author.follower_count || 0);
+        setFollowingCount(author.following_count || 0);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [author.id, showStats, author.follower_count, author.following_count]);
 
   const handleFollow = async () => {
     setIsLoading(true);
@@ -50,8 +90,12 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
     try {
       if (newFollowState) {
         await api.followAuthor(author.id);
+        // Optimistically update follower count (will be pending approval)
+        // Note: In reality, this might not increase the count until approved
       } else {
         await api.unfollowAuthor(author.id);
+        // Decrease follower count immediately
+        setFollowerCount(prev => Math.max(0, prev - 1));
       }
       
       setIsFollowing(newFollowState);
@@ -101,14 +145,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
           <p className="text-sm text-text-2 truncate">@{author.username}</p>
         </div>
         
-        {showActions && (
+        {showActions && !isOwnProfile && (
           <AnimatedButton
             size="sm"
             variant={isFollowing ? 'secondary' : 'primary'}
             onClick={handleFollow}
             loading={isLoading}
           >
-            {isFollowing ? 'Following' : 'Follow'}
+            {isFollowing ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </motion.div>
@@ -196,15 +240,15 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             
             <Link to={`/authors/${author.id}/followers`} className="flex items-center space-x-1 hover:underline min-w-0">
               <Users size={16} className="text-text-2 flex-shrink-0" />
-              <span className="font-semibold text-text-1">
-                {formatCount(author.follower_count || 0)}
+              <span className={`font-semibold text-text-1 ${statsLoading ? 'opacity-50' : ''}`}>
+                {formatCount(followerCount)}
               </span>
               <span className="text-text-2">followers</span>
             </Link>
             
             <Link to={`/authors/${author.id}/following`} className="flex items-center space-x-1 hover:underline min-w-0">
-              <span className="font-semibold text-text-1">
-                {formatCount(author.following_count || 0)}
+              <span className={`font-semibold text-text-1 ${statsLoading ? 'opacity-50' : ''}`}>
+                {formatCount(followingCount)}
               </span>
               <span className="text-text-2">following</span>
             </Link>
@@ -243,7 +287,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         )}
         
         {/* Follow Button */}
-        {showActions && (
+        {showActions && !isOwnProfile && (
           <AnimatedButton
             variant={isFollowing ? 'secondary' : 'primary'}
             onClick={handleFollow}
@@ -251,7 +295,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             icon={isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
             className="w-full"
           >
-            {isFollowing ? 'Unfollow' : 'Follow'}
+            {isFollowing ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </div>

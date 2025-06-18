@@ -479,7 +479,7 @@ export const ExplorePage: React.FC = () => {
                         loading={followingAuthors.has(author.id)}
                         className="w-full"
                       >
-                        {author.is_following ? "Following" : "Follow"}
+                        {author.is_following ? "Followed" : "Follow"}
                       </AnimatedButton>
                     </div>
                   </Card>

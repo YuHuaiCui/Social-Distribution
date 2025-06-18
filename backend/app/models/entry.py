@@ -22,7 +22,8 @@ class EntryManager(models.Manager):
             | Q(author1=OuterRef("author"), author2=viewing_author)
         )
 
-        following_exists = Follow.objects.filter(
+        # Check if viewing_author is a follower of the post author
+        follower_exists = Follow.objects.filter(
             follower=viewing_author, followed=OuterRef("author"), status=Follow.ACCEPTED
         )
 
@@ -30,12 +31,14 @@ class EntryManager(models.Manager):
             Q(visibility=Entry.PUBLIC)  # Public entries
             | Q(visibility=Entry.UNLISTED, author=viewing_author)  # Own unlisted
             | Q(visibility=Entry.UNLISTED)
-            & Exists(following_exists)  # Unlisted from followed
+            & (
+                Exists(follower_exists) | Exists(friendship_exists)
+            )  # Unlisted visible to followers and friends
             | Q(
                 visibility=Entry.FRIENDS_ONLY, author=viewing_author
             )  # Own friends-only
             | Q(visibility=Entry.FRIENDS_ONLY)
-            & Exists(friendship_exists)  # Friends-only from friends
+            & Exists(friendship_exists)  # Friends-only from friends only
         ).exclude(visibility=Entry.DELETED)
 
 

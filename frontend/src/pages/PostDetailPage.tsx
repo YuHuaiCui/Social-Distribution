@@ -22,6 +22,7 @@ import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
 import { entryService } from "../services/entry";
 import { socialService } from "../services/social";
+import { renderMarkdown } from "../utils/markdown";
 
 interface CommentWithReplies extends Comment {
   replies?: Comment[];
@@ -329,34 +330,10 @@ export const PostDetailPage: React.FC = () => {
 
   const renderContent = (content: string, contentType: string) => {
     if (contentType === "text/markdown") {
-      // Simple markdown rendering
-      const htmlContent = content
-        .replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold mb-4">$1</h1>')
-        .replace(
-          /^## (.*$)/gim,
-          '<h2 class="text-2xl font-semibold mb-3 mt-6">$1</h2>'
-        )
-        .replace(
-          /^### (.*$)/gim,
-          '<h3 class="text-xl font-semibold mb-2 mt-4">$1</h3>'
-        )
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(
-          /\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" class="text-[var(--primary-violet)] hover:underline" target="_blank" rel="noopener noreferrer">$1</a>'
-        )
-        .replace(/^- (.*$)/gim, '<li class="ml-6 list-disc">$1</li>')
-        .replace(/^\d+\. (.*$)/gim, '<li class="ml-6 list-decimal">$1</li>')
-        .replace(/\n\n/g, '</p><p class="mb-4">')
-        .replace(/\n/g, "<br>");
-
       return (
         <div
           className="prose prose-lg max-w-none text-text-1"
-          dangerouslySetInnerHTML={{
-            __html: `<p class="mb-4">${htmlContent}</p>`,
-          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
         />
       );
     }

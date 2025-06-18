@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Author } from '../types/models';
+import { api } from '../services/api';
+import { useAuth } from './context/AuthContext';
 import AnimatedGradient from './ui/AnimatedGradient';
 
 interface RightSidebarProps {
@@ -9,10 +11,58 @@ interface RightSidebarProps {
   trendingTags?: string[];
 }
 
+interface UserStats {
+  posts: number;
+  followers: number;
+  following: number;
+}
+
 const RightSidebar: React.FC<RightSidebarProps> = ({
   friends = [],
   trendingTags = ['technology', 'design', 'programming', 'webdev', 'opensource'],
 }) => {
+  const { user } = useAuth();
+  const [stats, setStats] = useState<UserStats>({ posts: 0, followers: 0, following: 0 });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      if (!user?.id) {
+        setIsLoadingStats(false);
+        return;
+      }
+      
+      try {
+        setIsLoadingStats(true);
+        
+        // Fetch real stats from the API
+        const [followers, following, entriesResponse] = await Promise.all([
+          api.getFollowers(user.id),
+          api.getFollowing(user.id),
+          // Fetch user's entries to count posts
+          fetch(`/api/authors/${user.id}/entries/`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            },
+          }).then(res => res.ok ? res.json() : []).catch(() => [])
+        ]);
+        
+        setStats({
+          posts: Array.isArray(entriesResponse) ? entriesResponse.length : 0,
+          followers: followers.length,
+          following: following.length,
+        });
+      } catch (error) {
+        console.error('Error fetching user stats:', error);
+        // Keep default values on error
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    fetchUserStats();
+  }, [user?.id]);
+
   return (
     <aside className="hidden lg:block w-72 shrink-0">
       <div className="sticky top-24 space-y-6">
@@ -104,15 +154,21 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-[color:var(--text-2)]">Posts</span>
-              <span className="text-sm font-medium text-[color:var(--text-1)]">42</span>
+              <span className={`text-sm font-medium text-[color:var(--text-1)] ${isLoadingStats ? 'opacity-50' : ''}`}>
+                {stats.posts}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-[color:var(--text-2)]">Followers</span>
-              <span className="text-sm font-medium text-[color:var(--text-1)]">128</span>
+              <span className={`text-sm font-medium text-[color:var(--text-1)] ${isLoadingStats ? 'opacity-50' : ''}`}>
+                {stats.followers}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-[color:var(--text-2)]">Following</span>
-              <span className="text-sm font-medium text-[color:var(--text-1)]">89</span>
+              <span className={`text-sm font-medium text-[color:var(--text-1)] ${isLoadingStats ? 'opacity-50' : ''}`}>
+                {stats.following}
+              </span>
             </div>
           </div>
         </div>
