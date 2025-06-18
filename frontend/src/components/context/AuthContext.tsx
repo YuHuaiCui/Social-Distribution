@@ -34,10 +34,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   // Check if user is authenticated on mount and when lastChecked changes
   useEffect(() => {
     const checkAuthStatus = async () => {
+      console.log("🔍 AuthContext: Starting auth check...");
       try {
         setLoading(true);
-
-        
 
         // Check for active session with expiry
         const sessionData = localStorage.getItem("sessionData");
@@ -48,15 +47,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           sessionStorage.getItem("authToken");
 
         console.log(
-          "Auth check - hasRememberMe:",
-          hasRememberMe,
-          "sessionData:",
-          !!sessionData,
-          "hasSession:",
-          hasSession,
-          "hasStoredToken:",
-          !!hasStoredToken
+          "🔍 AuthContext: Session state -",
+          "\n  hasRememberMe:", hasRememberMe,
+          "\n  sessionData:", !!sessionData,
+          "\n  hasSession cookie:", hasSession,
+          "\n  hasStoredToken:", !!hasStoredToken,
+          "\n  lastChecked:", lastChecked,
+          "\n  cookies:", document.cookie
         );
+
+        // If we have a Django session cookie, we should check with the backend
+        // This is important for GitHub OAuth where Django sets the session
+        if (hasSession) {
+          console.log("🔍 AuthContext: Django session found, will check with backend");
+        }
 
         // Check if we have a valid session (either remember me or 24-hour session)
         let hasValidSession = false;
@@ -66,21 +70,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
             const now = Date.now();
             const sessionExpiry = parsed.expiry || 0;
 
+            console.log("🔍 AuthContext: Session data parsed:", parsed);
+            console.log("🔍 AuthContext: Session expiry check:", now < sessionExpiry);
+
             if (hasRememberMe || now < sessionExpiry) {
               hasValidSession = true;
             } else {
               // Session expired, clear it
-
+              console.log("🔍 AuthContext: Session expired, clearing...");
               localStorage.removeItem("sessionData");
             }
           } catch {
             // Invalid session data, clear it
-
+            console.log("🔍 AuthContext: Invalid session data, clearing...");
             localStorage.removeItem("sessionData");
           }
         }
 
         // Only skip auth check if there's absolutely no sign of authentication
+        // IMPORTANT: Always check if we have a Django session cookie
         if (
           !hasRememberMe &&
           !hasSession &&
@@ -88,20 +96,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           !hasValidSession &&
           lastChecked === 0
         ) {
-          // User didn't choose to be remembered and has no active session or tokens, and this is initial load
+          console.log("🔍 AuthContext: No auth indicators found, skipping backend check");
           setIsAuthenticated(false);
           setUser(null);
           setLoading(false);
           return;
         }
 
+        console.log("🔍 AuthContext: Checking auth status with backend...");
         // Check auth status with backend
         const response = await api.getAuthStatus();
+        console.log("🔍 AuthContext: Backend response:", response);
 
         setIsAuthenticated(response.isAuthenticated);
         setUser(response.user || null);
+        
+        console.log("🔍 AuthContext: Auth state updated -",
+          "\n  isAuthenticated:", response.isAuthenticated,
+          "\n  user:", response.user?.username || "null"
+        );
       } catch (error) {
-        console.error("Auth status check failed:", error);
+        console.error("🔍 AuthContext: Auth check failed:", error);
         // If we get a 401/403, the interceptor will handle redirect
         // For other errors, just set as not authenticated
         setIsAuthenticated(false);
@@ -116,6 +131,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         localStorage.removeItem("rememberMe");
       } finally {
         setLoading(false);
+        console.log("🔍 AuthContext: Auth check complete");
       }
     };
 
@@ -169,6 +185,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     // If user data is provided, set it immediately
     if (userData) {
       setUser(userData);
+    } else {
+      // If no user data provided, fetch it from the backend
+      try {
+        const response = await api.getAuthStatus();
+        if (response.isAuthenticated && response.user) {
+          setUser(response.user);
+          userData = response.user;
+        }
+      } catch (error) {
+        console.error("Failed to fetch user data after login:", error);
+      }
     }
 
     // Create session data with expiry
@@ -209,6 +236,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       // Clear any stored auth tokens
       localStorage.removeItem("authToken");
       sessionStorage.removeItem("authToken");
+      // Clear auth check flags
+      sessionStorage.removeItem("authChecked");
+      sessionStorage.removeItem("githubAuthHandled");
       // Update lastChecked to trigger the auth check effect
       setLastChecked(Date.now());
     } catch (error) {
