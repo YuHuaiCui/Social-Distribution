@@ -124,6 +124,24 @@ export class InboxService extends BaseApiService {
   }
 
   /**
+   * Accept a follow request from inbox
+   */
+  async acceptFollowRequest(inboxItemId: string): Promise<{ status: string; message: string }> {
+    return this.request<{ status: string; message: string }>(`/api/inbox/${inboxItemId}/accept-follow/`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Reject a follow request from inbox
+   */
+  async rejectFollowRequest(inboxItemId: string): Promise<{ status: string; message: string }> {
+    return this.request<{ status: string; message: string }>(`/api/inbox/${inboxItemId}/reject-follow/`, {
+      method: 'POST',
+    });
+  }
+
+  /**
    * Subscribe to real-time inbox updates (WebSocket)
    */
   subscribeToUpdates(onUpdate: (item: InboxItem) => void): () => void {

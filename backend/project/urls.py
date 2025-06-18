@@ -23,10 +23,12 @@ from app.views.frontend import ReactAppView
 from django.conf import settings
 from django.conf.urls.static import static
 from app.views.follow import FollowViewSet
+from app.views.inbox import InboxViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register(r"api/follows", FollowViewSet, basename="follow")
+router.register(r"api/inbox", InboxViewSet, basename="inbox")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -41,18 +43,8 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
     # API endpoints - all other app URLs are API endpoints
     path("api/", include("app.urls")),
+    # Follow endpoints via router
     path("", include(router.urls)),
-    # Following end points
-    path(
-        "api/follows/<int:pk>/accept/",
-        FollowViewSet.as_view({"post": "accept"}),
-        name="accept-follow",
-    ),
-    path(
-        "api/follows/<int:pk>/reject/",
-        FollowViewSet.as_view({"post": "reject"}),
-        name="reject-follow",
-    ),
     # Catch-all pattern for React app - must be last!
     re_path(
         r"^(?!api|admin|accounts|static).*$", ReactAppView.as_view(), name="react-app"

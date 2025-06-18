@@ -1,6 +1,7 @@
 from django.db import models
 from .author import Author
 
+
 class Follow(models.Model):
     """Represents follow relationships between authors"""
 
@@ -27,6 +28,7 @@ class Follow(models.Model):
 
     class Meta:
         unique_together = ["follower", "followed"]
+        ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["follower", "status"]),
             models.Index(fields=["followed", "status"]),

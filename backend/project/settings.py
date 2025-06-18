@@ -19,7 +19,7 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env") 
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -31,7 +31,7 @@ SECRET_KEY = "django-insecure-s_xewz!0b-ctg2=3!e^=nfbbscf)8wi%04i@6s9xy70lf_7&+7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -66,7 +66,7 @@ MIDDLEWARE = [
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend"
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 SITE_ID = 1
@@ -79,21 +79,24 @@ ACCOUNT_LOGOUT_ON_GET = True  # Skip logout confirmation
 SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts
 
 # Custom adapter for GitHub OAuth
-SOCIALACCOUNT_ADAPTER = 'app.adapters.CustomSocialAccountAdapter'
+SOCIALACCOUNT_ADAPTER = "app.adapters.CustomSocialAccountAdapter"
 
 # Ensure these session settings are correctly configured
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'  # Try 'None' if using HTTPS and cross-origin
+SESSION_COOKIE_SAMESITE = "Lax"  # Try 'None' if using HTTPS and cross-origin
 SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
 SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
 
 # Make sure CSRF settings work with your frontend
-CSRF_COOKIE_SAMESITE = 'Lax'  # Match SESSION_COOKIE_SAMESITE
+CSRF_COOKIE_SAMESITE = "Lax"  # Match SESSION_COOKIE_SAMESITE
 CSRF_COOKIE_HTTPONLY = False  # Frontend JS needs to access the CSRF token
 CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
-CSRF_TRUSTED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173']  # Add your frontend domain
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
-CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_COOKIE_NAME = "csrftoken"
 
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
@@ -111,7 +114,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 ROOT_URLCONF = "project.urls"
 
-LOGIN_REDIRECT_URL = 'http://localhost:5173/home'     
+LOGIN_REDIRECT_URL = "http://localhost:5173/home"
 LOGOUT_REDIRECT_URL = "http://localhost:5173/"
 
 TEMPLATES = [
@@ -183,15 +186,15 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 
@@ -233,7 +236,6 @@ REST_FRAMEWORK = {
 # Site URL for generating author URLs
 SITE_URL = "http://localhost:8000"
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 os.makedirs(MEDIA_ROOT, exist_ok=True)
-

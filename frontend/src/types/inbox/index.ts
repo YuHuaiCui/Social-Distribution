@@ -11,13 +11,14 @@ export type InboxContentType = 'entry' | 'comment' | 'like' | 'follow' | 'entry_
 
 export interface InboxItem extends TimestampedModel {
   id: string;
-  owner: Author | string; // Can be URL reference
-  content_type: InboxContentType;
-  content_id: string;
-  sender: Author | string; // Can be URL reference
+  recipient: string; // Author URL
+  item_type: InboxContentType;
+  content_type: InboxContentType; // Same as item_type
+  sender: Author | string | null; // Can be Author object, URL reference, or null
   content_data?: InboxContentData;
-  processed: boolean;
-  read?: boolean; // Frontend field
+  raw_data?: any; // Raw JSON data
+  is_read: boolean;
+  read?: boolean; // Same as is_read
 }
 
 export type InboxContentData = 
