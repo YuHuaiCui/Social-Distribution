@@ -5,168 +5,166 @@ from django.contrib.auth import get_user_model
 
 Author = get_user_model()
 
+
 class AuthAPITest(BaseAPITestCase):
     """Test cases for Authentication API endpoints"""
-    
+
     def test_auth_status(self):
         """Test authentication status endpoint"""
-        url = reverse('social-distribution:auth-status')
-        
+        url = reverse("auth-status")
+
         # Test unauthenticated status
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertFalse(response.data['isAuthenticated'])
-        
+        self.assertFalse(response.data["isAuthenticated"])
+
         # Test authenticated status
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data['isAuthenticated'])
-        self.assertEqual(response.data['user']['username'], 'testuser')
-    
+        self.assertTrue(response.data["isAuthenticated"])
+        self.assertEqual(response.data["user"]["username"], "testuser")
+
     def test_signup(self):
         """Test user registration"""
-        url = reverse('signup')  # Note: This is not namespaced
+        url = reverse("signup")  # Note: This is not namespaced
         data = {
-            'username': 'newuser',
-            'email': 'new@example.com',
-            'password': 'newpass123',
-            'display_name': 'New User',
-            'github_username': 'newuser',
-            'bio': 'Test bio',
-            'location': 'Test location',
-            'website': 'https://test.com'
+            "username": "newuser",
+            "email": "new@example.com",
+            "password": "newpass123",
+            "display_name": "New User",
+            "github_username": "newuser",
+            "bio": "Test bio",
+            "location": "Test location",
+            "website": "https://test.com",
         }
-        
+
         # Test successful signup
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(response.data['success'])
-        self.assertEqual(response.data['user']['username'], 'newuser')
-        
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["user"]["username"], "newuser")
+
         # Test duplicate username
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['message'], 'Username already exists')
-        
+        self.assertEqual(response.data["message"], "Username already exists")
+
         # Test duplicate email with different username
-        data['username'] = 'anotheruser'
+        data["username"] = "anotheruser"
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['message'], 'Username already exists')
-        
+        self.assertEqual(response.data["message"], "Username already exists")
+
         # Test missing required fields
-        data.pop('username')
+        data.pop("username")
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['message'], 'username is required')
-    
+        self.assertEqual(response.data["message"], "username is required")
+
     def test_login(self):
         """Test user login"""
-        url = reverse('login')  # Note: This is not namespaced
-        
+        url = reverse("login")  # Note: This is not namespaced
+
         # Test successful login
-        data = {
-            'username': 'testuser',
-            'password': 'testpass123'
-        }
+        data = {"username": "testuser", "password": "testpass123"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data['success'])
-        self.assertEqual(response.data['user']['username'], 'testuser')
-        
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["user"]["username"], "testuser")
+
         # Test login with remember me
-        data['remember_me'] = True
+        data["remember_me"] = True
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data['success'])
-        
+        self.assertTrue(response.data["success"])
+
         # Test invalid credentials
-        data['password'] = 'wrongpassword'
+        data["password"] = "wrongpassword"
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(response.data['message'], 'Invalid username or password')
-        
+        self.assertEqual(response.data["message"], "Invalid username or password")
+
         # Test missing credentials
-        data.pop('username')
+        data.pop("username")
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['message'], 'Username and password are required')
-        
+        self.assertEqual(response.data["message"], "Username and password are required")
+
         # Test non-existent user
-        data = {
-            'username': 'nonexistent',
-            'password': 'testpass123'
-        }
+        data = {"username": "nonexistent", "password": "testpass123"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertEqual(response.data['message'], 'Invalid username or password')
-    
+        self.assertEqual(response.data["message"], "Invalid username or password")
+
     def test_github_callback(self):
         """Test GitHub callback endpoint"""
-        url = reverse('social-distribution:github-callback')
-        
+        url = reverse("github-callback")
+
         # Test without code
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['message'], 'No authorization code provided')
-        
+        self.assertEqual(response.data["message"], "No authorization code provided")
+
         # Test with invalid code (not authenticated)
-        response = self.client.post(url, {'code': 'invalid_code'})
+        response = self.client.post(url, {"code": "invalid_code"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data['pendingAuth'])
-        self.assertEqual(response.data['message'], 'Authentication status pending, check /api/auth/status/')
-        
+        self.assertTrue(response.data["pendingAuth"])
+        self.assertEqual(
+            response.data["message"],
+            "Authentication status pending, check /api/auth/status/",
+        )
+
         # Test with authenticated user
         self.user_client.force_authenticate(user=self.regular_user)
-        response = self.user_client.post(url, {'code': 'valid_code'})
+        response = self.user_client.post(url, {"code": "valid_code"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data['success'])
-        self.assertEqual(response.data['user']['username'], 'testuser')
-    
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["user"]["username"], "testuser")
+
     def test_logout(self):
         """Test logout endpoint"""
-        url = reverse('social-distribution:logout')
-        
+        url = reverse("logout")
+
         # Test unauthenticated logout
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        
+
         # Test authenticated logout
         response = self.user_client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data['success'])
-        
+        self.assertTrue(response.data["success"])
+
         # Verify user is logged out but is still authenticated
-        status_url = reverse('social-distribution:auth-status')
+        status_url = reverse("auth-status")
         response = self.user_client.get(status_url)
-        self.assertTrue(response.data['isAuthenticated'])
-    
+        self.assertTrue(response.data["isAuthenticated"])
+
     def test_author_me(self):
         """Test author me endpoint"""
-        url = reverse('social-distribution:author-me')
-        
+        url = reverse("author-me")
+
         # Test unauthenticated access
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        
+
         # Test authenticated access
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['username'], 'testuser')
-        
+        self.assertEqual(response.data["username"], "testuser")
+
         # Test profile update
         data = {
-            'display_name': 'Updated Name',
-            'bio': 'Updated bio',
-            'location': 'Updated location',
-            'website': 'https://updated.com'
+            "display_name": "Updated Name",
+            "bio": "Updated bio",
+            "location": "Updated location",
+            "website": "https://updated.com",
         }
         response = self.user_client.patch(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['display_name'], 'Updated Name')
-        self.assertEqual(response.data['bio'], 'Updated bio')
-        
+        self.assertEqual(response.data["display_name"], "Updated Name")
+        self.assertEqual(response.data["bio"], "Updated bio")
+
         # Test invalid update
-        data = {'email': 'invalid-email'}
+        data = {"email": "invalid-email"}
         response = self.user_client.patch(url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST) 
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
