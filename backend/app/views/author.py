@@ -318,7 +318,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
         author = self.get_object()
 
         if request.method == "GET":
-            if request.user.is_authenticated and str(request.user.id) == str(author.id):
+            # Admin can see all posts regardless of visibility
+            if request.user.is_staff:
+                entries = Entry.objects.filter(author=author).exclude(
+                    visibility=Entry.DELETED
+                )
+            elif request.user.is_authenticated and str(request.user.id) == str(author.id):
                 # Viewing your own profile: show all entries except deleted
                 entries = Entry.objects.filter(author=author).exclude(
                     visibility=Entry.DELETED

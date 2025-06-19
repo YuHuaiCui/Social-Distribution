@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { 
   UserPlus, UserMinus, Users, FileText, 
   MapPin, Link as LinkIcon, Calendar,
-  MoreVertical, Mail, Ban, Flag, Clock
+  MoreVertical, Mail, Ban, Flag, Clock,
+  Shield, Trash2, UserX, CheckCircle, XCircle
 } from 'lucide-react';
 import type { Author } from '../types/models';
 import Avatar from './Avatar/Avatar';
@@ -145,6 +146,38 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
     return count.toString();
   };
 
+  // Admin actions
+  const handleAdminAction = async (action: 'approve' | 'deactivate' | 'activate' | 'delete') => {
+    if (!currentUser?.is_staff) return;
+    
+    setIsLoading(true);
+    try {
+      switch (action) {
+        case 'approve':
+          await api.approveAuthor(author.id);
+          break;
+        case 'deactivate':
+          await api.deactivateAuthor(author.id);
+          break;
+        case 'activate':
+          await api.activateAuthor(author.id);
+          break;
+        case 'delete':
+          if (window.confirm(`Are you sure you want to delete ${author.display_name}?`)) {
+            await api.deleteAuthor(author.id);
+          }
+          break;
+      }
+      // Refresh the page or notify parent component
+      window.location.reload();
+    } catch (error) {
+      console.error(`Error performing ${action}:`, error);
+    } finally {
+      setIsLoading(false);
+      setShowMenu(false);
+    }
+  };
+
   if (variant === 'compact') {
     return (
       <motion.div
@@ -156,6 +189,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             imgSrc={author.profile_image}
             alt={author.display_name}
             size="md"
+            isAdmin={author.is_staff || author.is_superuser}
           />
         </Link>
         
@@ -194,6 +228,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
                 imgSrc={author.profile_image}
                 alt={author.display_name}
                 size={variant === 'detailed' ? 'xl' : 'lg'}
+                isAdmin={author.is_staff || author.is_superuser}
               />
             </motion.div>
             
@@ -240,6 +275,53 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
                     <Flag size={16} />
                     <span>Report</span>
                   </button>
+                  
+                  {/* Admin controls */}
+                  {currentUser?.is_staff && (
+                    <>
+                      <div className="border-t border-border-1 my-1" />
+                      <div className="px-3 py-1.5 text-xs text-text-2 font-medium flex items-center space-x-1">
+                        <Shield size={12} />
+                        <span>Admin Actions</span>
+                      </div>
+                      
+                      {!author.is_approved && (
+                        <button 
+                          onClick={() => handleAdminAction('approve')}
+                          className="w-full px-4 py-2 text-left text-green-500 hover:bg-green-500/10 transition-colors flex items-center space-x-2"
+                        >
+                          <CheckCircle size={16} />
+                          <span>Approve User</span>
+                        </button>
+                      )}
+                      
+                      {author.is_active ? (
+                        <button 
+                          onClick={() => handleAdminAction('deactivate')}
+                          className="w-full px-4 py-2 text-left text-orange-500 hover:bg-orange-500/10 transition-colors flex items-center space-x-2"
+                        >
+                          <UserX size={16} />
+                          <span>Deactivate User</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleAdminAction('activate')}
+                          className="w-full px-4 py-2 text-left text-blue-500 hover:bg-blue-500/10 transition-colors flex items-center space-x-2"
+                        >
+                          <CheckCircle size={16} />
+                          <span>Activate User</span>
+                        </button>
+                      )}
+                      
+                      <button 
+                        onClick={() => handleAdminAction('delete')}
+                        className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2"
+                      >
+                        <Trash2 size={16} />
+                        <span>Delete User</span>
+                      </button>
+                    </>
+                  )}
                 </motion.div>
               )}
             </div>

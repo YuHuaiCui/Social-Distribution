@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Inbox, UserPlus, Share2, Heart, MessageCircle, 
-  Check, X, Clock, Bell 
+  Check, X, Clock, Bell, Shield 
 } from 'lucide-react';
 import AnimatedButton from '../components/ui/AnimatedButton';
 import Card from '../components/ui/Card';
@@ -10,6 +10,7 @@ import Avatar from '../components/Avatar/Avatar';
 import Loader from '../components/ui/Loader';
 import { inboxService } from '../services/inbox';
 import type { InboxItem as ApiInboxItem } from '../types/inbox';
+import { useAuth } from '../components/context/AuthContext';
 
 type InboxItemType = 'follow_request' | 'post_share' | 'like' | 'comment' | 'mention';
 
@@ -65,14 +66,19 @@ const inboxTypeConfig = {
 };
 
 export const InboxPage: React.FC = () => {
+  const { user } = useAuth();
   const [items, setItems] = useState<FrontendInboxItem[]>([]);
   const [filter, setFilter] = useState<InboxItemType | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
+  const [showAllRequests, setShowAllRequests] = useState(false);
+  
+  // Check if current user is admin
+  const isAdmin = user?.is_staff || user?.is_superuser;
 
   useEffect(() => {
     fetchInboxItems();
-  }, [filter]);
+  }, [filter, showAllRequests]);
 
   const fetchInboxItems = async () => {
     setIsLoading(true);
@@ -89,6 +95,13 @@ export const InboxPage: React.FC = () => {
           'mention': 'entry' // mentions would be entries that mention the user
         };
         params.content_type = typeMapping[filter as keyof typeof typeMapping];
+      }
+      
+      // If admin and showing all requests, use a different endpoint
+      if (isAdmin && showAllRequests && filter === 'follow_request') {
+        // For now, we'll use the same endpoint but you could add a backend endpoint
+        // to fetch all follow requests across the system
+        params.all_requests = true;
       }
 
       const response = await inboxService.getInbox(params);
@@ -329,6 +342,22 @@ export const InboxPage: React.FC = () => {
           </motion.button>
         ))}
         
+        {/* Admin toggle for viewing all follow requests */}
+        {isAdmin && filter === 'follow_request' && (
+          <motion.button
+            onClick={() => setShowAllRequests(!showAllRequests)}
+            className={`ml-auto px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
+              showAllRequests
+                ? 'bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white'
+                : 'glass-card-subtle text-text-2 hover:text-text-1'
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Shield size={14} />
+            <span>{showAllRequests ? 'All Requests' : 'My Requests'}</span>
+          </motion.button>
+        )}
       </motion.div>
 
 

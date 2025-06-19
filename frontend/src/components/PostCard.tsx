@@ -9,6 +9,7 @@ import {
   Edit,
   Trash2,
   FileText,
+  Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Entry, Author } from "../types/models";
@@ -193,6 +194,8 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   // Check if current user is the author
   const isOwnPost = user && author.id === user.id;
+  // Check if current user is admin
+  const isAdmin = user?.is_staff || user?.is_superuser;
 
   // Handle click outside
   React.useEffect(() => {
@@ -226,22 +229,43 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const getVisibilityBadge = () => {
+    const badges = [];
+    
     switch (post.visibility) {
       case "friends":
-        return (
-          <span className="text-xs bg-cat-mint px-2 py-0.5 rounded-full">
+        badges.push(
+          <span key="friends" className="text-xs bg-cat-mint px-2 py-0.5 rounded-full">
             Friends
           </span>
         );
+        break;
       case "unlisted":
-        return (
-          <span className="text-xs bg-cat-yellow px-2 py-0.5 rounded-full">
+        badges.push(
+          <span key="unlisted" className="text-xs bg-cat-yellow px-2 py-0.5 rounded-full">
             Unlisted
           </span>
         );
-      default:
-        return null;
+        break;
+      case "private":
+        badges.push(
+          <span key="private" className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
+            Private
+          </span>
+        );
+        break;
     }
+    
+    // Show admin visibility indicator if viewing a post that wouldn't normally be visible
+    if (isAdmin && !isOwnPost && (post.visibility === "private" || post.visibility === "friends")) {
+      badges.push(
+        <span key="admin" className="text-xs bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+          <Shield size={10} />
+          Admin View
+        </span>
+      );
+    }
+    
+    return badges.length > 0 ? badges : null;
   };
 
   return (
@@ -277,14 +301,16 @@ export const PostCard: React.FC<PostCardProps> = ({
                 {getVisibilityBadge() && (
                   <>
                     <span className="mx-1">·</span>
-                    {getVisibilityBadge()}
+                    <div className="inline-flex items-center gap-1">
+                      {getVisibilityBadge()}
+                    </div>
                   </>
                 )}
               </div>
             </div>
           </Link>
 
-          {isOwnPost && (
+          {(isOwnPost || isAdmin) && (
             <div className="ml-auto relative" ref={actionsRef}>
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -304,19 +330,46 @@ export const PostCard: React.FC<PostCardProps> = ({
                     exit={{ opacity: 0, scale: 0.9, y: -10 }}
                     className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden z-dropdown"
                   >
-                    <motion.button
-                      whileHover={{ x: 4 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 30,
-                      }}
-                      onClick={handleEdit}
-                      className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Edit size={16} />
-                      <span>Edit Post</span>
-                    </motion.button>
+                    {isOwnPost && (
+                      <motion.button
+                        whileHover={{ x: 4 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 30,
+                        }}
+                        onClick={handleEdit}
+                        className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
+                      >
+                        <Edit size={16} />
+                        <span>Edit Post</span>
+                      </motion.button>
+                    )}
+                    
+                    {/* Admin controls */}
+                    {isAdmin && !isOwnPost && (
+                      <>
+                        {(isOwnPost || isAdmin) && <div className="border-t border-border-1 my-1" />}
+                        <div className="px-3 py-1.5 text-xs text-text-2 font-medium flex items-center space-x-1">
+                          <Shield size={12} />
+                          <span>Admin Actions</span>
+                        </div>
+                        <motion.button
+                          whileHover={{ x: 4 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 30,
+                          }}
+                          onClick={handleEdit}
+                          className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
+                        >
+                          <Edit size={16} />
+                          <span>Modify Post</span>
+                        </motion.button>
+                      </>
+                    )}
+                    
                     <motion.button
                       whileHover={{ x: 4 }}
                       transition={{
@@ -328,7 +381,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                       className="w-full px-4 py-2.5 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2 cursor-pointer"
                     >
                       <Trash2 size={16} />
-                      <span>Delete Post</span>
+                      <span>{isAdmin && !isOwnPost ? 'Remove Post' : 'Delete Post'}</span>
                     </motion.button>
                   </motion.div>
                 )}

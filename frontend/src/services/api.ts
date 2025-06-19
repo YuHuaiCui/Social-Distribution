@@ -314,6 +314,23 @@ class ApiService {
     return this.request<Author[]>(`/api/authors/${authorId}/friends/`);
   }
 
+  // Admin endpoints
+  async approveAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/approve/`, { method: 'POST' });
+  }
+
+  async deactivateAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/deactivate/`, { method: 'POST' });
+  }
+
+  async activateAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/activate/`, { method: 'POST' });
+  }
+
+  async deleteAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/`, { method: 'DELETE' });
+  }
+
   // Inbox endpoints (when implemented in backend)
   async getInbox(): Promise<Inbox[]> {
     // This endpoint needs to be implemented in backend
