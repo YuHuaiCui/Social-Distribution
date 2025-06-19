@@ -13,8 +13,10 @@ import AnimatedButton from './ui/AnimatedButton';
 import Card from './ui/Card';
 import { api } from '../services/api';
 import { socialService } from '../services/social';
+import { inboxService } from '../services/inbox';
 import { useAuth } from './context/AuthContext';
 import { triggerNotificationUpdate } from './context/NotificationContext';
+import { useToast } from './context/ToastContext';
 
 interface AuthorCardProps {
   author: Author & {
@@ -44,6 +46,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   className = '',
 }) => {
   const { user: currentUser } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [isFollowing, setIsFollowing] = useState(author.is_following || false);
   const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected'>('none');
   const [isLoading, setIsLoading] = useState(false);
@@ -150,6 +153,54 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
     return count.toString();
   };
 
+  const handleReport = async () => {
+    if (!currentUser) return;
+    
+    setShowMenu(false);
+    try {
+      // Create a report inbox item
+      // For now, we'll send it as a special type of inbox item
+      // The backend would need to handle 'report' content_type
+      const reportData = {
+        content_type: 'report' as any, // We'll treat report as a special content type
+        content_id: author.id,
+        content_data: {
+          reporter_id: currentUser.id,
+          reporter_name: currentUser.display_name,
+          reported_user_id: author.id,
+          reported_user_name: author.display_name,
+          report_time: new Date().toISOString(),
+          report_type: 'user_report'
+        }
+      };
+      
+      // Find admin users to send report to
+      // For now, we'll use a hardcoded approach - in production, you'd want an endpoint to get admin IDs
+      // or have the backend handle routing reports to admins
+      const adminsResponse = await api.getAuthors({ is_staff: true, page_size: 100 });
+      const admins = adminsResponse.results || [];
+      
+      if (admins.length === 0) {
+        showError('No admin users found to handle reports');
+        return;
+      }
+      
+      // Send report to all admin inboxes
+      await Promise.all(
+        admins.map(admin => 
+          inboxService.sendToInbox(admin.id, reportData).catch(err => {
+            console.error(`Failed to send report to admin ${admin.id}:`, err);
+          })
+        )
+      );
+      
+      showSuccess('User has been reported to administrators');
+    } catch (error) {
+      console.error('Error reporting user:', error);
+      showError('Failed to submit report');
+    }
+  };
+
   // Admin actions
   const handleAdminAction = async (action: 'approve' | 'deactivate' | 'activate' | 'delete') => {
     if (!currentUser?.is_staff) return;
@@ -250,7 +301,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             </div>
           </Link>
           
-          {showActions && (
+          {showActions && !isOwnProfile && (
             <div className="relative">
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -275,7 +326,10 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
                     <Ban size={16} />
                     <span>Block User</span>
                   </button>
-                  <button className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2">
+                  <button 
+                    onClick={() => handleReport()}
+                    className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2"
+                  >
                     <Flag size={16} />
                     <span>Report</span>
                   </button>

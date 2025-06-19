@@ -349,7 +349,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                     {/* Admin controls */}
                     {isAdmin && !isOwnPost && (
                       <>
-                        {(isOwnPost || isAdmin) && <div className="border-t border-border-1 my-1" />}
+                        <div className="border-t border-border-1 my-1" />
                         <div className="px-3 py-1.5 text-xs text-text-2 font-medium flex items-center space-x-1">
                           <Shield size={12} />
                           <span>Admin Actions</span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Inbox, UserPlus, Share2, Heart, MessageCircle, 
@@ -12,7 +13,7 @@ import { inboxService } from '../services/inbox';
 import type { InboxItem as ApiInboxItem } from '../types/inbox';
 import { useAuth } from '../components/context/AuthContext';
 
-type InboxItemType = 'follow_request' | 'post_share' | 'like' | 'comment' | 'mention';
+type InboxItemType = 'follow_request' | 'post_share' | 'like' | 'comment' | 'mention' | 'report';
 
 interface FrontendInboxItem {
   id: string;
@@ -63,6 +64,12 @@ const inboxTypeConfig = {
     bgColor: 'bg-[var(--primary-coral)]/10',
     title: 'mentioned you',
   },
+  report: {
+    icon: Shield,
+    color: 'text-red-500',
+    bgColor: 'bg-red-500/10',
+    title: 'reported a user',
+  },
 };
 
 export const InboxPage: React.FC = () => {
@@ -92,7 +99,8 @@ export const InboxPage: React.FC = () => {
           'post_share': 'entry_link',
           'like': 'like',
           'comment': 'comment',
-          'mention': 'entry' // mentions would be entries that mention the user
+          'mention': 'entry', // mentions would be entries that mention the user
+          'report': 'report'
         };
         params.content_type = typeMapping[filter as keyof typeof typeMapping];
       }
@@ -191,6 +199,24 @@ export const InboxPage: React.FC = () => {
               data.post_title = (apiItem.content_data.data as any)?.title;
             }
             break;
+          case 'report':
+            type = 'report';
+            // For reports, extract reporter and reported user info from content_data
+            if (apiItem.content_data) {
+              from_author = {
+                id: apiItem.content_data.reporter_id || '',
+                display_name: apiItem.content_data.reporter_name || 'Unknown Reporter',
+                username: apiItem.content_data.reporter_name || 'unknown',
+                profile_image: undefined
+              };
+              data = {
+                reported_user_id: apiItem.content_data.reported_user_id,
+                reported_user_name: apiItem.content_data.reported_user_name,
+                report_time: apiItem.content_data.report_time,
+                report_type: apiItem.content_data.report_type
+              };
+            }
+            break;
           default:
             type = 'mention';
         }
@@ -269,6 +295,7 @@ export const InboxPage: React.FC = () => {
     { value: 'post_share', label: 'Shared Posts' },
     { value: 'like', label: 'Likes' },
     { value: 'comment', label: 'Comments' },
+    ...(isAdmin ? [{ value: 'report', label: 'Reports' }] : []),
   ];
 
   const unreadCount = items.filter(item => !item.is_read).length;
@@ -437,6 +464,33 @@ export const InboxPage: React.FC = () => {
                             <p className="text-sm text-text-1 mt-2 p-3 glass-card-subtle rounded-lg">
                               {item.data.comment_text}
                             </p>
+                          )}
+                          
+                          {/* Report Details */}
+                          {item.type === 'report' && item.data && (
+                            <div className="mt-2 p-3 glass-card-subtle rounded-lg space-y-2">
+                              <p className="text-sm text-text-2">
+                                Reported User:{' '}
+                                <Link 
+                                  to={`/authors/${item.data.reported_user_id}`}
+                                  className="text-[var(--primary-purple)] hover:underline font-medium"
+                                >
+                                  {item.data.reported_user_name}
+                                </Link>
+                              </p>
+                              <p className="text-sm text-text-2">
+                                Reporter:{' '}
+                                <Link 
+                                  to={`/authors/${item.from_author.id}`}
+                                  className="text-[var(--primary-purple)] hover:underline font-medium"
+                                >
+                                  {item.from_author.display_name}
+                                </Link>
+                              </p>
+                              <p className="text-xs text-text-2">
+                                Type: {item.data.report_type?.replace('_', ' ')}
+                              </p>
+                            </div>
                           )}
                         </div>
 
