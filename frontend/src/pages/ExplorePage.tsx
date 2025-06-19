@@ -251,7 +251,7 @@ export const ExplorePage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-7xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-7xl mx-auto flex flex-col flex-1">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -382,12 +382,13 @@ export const ExplorePage: React.FC = () => {
       </motion.div>
 
       {/* Content */}
+      <div className="flex-1 flex flex-col">
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex-1 flex justify-center items-center">
           <Loader size="lg" message="Discovering content..." />
         </div>
       ) : (
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" className="flex-1 flex flex-col">
           {/* Trending Posts */}
           {activeTab === "trending" && (
             <motion.div
@@ -397,8 +398,8 @@ export const ExplorePage: React.FC = () => {
               exit={{ opacity: 0, y: -20 }}
               className={
                 viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 gap-6"
-                  : "space-y-4"
+                  ? "grid grid-cols-1 md:grid-cols-2 gap-6 flex-1"
+                  : "space-y-4 flex-1"
               }
             >
               {posts.map((post, index) => (
@@ -421,7 +422,7 @@ export const ExplorePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1"
             >
               {authors.map((author, index) => (
                 <motion.div
@@ -495,7 +496,7 @@ export const ExplorePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-1"
             >
               {categories.map((category, index) => (
                 <motion.div
@@ -537,6 +538,7 @@ export const ExplorePage: React.FC = () => {
           )}
         </AnimatePresence>
       )}
+      </div>
     </div>
   );
 };

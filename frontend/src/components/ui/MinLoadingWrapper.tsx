@@ -56,7 +56,7 @@ export const MinLoadingWrapper: React.FC<MinLoadingWrapperProps> = ({
   }
 
   return (
-    <div className="animate-fadeIn">
+    <div className="animate-fadeIn flex flex-col flex-1 min-h-0">
       {children}
     </div>
   );

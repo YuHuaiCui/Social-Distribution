@@ -34,8 +34,8 @@ export const MainLayout: React.FC = () => {
             )}
             
             {/* Main Content */}
-            <main className="flex-1 min-w-0 h-full overflow-y-auto pb-16 lg:pb-0">
-              <div className="min-h-full w-full">
+            <main className="flex-1 min-w-0 flex flex-col overflow-y-auto pb-16 lg:pb-0">
+              <div className="flex flex-col flex-1 w-full">
                 <Outlet />
               </div>
             </main>

@@ -117,7 +117,7 @@ export const FriendsPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-6xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-6xl mx-auto flex flex-col flex-1">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-1 mb-2">Connections</h1>
@@ -126,7 +126,7 @@ export const FriendsPage: React.FC = () => {
 
       {/* Filter Tabs */}
       <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-hide px-2">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
           {filter === "friends" ? (
             <AnimatedGradient
               gradientColors={[
@@ -292,8 +292,9 @@ export const FriendsPage: React.FC = () => {
       )}
 
       {/* Content */}
+      <div className="flex-1 flex flex-col">
       {isLoading ? (
-        <div className="flex justify-center items-center py-16">
+        <div className="flex-1 flex justify-center items-center py-16">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -303,19 +304,25 @@ export const FriendsPage: React.FC = () => {
           </motion.div>
         </div>
       ) : filteredAuthors.length === 0 ? (
-        <Card variant="main" className="text-center py-16">
-          <div className="text-text-2 mb-4">{getIcon()}</div>
-          <h3 className="font-medium text-lg mb-2 text-text-1">
-            {searchQuery ? "No results found" : `No ${filter} yet`}
-          </h3>
-          <p className="text-text-2 max-w-md mx-auto">
-            {searchQuery
-              ? `Try searching with a different term.`
-              : getEmptyMessage()}
-          </p>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col"
+        >
+          <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full">
+            <div className="flex justify-center text-text-2 mb-4">{getIcon()}</div>
+            <h3 className="font-medium text-lg mb-2 text-text-1">
+              {searchQuery ? "No results found" : `No ${filter} yet`}
+            </h3>
+            <p className="text-text-2 max-w-md mx-auto">
+              {searchQuery
+                ? `Try searching with a different term.`
+                : getEmptyMessage()}
+            </p>
+          </Card>
+        </motion.div>
       ) : (
-        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 flex-1">
           <AnimatePresence mode="popLayout">
             {filteredAuthors.map((author, index) => (
               <motion.div
@@ -339,6 +346,7 @@ export const FriendsPage: React.FC = () => {
           </AnimatePresence>
         </div>
       )}
+      </div>
     </div>
   );
 };

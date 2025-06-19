@@ -306,7 +306,7 @@ export const InboxPage: React.FC = () => {
   const unreadCount = items.filter(item => !item.is_read).length;
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6">
+    <div className="w-full px-4 lg:px-6 py-6 flex flex-col flex-1">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -394,18 +394,21 @@ export const InboxPage: React.FC = () => {
 
 
       {/* Inbox Items */}
+      <div className="flex-1 flex flex-col">
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex-1 flex justify-center items-center py-16">
           <Loader size="lg" message="Loading notifications..." />
         </div>
       ) : items.length === 0 ? (
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center py-12"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col"
         >
-          <Card variant="main" className="w-full p-12 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
-            <Inbox className="w-16 h-16 text-text-2 mx-auto mb-4" strokeWidth={1.5} />
+          <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full">
+            <div className="flex justify-center text-text-2 mb-4">
+              <Inbox className="w-16 h-16" strokeWidth={1.5} />
+            </div>
             <h3 className="text-lg font-medium text-text-1 mb-2">No notifications</h3>
             <p className="text-text-2">
               {filter === 'all' 
@@ -560,6 +563,7 @@ export const InboxPage: React.FC = () => {
           })}
         </AnimatePresence>
       )}
+      </div>
     </div>
   );
 };

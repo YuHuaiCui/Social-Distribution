@@ -83,7 +83,7 @@ export const HomePage: React.FC = () => {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex justify-center items-center py-12">
+        <div className="flex-1 flex justify-center items-center py-16">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -97,8 +97,10 @@ export const HomePage: React.FC = () => {
 
     if (posts.length === 0) {
       return (
-        <Card variant="main" className="text-center py-12">
-          <Globe size={48} className="mx-auto mb-4 text-text-2" />
+        <Card variant="main" className="text-center py-12 flex-1 flex flex-col justify-center">
+          <div className="flex justify-center mb-4">
+            <Globe size={48} className="text-text-2" />
+          </div>
           <h3 className="font-medium text-lg mb-2">No posts found</h3>
           <p className="text-text-2 mb-4">
             {feed === "friends"
@@ -122,7 +124,7 @@ export const HomePage: React.FC = () => {
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 flex-1">
         <AnimatePresence mode="popLayout">
           {posts.map((post) => (
             <motion.div
@@ -152,7 +154,7 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-4xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-4xl mx-auto flex flex-col flex-1">
       {/* Feed Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-text-1">
@@ -266,7 +268,9 @@ export const HomePage: React.FC = () => {
       )}
 
       {/* Posts */}
-      {renderContent()}
+      <div className="flex-1 flex flex-col">
+        {renderContent()}
+      </div>
     </div>
   );
 };
