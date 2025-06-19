@@ -16,12 +16,14 @@ class Inbox(models.Model):
     COMMENT = "comment"
     LIKE = "like"
     FOLLOW = "follow"
+    REPORT = "report"
 
     ITEM_TYPE_CHOICES = [
         (ENTRY, "Entry"),
         (COMMENT, "Comment"),
         (LIKE, "Like"),
         (FOLLOW, "Follow Request"),
+        (REPORT, "Report"),
     ]
 
     # Recipient of the inbox item

@@ -4,14 +4,19 @@ import { motion } from 'framer-motion';
 import { 
   UserPlus, UserMinus, Users, FileText, 
   MapPin, Link as LinkIcon, Calendar,
-  MoreVertical, Mail, Ban, Flag
+  MoreVertical, Mail, Ban, Flag, Clock,
+  Shield, Trash2, UserX, CheckCircle, XCircle
 } from 'lucide-react';
 import type { Author } from '../types/models';
 import Avatar from './Avatar/Avatar';
 import AnimatedButton from './ui/AnimatedButton';
 import Card from './ui/Card';
 import { api } from '../services/api';
+import { socialService } from '../services/social';
+import { inboxService } from '../services/inbox';
 import { useAuth } from './context/AuthContext';
+import { triggerNotificationUpdate } from './context/NotificationContext';
+import { useToast } from './context/ToastContext';
 
 interface AuthorCardProps {
   author: Author & {
@@ -41,7 +46,9 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   className = '',
 }) => {
   const { user: currentUser } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [isFollowing, setIsFollowing] = useState(author.is_following || false);
+  const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected'>('none');
   const [isLoading, setIsLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [followerCount, setFollowerCount] = useState(author.follower_count || 0);
@@ -51,10 +58,27 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   // Check if the current user is viewing their own profile
   const isOwnProfile = currentUser && currentUser.id === author.id;
 
-  // Sync local follow state with prop changes
+  // Check follow status when component mounts or author changes
   useEffect(() => {
-    setIsFollowing(author.is_following || false);
-  }, [author.is_following]);
+    const checkFollowStatus = async () => {
+      if (!currentUser || isOwnProfile) return;
+      
+      try {
+        // Use URLs instead of IDs for the follow status check
+        const currentUserUrl = currentUser.url || `${window.location.origin}/api/authors/${currentUser.id}`;
+        const authorUrl = author.url || `${window.location.origin}/api/authors/${author.id}`;
+        const status = await socialService.checkFollowStatus(currentUserUrl, authorUrl);
+        setIsFollowing(status.is_following);
+        setFollowStatus(status.follow_status || 'none');
+      } catch (error) {
+        console.error('Error checking follow status:', error);
+        // Fallback to props
+        setIsFollowing(author.is_following || false);
+      }
+    };
+    
+    checkFollowStatus();
+  }, [author.id, currentUser, isOwnProfile]);
 
   // Fetch real follower/following counts from backend
   useEffect(() => {
@@ -85,21 +109,26 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
 
   const handleFollow = async () => {
     setIsLoading(true);
-    const newFollowState = !isFollowing;
     
     try {
-      if (newFollowState) {
-        await api.followAuthor(author.id);
-        // Optimistically update follower count (will be pending approval)
-        // Note: In reality, this might not increase the count until approved
-      } else {
-        await api.unfollowAuthor(author.id);
-        // Decrease follower count immediately
+      if (followStatus === 'accepted' || isFollowing) {
+        // Unfollow
+        await socialService.unfollowAuthor(author.id);
+        setIsFollowing(false);
+        setFollowStatus('none');
         setFollowerCount(prev => Math.max(0, prev - 1));
+        onFollow?.(false);
+        // Dispatch event for other components
+        window.dispatchEvent(new Event('follow-update'));
+      } else if (followStatus === 'none' || followStatus === 'rejected') {
+        // Send follow request
+        await socialService.followAuthor(author.id);
+        setFollowStatus('pending');
+        onFollow?.(false);
+        // Dispatch event for other components
+        window.dispatchEvent(new Event('follow-update'));
       }
-      
-      setIsFollowing(newFollowState);
-      onFollow?.(newFollowState);
+      // If status is 'pending', clicking doesn't do anything
     } catch (error) {
       console.error('Error following/unfollowing:', error);
     } finally {
@@ -124,6 +153,86 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
     return count.toString();
   };
 
+  const handleReport = async () => {
+    if (!currentUser) return;
+    
+    setShowMenu(false);
+    try {
+      // Create a report inbox item
+      // For now, we'll send it as a special type of inbox item
+      // The backend would need to handle 'report' content_type
+      const reportData = {
+        content_type: 'report' as any, // We'll treat report as a special content type
+        content_id: author.id,
+        content_data: {
+          reporter_id: currentUser.id,
+          reporter_name: currentUser.display_name,
+          reported_user_id: author.id,
+          reported_user_name: author.display_name,
+          report_time: new Date().toISOString(),
+          report_type: 'user_report'
+        }
+      };
+      
+      // Find admin users to send report to
+      // For now, we'll use a hardcoded approach - in production, you'd want an endpoint to get admin IDs
+      // or have the backend handle routing reports to admins
+      const adminsResponse = await api.getAuthors({ is_staff: true, page_size: 100 });
+      const admins = adminsResponse.results || [];
+      
+      if (admins.length === 0) {
+        showError('No admin users found to handle reports');
+        return;
+      }
+      
+      // Send report to all admin inboxes
+      await Promise.all(
+        admins.map(admin => 
+          inboxService.sendToInbox(admin.id, reportData).catch(err => {
+            console.error(`Failed to send report to admin ${admin.id}:`, err);
+          })
+        )
+      );
+      
+      showSuccess('User has been reported to administrators');
+    } catch (error) {
+      console.error('Error reporting user:', error);
+      showError('Failed to submit report');
+    }
+  };
+
+  // Admin actions
+  const handleAdminAction = async (action: 'approve' | 'deactivate' | 'activate' | 'delete') => {
+    if (!currentUser?.is_staff) return;
+    
+    setIsLoading(true);
+    try {
+      switch (action) {
+        case 'approve':
+          await api.approveAuthor(author.id);
+          break;
+        case 'deactivate':
+          await api.deactivateAuthor(author.id);
+          break;
+        case 'activate':
+          await api.activateAuthor(author.id);
+          break;
+        case 'delete':
+          if (window.confirm(`Are you sure you want to delete ${author.display_name}?`)) {
+            await api.deleteAuthor(author.id);
+          }
+          break;
+      }
+      // Refresh the page or notify parent component
+      window.location.reload();
+    } catch (error) {
+      console.error(`Error performing ${action}:`, error);
+    } finally {
+      setIsLoading(false);
+      setShowMenu(false);
+    }
+  };
+
   if (variant === 'compact') {
     return (
       <motion.div
@@ -135,6 +244,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             imgSrc={author.profile_image}
             alt={author.display_name}
             size="md"
+            isAdmin={author.is_staff || author.is_superuser}
           />
         </Link>
         
@@ -148,11 +258,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {showActions && !isOwnProfile && (
           <AnimatedButton
             size="sm"
-            variant={isFollowing ? 'secondary' : 'primary'}
+            variant={followStatus === 'pending' ? 'secondary' : (isFollowing || followStatus === 'accepted') ? 'secondary' : 'primary'}
             onClick={handleFollow}
             loading={isLoading}
+            disabled={followStatus === 'pending'}
+            icon={followStatus === 'pending' ? <Clock size={14} /> : null}
+            className={followStatus === 'pending' ? 'opacity-60 bg-glass-low border border-glass-high' : ''}
           >
-            {isFollowing ? 'Followed' : 'Follow'}
+            {followStatus === 'pending' ? 'Requested' : (isFollowing || followStatus === 'accepted') ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </motion.div>
@@ -170,6 +283,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
                 imgSrc={author.profile_image}
                 alt={author.display_name}
                 size={variant === 'detailed' ? 'xl' : 'lg'}
+                isAdmin={author.is_staff || author.is_superuser}
               />
             </motion.div>
             
@@ -187,7 +301,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             </div>
           </Link>
           
-          {showActions && (
+          {showActions && !isOwnProfile && (
             <div className="relative">
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -212,10 +326,60 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
                     <Ban size={16} />
                     <span>Block User</span>
                   </button>
-                  <button className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2">
+                  <button 
+                    onClick={() => handleReport()}
+                    className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2"
+                  >
                     <Flag size={16} />
                     <span>Report</span>
                   </button>
+                  
+                  {/* Admin controls */}
+                  {currentUser?.is_staff && (
+                    <>
+                      <div className="border-t border-border-1 my-1" />
+                      <div className="px-3 py-1.5 text-xs text-text-2 font-medium flex items-center space-x-1">
+                        <Shield size={12} />
+                        <span>Admin Actions</span>
+                      </div>
+                      
+                      {!author.is_approved && (
+                        <button 
+                          onClick={() => handleAdminAction('approve')}
+                          className="w-full px-4 py-2 text-left text-green-500 hover:bg-green-500/10 transition-colors flex items-center space-x-2"
+                        >
+                          <CheckCircle size={16} />
+                          <span>Approve User</span>
+                        </button>
+                      )}
+                      
+                      {author.is_active ? (
+                        <button 
+                          onClick={() => handleAdminAction('deactivate')}
+                          className="w-full px-4 py-2 text-left text-orange-500 hover:bg-orange-500/10 transition-colors flex items-center space-x-2"
+                        >
+                          <UserX size={16} />
+                          <span>Deactivate User</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleAdminAction('activate')}
+                          className="w-full px-4 py-2 text-left text-blue-500 hover:bg-blue-500/10 transition-colors flex items-center space-x-2"
+                        >
+                          <CheckCircle size={16} />
+                          <span>Activate User</span>
+                        </button>
+                      )}
+                      
+                      <button 
+                        onClick={() => handleAdminAction('delete')}
+                        className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2"
+                      >
+                        <Trash2 size={16} />
+                        <span>Delete User</span>
+                      </button>
+                    </>
+                  )}
                 </motion.div>
               )}
             </div>
@@ -289,13 +453,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {/* Follow Button */}
         {showActions && !isOwnProfile && (
           <AnimatedButton
-            variant={isFollowing ? 'secondary' : 'primary'}
+            variant={followStatus === 'pending' ? 'secondary' : (isFollowing || followStatus === 'accepted') ? 'secondary' : 'primary'}
             onClick={handleFollow}
             loading={isLoading}
-            icon={isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
-            className="w-full"
+            disabled={followStatus === 'pending'}
+            icon={followStatus === 'pending' ? <Clock size={16} /> : (isFollowing || followStatus === 'accepted') ? <UserMinus size={16} /> : <UserPlus size={16} />}
+            className={`w-full ${followStatus === 'pending' ? 'opacity-60 bg-glass-low border border-glass-high' : ''}`}
           >
-            {isFollowing ? 'Followed' : 'Follow'}
+            {followStatus === 'pending' ? 'Requested' : (isFollowing || followStatus === 'accepted') ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </div>
