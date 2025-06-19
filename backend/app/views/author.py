@@ -250,10 +250,21 @@ class AuthorViewSet(viewsets.ModelViewSet):
             ).first()
 
             if existing_follow:
-                return Response(
-                    {"error": "Follow request already exists"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                # If already accepted, return error
+                if existing_follow.status == Follow.ACCEPTED:
+                    return Response(
+                        {"error": "Already following this user"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                # If pending, return error
+                elif existing_follow.status == Follow.PENDING:
+                    return Response(
+                        {"error": "Follow request already pending"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                # If rejected, delete the old one and create a new one
+                elif existing_follow.status == Follow.REJECTED:
+                    existing_follow.delete()
 
             # Create follow request
             follow = Follow.objects.create(
@@ -273,11 +284,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         "id": follow.follower.url,
                         "display_name": follow.follower.display_name,
                         "username": follow.follower.username,
-                        "profile_image": (
-                            follow.follower.profile_image.url
-                            if follow.follower.profile_image
-                            else None
-                        ),
+                        "profile_image": follow.follower.profile_image if follow.follower.profile_image else None,
                     },
                     "object": follow.followed.url,
                     "status": follow.status,

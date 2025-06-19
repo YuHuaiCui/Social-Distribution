@@ -373,9 +373,9 @@ export const InboxPage: React.FC = () => {
                 <Card
                   variant={item.is_read ? 'subtle' : 'main'}
                   hoverable
-                  className={`card-layout ${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''} bg-[rgba(var(--glass-rgb),${item.is_read ? '0.3' : '0.4'})] backdrop-blur-lg`}
+                  className={`${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''} bg-[rgba(var(--glass-rgb),${item.is_read ? '0.3' : '0.4'})] backdrop-blur-lg`}
                 >
-                  <div className="flex items-start space-x-4">
+                  <div className="flex items-start space-x-4 h-full">
                     {/* Author Avatar */}
                     <motion.div
                       whileHover={{ scale: 1.05 }}
@@ -388,8 +388,8 @@ export const InboxPage: React.FC = () => {
                     </motion.div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0 flex flex-col">
-                      <div className="flex items-start justify-between card-content">
+                    <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
+                      <div className="flex items-start justify-between">
                         <div className="flex-1 mr-4">
                           <p className="text-text-1">
                             <span className="font-semibold">
@@ -418,7 +418,7 @@ export const InboxPage: React.FC = () => {
                       </div>
 
                       {/* Footer - Always at bottom */}
-                      <div className="card-footer mt-3">
+                      <div className="mt-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <span className="text-xs text-text-2 flex items-center">
@@ -446,15 +446,17 @@ export const InboxPage: React.FC = () => {
                                 disabled={isProcessing}
                                 loading={isProcessing}
                                 icon={<Check size={16} />}
+                                className="!outline-none !ring-0"
                               >
                                 Accept
                               </AnimatedButton>
                               <AnimatedButton
                                 size="sm"
-                                variant="ghost"
+                                variant="secondary"
                                 onClick={() => handleFollowRequest(item.id, false)}
                                 disabled={isProcessing}
                                 icon={<X size={16} />}
+                                className="!outline-none !ring-0"
                               >
                                 Decline
                               </AnimatedButton>

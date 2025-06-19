@@ -4,14 +4,16 @@ import { motion } from 'framer-motion';
 import { 
   UserPlus, UserMinus, Users, FileText, 
   MapPin, Link as LinkIcon, Calendar,
-  MoreVertical, Mail, Ban, Flag
+  MoreVertical, Mail, Ban, Flag, Clock
 } from 'lucide-react';
 import type { Author } from '../types/models';
 import Avatar from './Avatar/Avatar';
 import AnimatedButton from './ui/AnimatedButton';
 import Card from './ui/Card';
 import { api } from '../services/api';
+import { socialService } from '../services/social';
 import { useAuth } from './context/AuthContext';
+import { triggerNotificationUpdate } from './context/NotificationContext';
 
 interface AuthorCardProps {
   author: Author & {
@@ -42,6 +44,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
 }) => {
   const { user: currentUser } = useAuth();
   const [isFollowing, setIsFollowing] = useState(author.is_following || false);
+  const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected'>('none');
   const [isLoading, setIsLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [followerCount, setFollowerCount] = useState(author.follower_count || 0);
@@ -51,10 +54,27 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   // Check if the current user is viewing their own profile
   const isOwnProfile = currentUser && currentUser.id === author.id;
 
-  // Sync local follow state with prop changes
+  // Check follow status when component mounts or author changes
   useEffect(() => {
-    setIsFollowing(author.is_following || false);
-  }, [author.is_following]);
+    const checkFollowStatus = async () => {
+      if (!currentUser || isOwnProfile) return;
+      
+      try {
+        // Use URLs instead of IDs for the follow status check
+        const currentUserUrl = currentUser.url || `${window.location.origin}/api/authors/${currentUser.id}`;
+        const authorUrl = author.url || `${window.location.origin}/api/authors/${author.id}`;
+        const status = await socialService.checkFollowStatus(currentUserUrl, authorUrl);
+        setIsFollowing(status.is_following);
+        setFollowStatus(status.follow_status || 'none');
+      } catch (error) {
+        console.error('Error checking follow status:', error);
+        // Fallback to props
+        setIsFollowing(author.is_following || false);
+      }
+    };
+    
+    checkFollowStatus();
+  }, [author.id, currentUser, isOwnProfile]);
 
   // Fetch real follower/following counts from backend
   useEffect(() => {
@@ -85,21 +105,22 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
 
   const handleFollow = async () => {
     setIsLoading(true);
-    const newFollowState = !isFollowing;
     
     try {
-      if (newFollowState) {
-        await api.followAuthor(author.id);
-        // Optimistically update follower count (will be pending approval)
-        // Note: In reality, this might not increase the count until approved
-      } else {
-        await api.unfollowAuthor(author.id);
-        // Decrease follower count immediately
+      if (followStatus === 'accepted' || isFollowing) {
+        // Unfollow
+        await socialService.unfollowAuthor(author.id);
+        setIsFollowing(false);
+        setFollowStatus('none');
         setFollowerCount(prev => Math.max(0, prev - 1));
+        onFollow?.(false);
+      } else if (followStatus === 'none' || followStatus === 'rejected') {
+        // Send follow request
+        await socialService.followAuthor(author.id);
+        setFollowStatus('pending');
+        onFollow?.(false);
       }
-      
-      setIsFollowing(newFollowState);
-      onFollow?.(newFollowState);
+      // If status is 'pending', clicking doesn't do anything
     } catch (error) {
       console.error('Error following/unfollowing:', error);
     } finally {
@@ -148,11 +169,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {showActions && !isOwnProfile && (
           <AnimatedButton
             size="sm"
-            variant={isFollowing ? 'secondary' : 'primary'}
+            variant={followStatus === 'pending' ? 'secondary' : (isFollowing || followStatus === 'accepted') ? 'secondary' : 'primary'}
             onClick={handleFollow}
             loading={isLoading}
+            disabled={followStatus === 'pending'}
+            icon={followStatus === 'pending' ? <Clock size={14} /> : null}
+            className={followStatus === 'pending' ? 'opacity-60 bg-glass-low border border-glass-high' : ''}
           >
-            {isFollowing ? 'Followed' : 'Follow'}
+            {followStatus === 'pending' ? 'Requested' : (isFollowing || followStatus === 'accepted') ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </motion.div>
@@ -289,13 +313,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {/* Follow Button */}
         {showActions && !isOwnProfile && (
           <AnimatedButton
-            variant={isFollowing ? 'secondary' : 'primary'}
+            variant={followStatus === 'pending' ? 'secondary' : (isFollowing || followStatus === 'accepted') ? 'secondary' : 'primary'}
             onClick={handleFollow}
             loading={isLoading}
-            icon={isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
-            className="w-full"
+            disabled={followStatus === 'pending'}
+            icon={followStatus === 'pending' ? <Clock size={16} /> : (isFollowing || followStatus === 'accepted') ? <UserMinus size={16} /> : <UserPlus size={16} />}
+            className={`w-full ${followStatus === 'pending' ? 'opacity-60 bg-glass-low border border-glass-high' : ''}`}
           >
-            {isFollowing ? 'Followed' : 'Follow'}
+            {followStatus === 'pending' ? 'Requested' : (isFollowing || followStatus === 'accepted') ? 'Followed' : 'Follow'}
           </AnimatedButton>
         )}
       </div>
