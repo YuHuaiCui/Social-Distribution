@@ -157,6 +157,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
         onSuccess?.(newPost);
         triggerRefresh(); // Trigger posts refresh
+        // Dispatch event for other components to update
+        window.dispatchEvent(new Event('post-created'));
         console.log("Post created successfully, refreshing feed...");
         handleClose();
       }

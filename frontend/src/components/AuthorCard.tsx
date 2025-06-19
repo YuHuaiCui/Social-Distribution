@@ -115,11 +115,15 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         setFollowStatus('none');
         setFollowerCount(prev => Math.max(0, prev - 1));
         onFollow?.(false);
+        // Dispatch event for other components
+        window.dispatchEvent(new Event('follow-update'));
       } else if (followStatus === 'none' || followStatus === 'rejected') {
         // Send follow request
         await socialService.followAuthor(author.id);
         setFollowStatus('pending');
         onFollow?.(false);
+        // Dispatch event for other components
+        window.dispatchEvent(new Event('follow-update'));
       }
       // If status is 'pending', clicking doesn't do anything
     } catch (error) {
