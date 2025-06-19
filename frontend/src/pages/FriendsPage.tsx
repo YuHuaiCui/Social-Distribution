@@ -307,7 +307,7 @@ export const FriendsPage: React.FC = () => {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
           <AnimatePresence mode="popLayout">
             {filteredAuthors.map((author, index) => (
               <motion.div
