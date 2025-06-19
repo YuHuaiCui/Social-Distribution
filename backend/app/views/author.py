@@ -463,3 +463,71 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
         except Entry.DoesNotExist:
             return Response({"detail": "Image not found"}, status=404)
+    
+    @action(detail=True, methods=["post"], url_path="inbox")
+    def post_to_inbox(self, request, pk=None):
+        """
+        Post an item to an author's inbox
+        POST /api/authors/{id}/inbox/
+        
+        Expected data:
+        {
+            "content_type": "entry" | "comment" | "like" | "follow" | "report",
+            "content_id": "id of the content",
+            "content_data": { ... additional data ... }
+        }
+        """
+        from app.models import Inbox
+        from app.serializers.inbox import InboxItemSerializer
+        
+        try:
+            # Get the recipient author
+            recipient = self.get_object()
+            
+            # Get the content type and data
+            content_type = request.data.get('content_type')
+            content_id = request.data.get('content_id')
+            content_data = request.data.get('content_data', {})
+            
+            # Validate content type
+            valid_types = ['entry', 'comment', 'like', 'follow', 'report']
+            if content_type not in valid_types:
+                return Response(
+                    {"error": f"Invalid content_type. Must be one of: {', '.join(valid_types)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # For reports, we just store the data in raw_data
+            if content_type == 'report':
+                inbox_item = Inbox.objects.create(
+                    recipient=recipient,
+                    item_type='report',
+                    raw_data={
+                        'content_type': 'report',
+                        'content_id': content_id,
+                        **content_data
+                    }
+                )
+                serializer = InboxItemSerializer(inbox_item)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            # For other types, we'd need to handle them appropriately
+            # For now, just create with raw_data
+            inbox_item = Inbox.objects.create(
+                recipient=recipient,
+                item_type=content_type,
+                raw_data={
+                    'content_type': content_type,
+                    'content_id': content_id,
+                    **content_data
+                }
+            )
+            
+            serializer = InboxItemSerializer(inbox_item)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
