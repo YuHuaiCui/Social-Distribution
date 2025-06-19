@@ -231,7 +231,12 @@ export const InboxPage: React.FC = () => {
         };
       });
 
-      setItems(transformedItems);
+      // Filter out report items for non-admin users
+      const filteredItems = isAdmin 
+        ? transformedItems 
+        : transformedItems.filter(item => item.type !== 'report');
+      
+      setItems(filteredItems);
     } catch (error) {
       console.error('Error fetching inbox:', error);
       // Fallback to empty array on error

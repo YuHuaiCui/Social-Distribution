@@ -62,7 +62,7 @@ export const GlobalFooter: React.FC = () => {
                   Privacy
                 </Link>
                 <a 
-                  href="https://github.com/CMPUT404" 
+                  href="https://github.com/uofa-cmput404/s25-project-black" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-text-2 hover:text-text-1 transition-colors flex items-center gap-1 whitespace-nowrap"
@@ -117,7 +117,7 @@ export const GlobalFooter: React.FC = () => {
           <div className="flex items-center justify-center text-sm text-text-2">
             <span>© {currentYear}</span>
             <Heart size={14} className="mx-1 text-[var(--primary-pink)] fill-current" />
-            <span>CMPUT 404</span>
+            <span>CMPUT 404 • S25 Project Black</span>
           </div>
         </div>
       </div>

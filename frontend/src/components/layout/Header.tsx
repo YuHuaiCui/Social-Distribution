@@ -308,13 +308,13 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                     {user.profile_image ? (
                       <LoadingImage
                         src={user.profile_image}
-                        alt={user.display_name}
+                        alt={user.display_name || 'Unknown'}
                         className="w-full h-full"
                         loaderSize={16}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white">
-                        {user.display_name.charAt(0).toUpperCase()}
+                        {user.display_name ? user.display_name.charAt(0).toUpperCase() : 'U'}
                       </div>
                     )}
                   </div>

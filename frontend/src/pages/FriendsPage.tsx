@@ -126,7 +126,7 @@ export const FriendsPage: React.FC = () => {
 
       {/* Filter Tabs */}
       <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-hide">
+        <div className="flex items-center gap-2 overflow-x-auto py-2 scrollbar-hide px-2">
           {filter === "friends" ? (
             <AnimatedGradient
               gradientColors={[
@@ -141,27 +141,27 @@ export const FriendsPage: React.FC = () => {
             >
               <Users size={18} />
               <span className="font-medium">Friends</span>
-              {!isLoading && (
-                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                  {friendsCount}
-                </span>
-              )}
+              <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                {friendsCount}
+              </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("friends")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <Users size={18} />
-              <span className="font-medium">Friends</span>
-              {!isLoading && (
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Users size={18} />
+                <span className="font-medium">Friends</span>
                 <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
                   {friendsCount}
                 </span>
-              )}
-            </motion.div>
+              </motion.div>
+            </div>
           )}
 
           {filter === "following" ? (
@@ -183,18 +183,22 @@ export const FriendsPage: React.FC = () => {
               </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("following")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <UserPlus size={18} />
-              <span className="font-medium">Following</span>
-              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followingCount}
-              </span>
-            </motion.div>
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <UserPlus size={18} />
+                <span className="font-medium">Following</span>
+                <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                  {followingCount}
+                </span>
+              </motion.div>
+            </div>
           )}
 
           {filter === "followers" ? (
@@ -216,18 +220,22 @@ export const FriendsPage: React.FC = () => {
               </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("followers")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <UserCheck size={18} />
-              <span className="font-medium">Followers</span>
-              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followersCount}
-              </span>
-            </motion.div>
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <UserCheck size={18} />
+                <span className="font-medium">Followers</span>
+                <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                  {followersCount}
+                </span>
+              </motion.div>
+            </div>
           )}
         </div>
 

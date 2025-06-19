@@ -1,5 +1,5 @@
 import LoadingImage from "../ui/LoadingImage";
-import { Shield } from 'lucide-react';
+import { Shield, User } from 'lucide-react';
 
 interface AvatarProps {
   imgSrc?: string | null;
@@ -57,7 +57,7 @@ export default function Avatar({
     );
   }
 
-  // Default avatar with initials
+  // Default avatar with initials or user icon
   const initials = alt
     .split(" ")
     .map((name) => name[0])
@@ -69,7 +69,7 @@ export default function Avatar({
     <div
       className={`${sizeClass} rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center neumorphism font-bold ${className}`}
     >
-      {initials || "U"}
+      {initials ? initials : <User size={iconSize} strokeWidth={2} />}
     </div>
   );
 }

@@ -242,7 +242,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         <Link to={`/authors/${author.id}`}>
           <Avatar
             imgSrc={author.profile_image}
-            alt={author.display_name}
+            alt={author.display_name || 'Unknown'}
             size="md"
             isAdmin={author.is_staff || author.is_superuser}
           />
@@ -250,7 +250,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         
         <div className="flex-1 min-w-0">
           <Link to={`/authors/${author.id}`} className="hover:underline">
-            <h4 className="font-medium text-text-1 truncate">{author.display_name}</h4>
+            <h4 className="font-medium text-text-1 truncate">{author.display_name || 'Unknown'}</h4>
           </Link>
           <p className="text-sm text-text-2 truncate">@{author.username}</p>
         </div>
@@ -281,7 +281,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             <motion.div whileHover={{ scale: 1.05 }}>
               <Avatar
                 imgSrc={author.profile_image}
-                alt={author.display_name}
+                alt={author.display_name || 'Unknown'}
                 size={variant === 'detailed' ? 'xl' : 'lg'}
                 isAdmin={author.is_staff || author.is_superuser}
               />
@@ -289,7 +289,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             
             <div>
               <h3 className="text-lg font-semibold text-text-1 hover:underline">
-                {author.display_name}
+                {author.display_name || 'Unknown'}
               </h3>
               <p className="text-text-2">@{author.username}</p>
               
