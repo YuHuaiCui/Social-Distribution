@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { RefreshCw } from 'lucide-react';
 import type { Author } from '../types/models';
 import { api } from '../services/api';
 import { useAuth } from './context/AuthContext';
@@ -18,62 +19,130 @@ interface UserStats {
 }
 
 const RightSidebar: React.FC<RightSidebarProps> = ({
-  friends = [],
+  friends: propsFriends,
   trendingTags = ['technology', 'design', 'programming', 'webdev', 'opensource'],
 }) => {
   const { user } = useAuth();
   const [stats, setStats] = useState<UserStats>({ posts: 0, followers: 0, following: 0 });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [friends, setFriends] = useState<Author[]>(propsFriends || []);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchUserStats = useCallback(async () => {
+    if (!user?.id) {
+      setIsLoadingStats(false);
+      return;
+    }
+    
+    try {
+      if (!isRefreshing) {
+        setIsLoadingStats(true);
+      }
+      
+      // Fetch real stats from the API
+      const [followers, following, entries] = await Promise.all([
+        api.getFollowers(user.id),
+        api.getFollowing(user.id),
+        api.getAuthorEntries(user.id)
+      ]);
+      
+      setStats({
+        posts: entries.length,
+        followers: followers.length,
+        following: following.length,
+      });
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      // Keep default values on error
+    } finally {
+      setIsLoadingStats(false);
+      setIsRefreshing(false);
+    }
+  }, [user?.id, isRefreshing]);
 
   useEffect(() => {
-    const fetchUserStats = async () => {
-      if (!user?.id) {
-        setIsLoadingStats(false);
+    fetchUserStats();
+  }, [fetchUserStats]);
+
+  // Listen for post creation events to update stats
+  useEffect(() => {
+    const handlePostCreated = () => {
+      // Refresh stats when a new post is created
+      fetchUserStats();
+    };
+
+    const handleFollowUpdate = () => {
+      // Refresh stats when follow status changes
+      fetchUserStats();
+      // Also refresh friends list
+      if (user?.id && !propsFriends) {
+        api.getFriends(user.id).then(friendsList => {
+          setFriends(friendsList.slice(0, 5));
+        }).catch(console.error);
+      }
+    };
+
+    window.addEventListener('post-created', handlePostCreated);
+    window.addEventListener('follow-update', handleFollowUpdate);
+
+    return () => {
+      window.removeEventListener('post-created', handlePostCreated);
+      window.removeEventListener('follow-update', handleFollowUpdate);
+    };
+  }, [fetchUserStats, user?.id, propsFriends]);
+
+  // Fetch friends list
+  useEffect(() => {
+    const fetchFriends = async () => {
+      if (!user?.id || propsFriends) {
+        setIsLoadingFriends(false);
         return;
       }
       
       try {
-        setIsLoadingStats(true);
-        
-        // Fetch real stats from the API
-        const [followers, following, entriesResponse] = await Promise.all([
-          api.getFollowers(user.id),
-          api.getFollowing(user.id),
-          // Fetch user's entries to count posts
-          fetch(`/api/authors/${user.id}/entries/`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-            },
-          }).then(res => res.ok ? res.json() : []).catch(() => [])
-        ]);
-        
-        setStats({
-          posts: Array.isArray(entriesResponse) ? entriesResponse.length : 0,
-          followers: followers.length,
-          following: following.length,
-        });
+        setIsLoadingFriends(true);
+        const friendsList = await api.getFriends(user.id);
+        // Only show online friends (this is a mock - in real app you'd have online status)
+        // For now, we'll just show the first 5 friends
+        setFriends(friendsList.slice(0, 5));
       } catch (error) {
-        console.error('Error fetching user stats:', error);
-        // Keep default values on error
+        console.error('Error fetching friends:', error);
+        setFriends([]);
       } finally {
-        setIsLoadingStats(false);
+        setIsLoadingFriends(false);
       }
     };
 
-    fetchUserStats();
-  }, [user?.id]);
+    fetchFriends();
+  }, [user?.id, propsFriends]);
 
   return (
     <aside className="hidden lg:block w-72 shrink-0">
       <div className="sticky top-24 space-y-6">
         {/* Friends Online */}
-        {friends.length > 0 && (
+        {(friends.length > 0 || isLoadingFriends) && (
           <div className="rounded-2xl border border-border-1 p-4">
             <h3 className="text-[color:var(--text-2)] text-sm font-medium mb-3">
               Friends Online
             </h3>
-            <ul className="space-y-3">
-              {friends.map(friend => (
+            {isLoadingFriends ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="flex items-center p-2 animate-pulse">
+                    <div className="w-10 h-10 rounded-full bg-[color:var(--glass-rgb)]/20"></div>
+                    <div className="ml-3 flex-1">
+                      <div className="h-4 bg-[color:var(--glass-rgb)]/20 rounded w-24 mb-1"></div>
+                      <div className="h-3 bg-[color:var(--glass-rgb)]/20 rounded w-16"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : friends.length === 0 ? (
+              <p className="text-xs text-[color:var(--text-2)]">No friends online</p>
+            ) : (
+              <ul className="space-y-3">
+                {friends.map(friend => (
                 <li key={friend.id}>
                   <Link 
                     to={`/authors/${friend.id}`}
@@ -105,8 +174,9 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                     </div>
                   </Link>
                 </li>
-              ))}
-            </ul>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
@@ -148,26 +218,46 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
 
         {/* Quick Stats */}
         <div className="rounded-2xl border border-border-1 p-4">
-          <h3 className="text-[color:var(--text-2)] text-sm font-medium mb-3">
-            Your Stats
-          </h3>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-[color:var(--text-2)] text-sm font-medium">
+              Your Stats
+            </h3>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                setIsRefreshing(true);
+                fetchUserStats();
+              }}
+              disabled={isLoadingStats || isRefreshing}
+              className="text-[color:var(--text-2)] hover:text-[color:var(--text-1)] transition-colors disabled:opacity-50"
+              title="Refresh stats"
+            >
+              <motion.div
+                animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                transition={{ duration: 1, repeat: isRefreshing ? Infinity : 0, ease: "linear" }}
+              >
+                <RefreshCw size={14} />
+              </motion.div>
+            </motion.button>
+          </div>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-[color:var(--text-2)]">Posts</span>
-              <span className={`text-sm font-medium text-[color:var(--text-1)] ${isLoadingStats ? 'opacity-50' : ''}`}>
-                {stats.posts}
+              <span className={`text-sm font-medium text-[color:var(--text-1)] transition-opacity ${isLoadingStats && !isRefreshing ? 'opacity-50' : ''}`}>
+                {isLoadingStats && !isRefreshing ? '...' : stats.posts}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-[color:var(--text-2)]">Followers</span>
-              <span className={`text-sm font-medium text-[color:var(--text-1)] ${isLoadingStats ? 'opacity-50' : ''}`}>
-                {stats.followers}
+              <span className={`text-sm font-medium text-[color:var(--text-1)] transition-opacity ${isLoadingStats && !isRefreshing ? 'opacity-50' : ''}`}>
+                {isLoadingStats && !isRefreshing ? '...' : stats.followers}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-[color:var(--text-2)]">Following</span>
-              <span className={`text-sm font-medium text-[color:var(--text-1)] ${isLoadingStats ? 'opacity-50' : ''}`}>
-                {stats.following}
+              <span className={`text-sm font-medium text-[color:var(--text-1)] transition-opacity ${isLoadingStats && !isRefreshing ? 'opacity-50' : ''}`}>
+                {isLoadingStats && !isRefreshing ? '...' : stats.following}
               </span>
             </div>
           </div>

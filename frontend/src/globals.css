@@ -1248,3 +1248,37 @@
 .animate-fadeOut {
   animation: fadeOut 0.3s ease-in-out;
 }
+
+/* Remove focus outlines on buttons */
+button:focus {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+button:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Remove outline from buttons but keep shadows for effect */
+button {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+/* Specifically target AnimatedButton components in inbox */
+.glass-card-main button,
+.glass-card-subtle button,
+.glass-card-prominent button {
+  outline: none !important;
+  outline-offset: 0 !important;
+  border-color: transparent !important;
+}
+
+/* Override any Tailwind focus states */
+button:focus-within {
+  outline: none !important;
+  --tw-ring-offset-width: 0px !important;
+  --tw-ring-width: 0px !important;
+}

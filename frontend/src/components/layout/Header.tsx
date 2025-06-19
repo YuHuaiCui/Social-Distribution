@@ -180,7 +180,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                   markAsRead([notif.id]);
                                 }
                                 if (notif.item_type === 'follow') {
-                                  navigate('/friends');
+                                  navigate('/inbox');
                                 } else if (notif.item_type === 'comment' || notif.item_type === 'like') {
                                   // Navigate to the related post if we have the data
                                   if (notif.content_data && notif.content_data.type === notif.item_type) {

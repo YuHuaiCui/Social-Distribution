@@ -92,8 +92,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (isAuthenticated) {
       refreshNotifications();
       
-      // Refresh every 30 seconds
-      const interval = setInterval(refreshNotifications, 30000);
+      // Refresh every 10 seconds for more responsive notifications
+      const interval = setInterval(refreshNotifications, 10000);
       
       return () => clearInterval(interval);
     }
