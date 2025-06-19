@@ -247,7 +247,7 @@ npm run preview
                 </motion.div>
               </div>
             ) : (
-              <div className="prose prose-invert max-w-none">
+              <div className="prose prose-invert max-w-none relative">
                 <div 
                   className="text-text-1 [&>h1]:text-3xl [&>h1]:font-bold [&>h1]:mb-6 [&>h1]:text-text-1
                              [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:mt-8 [&>h2]:mb-4 [&>h2]:text-text-1
@@ -260,6 +260,8 @@ npm run preview
                              [&>pre>code]:bg-transparent [&>pre>code]:p-0"
                   dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(content) }}
                 />
+                {/* Fade out gradient at the bottom */}
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-2)] to-transparent pointer-events-none" />
               </div>
             )}
           </Card>
