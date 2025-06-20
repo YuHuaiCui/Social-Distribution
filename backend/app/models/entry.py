@@ -91,6 +91,9 @@ class Entry(models.Model):
     source = models.URLField(blank=True, help_text="Source URL (e.g., GitHub)")
     origin = models.URLField(blank=True, help_text="Origin URL")
 
+    # Image data for image posts
+    image_data = models.BinaryField(null=True, blank=True, help_text="Image data stored as blob")
+    
     # Tracking for federation
     inboxes_sent_to = models.ManyToManyField(
         Author, through="InboxDelivery", related_name="received_entries"

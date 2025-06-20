@@ -103,6 +103,17 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       return;
     }
 
+    console.log("Validation check:", {
+      contentType,
+      startsWithImage: contentType?.startsWith("image/"),
+      imagesLength: images.length,
+      images,
+      uploadedImageUrls,
+      uploadedUrlsLength: uploadedImageUrls.length,
+      contentTrim: content.trim(),
+      hasContent: !!content.trim()
+    });
+    
     if (
       contentType &&
       contentType.startsWith("image/") &&
@@ -116,17 +127,29 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     setError("");
 
     try {
+      console.log("Creating post with:", {
+        title,
+        content,
+        contentType,
+        visibility,
+        categories,
+        imagesLength: images.length,
+        hasImage: images.length > 0
+      });
+      
       const entryData: CreateEntryData = {
         title,
-        content: contentType.startsWith("image/") && uploadedImageUrls.length > 0 
-          ? uploadedImageUrls[0]  // Use the uploaded image URL as content
+        content: contentType.startsWith("image/") 
+          ? (content || "Image post")  // Use caption for image posts
           : content,
         content_type: contentType,
         visibility,
         categories,
-        // Don't include image file if we're using uploaded URLs
-        ...(images.length > 0 && uploadedImageUrls.length === 0 && { image: images[0] }),
+        // Include image file for image posts
+        ...(images.length > 0 && { image: images[0] }),
       };
+      
+      console.log("Entry data:", entryData);
       if (editingPost) {
         // Update existing post
         console.log("editingPost:", editingPost);
@@ -357,19 +380,24 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                           {contentType && contentType.startsWith("image/") ? (
                             <div>
                               <ImageUploader
-                                onImagesChange={setImages}
+                                onImagesChange={(newImages) => {
+                                  console.log("Images changed:", newImages);
+                                  setImages(newImages);
+                                }}
                                 onImagesUploaded={(uploadedImages) => {
+                                  console.log("Images uploaded:", uploadedImages);
                                   // Store the URLs of uploaded images
                                   const urls = uploadedImages.map(img => img.url);
+                                  console.log("Extracted URLs:", urls);
                                   setUploadedImageUrls(urls);
                                   // If we have uploaded images, use the first URL as content
-                                  if (urls.length > 0 && !content) {
+                                  if (urls.length > 0) {
                                     setContent(urls[0]);
                                   }
                                 }}
-                                maxImages={4}
+                                maxImages={1}
                                 className="mt-3"
-                                uploadToServer={true}
+                                uploadToServer={false}
                               />
                               {images.length > 0 && (
                                 <div className="mt-3">

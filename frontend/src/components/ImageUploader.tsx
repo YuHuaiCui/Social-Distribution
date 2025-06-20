@@ -190,22 +190,25 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   // Update parent when images change
   React.useEffect(() => {
-    const uploadedImages = images.filter(img => img.uploaded);
-    const uploadedFiles = uploadedImages.map(img => img.file);
+    // If not uploading to server, all images are considered ready
+    const readyImages = uploadToServer 
+      ? images.filter(img => img.uploaded)
+      : images.filter(img => !img.error);
+    const readyFiles = readyImages.map(img => img.file);
     
     // Only call onImagesChange if the files have actually changed
-    onImagesChange(uploadedFiles);
+    onImagesChange(readyFiles);
     
     // Also notify about uploaded image data if callback provided
     if (onImagesUploaded && uploadToServer) {
-      const uploadedData = uploadedImages
+      const uploadedData = readyImages
         .filter(img => img.uploadedData)
         .map(img => img.uploadedData!);
       if (uploadedData.length > 0) {
         onImagesUploaded(uploadedData);
       }
     }
-  }, [images.length]); // Only depend on images.length to avoid infinite loops
+  }, [images, onImagesChange, onImagesUploaded, uploadToServer]); // Depend on images to catch uploadedData changes
 
   return (
     <div className={className}>

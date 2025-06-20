@@ -10,6 +10,7 @@ import AnimatedButton from "../components/ui/AnimatedButton";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
 import Card from "../components/ui/Card";
 import { entryService } from "../services/entry";
+import { api } from "../services/api";
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
@@ -28,53 +29,63 @@ export const HomePage: React.FC = () => {
   const fetchPosts = async () => {
     setIsLoading(true);
     try {
-      // For now, we'll use mock data since entry endpoints aren't implemented
-      // Once backend is ready, use: const response = await api.getEntries({ visibility: feed });
-      // Try to fetch real data first, fall back to mock data if needed
-      try {
-        const response = await entryService.getEntries({
-          page: 1,
-          page_size: 20,
-        });
-        if (response.results && response.results.length > 0) {
-          setPosts(response.results);
-          return;
-        }
-      } catch (error) {
-        console.error("Failed to fetch real entries, using mock data:", error);
+      let response = null;
+      console.log("Fetching posts for feed:", feed);
+      
+      switch (feed) {
+        case "all":
+          // Fetch all public posts
+          response = await entryService.getEntries({
+            page: 1,
+            page_size: 20,
+          });
+          break;
+          
+        case "friends":
+          // Fetch posts from friends/following
+          if (user) {
+            console.log("Fetching friends feed for user:", user);
+            // For now, use the home feed endpoint which should show friends' posts
+            response = await entryService.getHomeFeed({
+              page: 1,
+              page_size: 20,
+            });
+            console.log("Friends feed response:", response);
+          } else {
+            console.log("No user logged in, cannot fetch friends feed");
+            response = { results: [] };
+          }
+          break;
+          
+        case "liked":
+          // Fetch posts liked by the current user
+          console.log("Fetching liked entries...");
+          response = await api.getLikedEntries({
+            page: 1,
+            page_size: 20,
+          });
+          console.log("Liked entries response:", response);
+          break;
+          
+        default:
+          // Default to all posts
+          response = await entryService.getEntries({
+            page: 1,
+            page_size: 20,
+          });
       }
 
-      // Mock data for demonstration - using proper UUID format
-      const mockPosts: Entry[] = [
-        {
-          id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-          url: "http://localhost:8000/api/entries/f47ac10b-58cc-4372-a567-0e02b2c3d479/",
-          author: user || {
-            id: "f47ac10b-58cc-4372-a567-0e02b2c3d480",
-            url: "http://localhost:8000/api/authors/f47ac10b-58cc-4372-a567-0e02b2c3d480/",
-            username: "demo",
-            email: "demo@example.com",
-            display_name: "Demo User",
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          title: "Welcome to Social Distribution",
-          content:
-            "This is a **demo post** showing the markdown capabilities of our platform.",
-          content_type: "text/markdown" as const,
-          visibility: "public" as const,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          likes_count: 5,
-          comments_count: 2,
-        },
-      ];
-
-      setPosts(mockPosts);
+      if (response && response.results) {
+        console.log(`Setting ${response.results.length} posts for feed: ${feed}`);
+        setPosts(response.results);
+      } else {
+        console.log(`No response or results for feed: ${feed}`, response);
+        setPosts([]);
+      }
     } catch (error) {
       console.error("Error fetching posts:", error);
+      // On error, set empty array
+      setPosts([]);
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +108,7 @@ export const HomePage: React.FC = () => {
 
     if (posts.length === 0) {
       return (
-        <Card variant="main" className="text-center py-12 flex-1 flex flex-col justify-center">
+        <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center">
           <div className="flex justify-center mb-4">
             <Globe size={48} className="text-text-2" />
           </div>
@@ -115,6 +126,7 @@ export const HomePage: React.FC = () => {
             <AnimatedButton
               onClick={() => openCreatePost()}
               icon={<Plus size={18} />}
+              className="max-w-xs mx-auto"
             >
               Create Post
             </AnimatedButton>

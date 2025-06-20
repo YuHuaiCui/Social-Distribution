@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Heart,
   MessageCircle,
@@ -46,6 +46,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const { user } = useAuth();
   const { openCreatePost } = useCreatePost();
   const { showSuccess, showError, showInfo } = useToast();
+  const navigate = useNavigate();
   const [liked, setLiked] = useState(isLiked);
   const [saved, setSaved] = useState(isSaved);
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
@@ -461,7 +462,13 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Post stats and interaction buttons */}
       <div className="card-footer border-t border-border-1 -mx-5 -mb-5 px-0 rounded-b-xl overflow-hidden">
-        <div className="flex items-stretch divide-x divide-border-1">
+        <div className="flex items-stretch divide-x divide-border-1" style={{ borderColor: 'var(--border-1)' }}>
+          <style>{`
+            .card-footer .divide-x > :not([hidden]) ~ :not([hidden]) {
+              border-left-color: var(--border-1) !important;
+              border-left-width: 1px !important;
+            }
+          `}</style>
           {/* Like Button */}
           <button
             onClick={handleLike}
@@ -500,31 +507,30 @@ export const PostCard: React.FC<PostCardProps> = ({
           </button>
 
           {/* Comment Button */}
-          <Link to={`/posts/${extractUUID(post.id)}`} className="flex-1">
-            <button
-              className="w-full h-full flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-              aria-label="View comments"
+          <button
+            onClick={() => navigate(`/posts/${extractUUID(post.id)}`)}
+            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
+            aria-label="View comments"
+          >
+            {/* Gradient background on hover */}
+            <motion.div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)",
+              }}
+            />
+            <motion.div
+              className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
             >
-              {/* Gradient background on hover */}
-              <motion.div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)",
-                }}
-              />
-              <motion.div
-                className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <MessageCircle size={18} />
-                <span className="text-sm font-medium">
-                  {commentCount}
-                </span>
-              </motion.div>
-            </button>
-          </Link>
+              <MessageCircle size={18} />
+              <span className="text-sm font-medium">
+                {commentCount}
+              </span>
+            </motion.div>
+          </button>
 
           {/* Share Button */}
           <button

@@ -3,7 +3,9 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import models
+from django.db.models import Q
 from app.models import Entry, Author
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
@@ -11,6 +13,7 @@ from app.permissions import IsAuthorSelfOrReadOnly
 
 class EntryViewSet(viewsets.ModelViewSet):
     lookup_field = "id"
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     ...
 
     """
@@ -148,6 +151,39 @@ class EntryViewSet(viewsets.ModelViewSet):
             {"detail": "Entry soft-deleted."}, status=status.HTTP_204_NO_CONTENT
         )
 
+    @action(detail=False, methods=["get"], url_path="liked")
+    def liked_entries(self, request):
+        """Get entries that the current user has liked"""
+        from app.models import Like
+
+        # Get the current user's author
+        user = request.user
+        
+        try:
+            # Get entries that this user has liked
+            liked_entry_ids = Like.objects.filter(
+                author=user,  # User is already an Author object
+            ).values_list("entry__id", flat=True)
+
+            entries = Entry.objects.filter(id__in=liked_entry_ids).order_by(
+                "-created_at"
+            )
+
+            # Paginate the results
+            page = self.paginate_queryset(entries)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(entries, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Could not retrieve liked entries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=["get"], url_path="saved")
     def saved_entries(self, request):
         """Get the current user's saved entries"""
@@ -177,6 +213,75 @@ class EntryViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {"error": f"Could not retrieve saved entries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"], url_path="feed")
+    def feed_entries(self, request):
+        """Get entries from friends (mutually following users) for the home feed"""
+        from app.models import Follow
+        
+        user = request.user
+        
+        try:
+            # Use the user's author instance if available
+            if hasattr(user, 'author'):
+                current_author = user.author
+            else:
+                current_author = user
+            
+            print(f"FEED DEBUG - Current author: {current_author}")
+            
+            # Get all users that the current user is following with ACCEPTED status
+            following_ids = set(Follow.objects.filter(
+                follower=current_author,
+                status=Follow.ACCEPTED
+            ).values_list("followed__id", flat=True))
+            
+            print(f"FEED DEBUG - Following IDs: {following_ids}")
+            
+            # Get all users that follow the current user with ACCEPTED status
+            followers_ids = set(Follow.objects.filter(
+                followed=current_author,
+                status=Follow.ACCEPTED
+            ).values_list("follower__id", flat=True))
+            
+            print(f"FEED DEBUG - Followers IDs: {followers_ids}")
+            
+            # Friends are users who mutually follow each other (intersection)
+            friends_ids = following_ids & followers_ids
+            
+            print(f"FEED DEBUG - Friends IDs (mutual follows): {friends_ids}")
+            
+            # Debug: Let's also check the raw follow relationships
+            all_follows = Follow.objects.filter(
+                Q(follower=current_author) | Q(followed=current_author),
+                status=Follow.ACCEPTED
+            )
+            for follow in all_follows:
+                print(f"FEED DEBUG - Follow: {follow.follower.username} -> {follow.followed.username} (status: {follow.status})")
+            
+            # Get all entries from friends (all their posts, regardless of visibility)
+            entries = Entry.objects.filter(
+                author__id__in=friends_ids
+            ).exclude(
+                visibility=Entry.DELETED
+            ).order_by("-created_at")
+            
+            print(f"FEED DEBUG - Found {entries.count()} entries from friends")
+            
+            # Paginate the results
+            page = self.paginate_queryset(entries)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            serializer = self.get_serializer(entries, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Could not retrieve feed entries: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

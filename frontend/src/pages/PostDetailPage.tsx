@@ -257,6 +257,36 @@ export const PostDetailPage: React.FC = () => {
       setIsBookmarked(!newBookmarkState);
     }
   };
+
+  const handleShare = async () => {
+    if (!post) return;
+
+    const shareUrl = `${window.location.origin}/posts/${extractUUID(post.id)}`;
+    const shareText = `Check out this post: ${post.title}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post.title,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Error sharing:', err);
+        }
+      }
+    } else {
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        // You might want to show a toast notification here
+        alert('Link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy link:', err);
+      }
+    }
+  };
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim() || !postId) return;
@@ -381,6 +411,26 @@ export const PostDetailPage: React.FC = () => {
           className="prose prose-lg max-w-none text-text-1"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
         />
+      );
+    }
+
+    // For image posts, display the image and caption
+    if (contentType === "image/png" || contentType === "image/jpeg") {
+      return (
+        <div className="space-y-4">
+          {post.image && (
+            <div className="rounded-lg overflow-hidden">
+              <img 
+                src={post.image} 
+                alt={post.title}
+                className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
+              />
+            </div>
+          )}
+          {content && content !== "Image post" && (
+            <p className="text-text-1 text-center italic">{content}</p>
+          )}
+        </div>
       );
     }
 
@@ -577,6 +627,7 @@ export const PostDetailPage: React.FC = () => {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
+                onClick={handleShare}
                 className="text-text-2 hover:text-text-1 transition-colors"
               >
                 <Share2 size={20} />
