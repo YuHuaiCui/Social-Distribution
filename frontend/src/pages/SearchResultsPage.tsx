@@ -63,7 +63,6 @@ export const SearchResultsPage: React.FC = () => {
             is_approved: true,
             is_active: true,
           });
-          console.log('Authors search response:', authorsResponse);
           // Handle both paginated and direct array responses
           searchResults.authors = authorsResponse.results || authorsResponse || [];
         } catch (error) {

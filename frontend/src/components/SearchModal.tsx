@@ -77,7 +77,6 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
             is_approved: true,
             is_active: true,
           });
-          console.log('Modal authors search response:', authorsResponse);
           // Handle both paginated and direct array responses
           searchResults.authors = authorsResponse.results || authorsResponse || [];
         } catch (error) {

@@ -73,7 +73,6 @@ export const PostDetailPage: React.FC = () => {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(extractedId)) {
-      console.warn(`Invalid UUID format for postId: ${extractedId} (original: ${postId})`);
       setPost(null);
       setIsLoading(false);
       return;
@@ -95,7 +94,6 @@ export const PostDetailPage: React.FC = () => {
       // if the direct entry endpoint returns a 404
       if (user?.id) {
         try {
-          console.log("Trying to fetch post using author endpoint");
           // Try fetching through author's endpoint which might have different permissions
           const response = await entryService.getEntriesByAuthor(user.id);
           const authorPost = response.results.find(
@@ -103,16 +101,11 @@ export const PostDetailPage: React.FC = () => {
           );
 
           if (authorPost) {
-            console.log("Found post via author endpoint");
             setPost(authorPost);
             setIsLoading(false);
             return;
           }
         } catch (authorError) {
-          console.error(
-            "Also failed to fetch via author endpoint:",
-            authorError
-          );
         }
       }
 
@@ -298,9 +291,6 @@ export const PostDetailPage: React.FC = () => {
       extractedId = segments[segments.length - 1] || segments[segments.length - 2];
     }
 
-    console.log("Submitting comment for post ID:", extractedId, "(original:", postId, ")");
-    console.log("Current user:", user);
-    console.log("Session cookie:", document.cookie);
 
     setIsSubmitting(true);
     try {
@@ -359,21 +349,6 @@ export const PostDetailPage: React.FC = () => {
         triggerNotificationUpdate();
       }
     } catch (err) {
-      console.error("Error submitting comment:", err);
-
-      // Provide detailed error logging to help troubleshooting
-      if (err instanceof Error) {
-        console.error("Error message:", err.message);
-      }
-
-      // Log request data for debugging
-      console.log("Comment request data:", {
-        postId,
-        commentData: {
-          content: commentText,
-          content_type: commentContentType,
-        },
-      });
 
       // Show user-friendly error message
       showError("Failed to submit comment. Please try again.");
@@ -418,11 +393,11 @@ export const PostDetailPage: React.FC = () => {
     if (contentType === "image/png" || contentType === "image/jpeg") {
       return (
         <div className="space-y-4">
-          {post.image && (
+          {post?.image && (
             <div className="rounded-lg overflow-hidden">
               <img 
                 src={post.image} 
-                alt={post.title}
+                alt={post?.title}
                 className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
               />
             </div>

@@ -438,26 +438,37 @@ Lists entries visible to the authenticated user.
 #### 2. Create Entry
 **POST** `/api/entries/`
 
-Creates a new entry/post.
+Creates a new entry/post. For image posts, use multipart/form-data to upload images.
 
-**Request Body:**
+**Request Body (JSON for text posts):**
 ```json
 {
   "title": "My New Post",
   "content": "This is the content of my new post",
   "content_type": "text/markdown",
-  "visibility": "public"
+  "visibility": "public",
+  "categories": ["technology", "programming"]
 }
 ```
 
+**Request Body (multipart/form-data for image posts):**
+- `title`: Post title
+- `content`: Caption for the image (optional)
+- `content_type`: "image/png" or "image/jpeg"
+- `visibility`: One of: public, unlisted, friends
+- `categories`: JSON stringified array of category tags
+- `image`: The image file to upload
+
 **Required Fields:**
 - `title`: Post title
-- `content`: Post content
+- `content`: Post content (or caption for images)
 - `content_type`: One of: text/plain, text/markdown, image/png, image/jpeg
 - `visibility`: One of: public, unlisted, friends
 
+**Note:** Images are stored as binary data (blobs) in the database. The API returns base64-encoded data URLs for images in the `image` field.
+
 **Response (201 Created):**
-Returns the created entry object.
+Returns the created entry object with the `image` field containing a data URL for image posts.
 
 #### 3. Get Specific Entry
 **GET** `/api/entries/{id}/`
@@ -483,12 +494,28 @@ Updates an entry (author only).
 
 Soft deletes an entry (sets visibility to "deleted").
 
-#### 6. Get Saved Entries
+#### 6. Get Liked Entries
+**GET** `/api/entries/liked/`
+
+Gets entries that the current user has liked.
+
+**Response (200 OK):**
+Returns paginated list of liked entries.
+
+#### 7. Get Friends Feed
+**GET** `/api/entries/feed/`
+
+Gets entries from users who are friends (mutual follows) with the current user. This endpoint returns all posts from friends regardless of visibility settings.
+
+**Response (200 OK):**
+Returns paginated list of entries from friends.
+
+#### 8. Get Saved Entries
 **GET** `/api/entries/saved/`
 
 Gets the current user's saved/bookmarked entries.
 
-#### 7. Save/Unsave Entry
+#### 9. Save/Unsave Entry
 **POST/DELETE** `/api/entries/{id}/save/`
 
 Save or unsave an entry.

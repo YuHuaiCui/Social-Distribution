@@ -59,10 +59,8 @@ export const PostCard: React.FC<PostCardProps> = ({
         const extractedId = extractUUID(post.id);
         const data = await api.getEntryLikeStatus(extractedId);
         setLikeCount(data.like_count);
-        console.log("Like status from API:", data);
         setLiked(data.liked_by_current_user);
       } catch (error) {
-        console.warn("Failed to fetch like data:", error);
         // Use the data from the post itself as fallback
         setLikeCount(post.likes_count || 0);
         setLiked(post.is_liked || false); // Use is_liked from post if available
@@ -170,7 +168,6 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const handleEdit = () => {
-    console.log("Editing post:", post);
     setShowActions(false);
     openCreatePost(post);
   };
@@ -247,17 +244,10 @@ export const PostCard: React.FC<PostCardProps> = ({
           </span>
         );
         break;
-      case "private":
-        badges.push(
-          <span key="private" className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
-            Private
-          </span>
-        );
-        break;
     }
     
     // Show admin visibility indicator if viewing a post that wouldn't normally be visible
-    if (isAdmin && !isOwnPost && (post.visibility === "private" || post.visibility === "friends")) {
+    if (isAdmin && !isOwnPost && post.visibility === "friends") {
       badges.push(
         <span key="admin" className="text-xs bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white px-2 py-0.5 rounded-full flex items-center gap-1">
           <Shield size={10} />

@@ -63,7 +63,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         is_approved: true,
         is_active: true,
       });
-      console.log('ShareModal user search response:', response);
       // Handle both paginated and direct array responses
       setUsers(response.results || response || []);
     } catch (error) {
