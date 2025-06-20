@@ -30,11 +30,9 @@ export const HomePage: React.FC = () => {
     setIsLoading(true);
     try {
       let response = null;
-      console.log("Fetching posts for feed:", feed);
       
       switch (feed) {
         case "all":
-          // Fetch all public posts
           response = await entryService.getEntries({
             page: 1,
             page_size: 20,
@@ -42,33 +40,24 @@ export const HomePage: React.FC = () => {
           break;
           
         case "friends":
-          // Fetch posts from friends/following
           if (user) {
-            console.log("Fetching friends feed for user:", user);
-            // For now, use the home feed endpoint which should show friends' posts
             response = await entryService.getHomeFeed({
               page: 1,
               page_size: 20,
             });
-            console.log("Friends feed response:", response);
           } else {
-            console.log("No user logged in, cannot fetch friends feed");
             response = { results: [] };
           }
           break;
           
         case "liked":
-          // Fetch posts liked by the current user
-          console.log("Fetching liked entries...");
           response = await api.getLikedEntries({
             page: 1,
             page_size: 20,
           });
-          console.log("Liked entries response:", response);
           break;
           
         default:
-          // Default to all posts
           response = await entryService.getEntries({
             page: 1,
             page_size: 20,
@@ -76,15 +65,12 @@ export const HomePage: React.FC = () => {
       }
 
       if (response && response.results) {
-        console.log(`Setting ${response.results.length} posts for feed: ${feed}`);
         setPosts(response.results);
       } else {
-        console.log(`No response or results for feed: ${feed}`, response);
         setPosts([]);
       }
     } catch (error) {
       console.error("Error fetching posts:", error);
-      // On error, set empty array
       setPosts([]);
     } finally {
       setIsLoading(false);

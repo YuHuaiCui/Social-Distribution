@@ -49,7 +49,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
-  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
   const [expandedSection, setExpandedSection] = useState<
     "content" | "tags" | "privacy" | null
   >("content");
@@ -103,17 +102,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       return;
     }
 
-    console.log("Validation check:", {
-      contentType,
-      startsWithImage: contentType?.startsWith("image/"),
-      imagesLength: images.length,
-      images,
-      uploadedImageUrls,
-      uploadedUrlsLength: uploadedImageUrls.length,
-      contentTrim: content.trim(),
-      hasContent: !!content.trim()
-    });
-    
     if (
       contentType &&
       contentType.startsWith("image/") &&
@@ -127,16 +115,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     setError("");
 
     try {
-      console.log("Creating post with:", {
-        title,
-        content,
-        contentType,
-        visibility,
-        categories,
-        imagesLength: images.length,
-        hasImage: images.length > 0
-      });
-      
       const entryData: CreateEntryData = {
         title,
         content: contentType.startsWith("image/") 
@@ -148,18 +126,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         // Include image file for image posts
         ...(images.length > 0 && { image: images[0] }),
       };
-      
-      console.log("Entry data:", entryData);
       if (editingPost) {
         // Update existing post
-        console.log("editingPost:", editingPost);
         if (!editingPost.id) {
-          console.error("Editing post is missing an ID");
           setError("Cannot update: missing post ID");
           return;
         }
         const id = editingPost.id.includes("/") ? editingPost.id.split("/").pop() : editingPost.id;
-        console.log("[PATCH] Entry ID used for update:", id);
         if (!id) {
           setError("Cannot update: invalid post ID");
           setIsLoading(false);
@@ -173,7 +146,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         onSuccess?.(updatedPost);
         triggerRefresh(); // Trigger posts refresh
         handleClose();
-        console.log("Post updated successfully, refreshing feed...");
       } else {
         // Create new post
         const newPost = await entryService.createEntry(entryData);
@@ -182,7 +154,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         triggerRefresh(); // Trigger posts refresh
         // Dispatch event for other components to update
         window.dispatchEvent(new Event('post-created'));
-        console.log("Post created successfully, refreshing feed...");
         handleClose();
       }
     } catch (err: unknown) {
@@ -205,7 +176,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
-      setUploadedImageUrls([]);
       setError("");
       setExpandedSection("content");
       setIsFullscreen(false);
@@ -381,19 +351,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                             <div>
                               <ImageUploader
                                 onImagesChange={(newImages) => {
-                                  console.log("Images changed:", newImages);
                                   setImages(newImages);
-                                }}
-                                onImagesUploaded={(uploadedImages) => {
-                                  console.log("Images uploaded:", uploadedImages);
-                                  // Store the URLs of uploaded images
-                                  const urls = uploadedImages.map(img => img.url);
-                                  console.log("Extracted URLs:", urls);
-                                  setUploadedImageUrls(urls);
-                                  // If we have uploaded images, use the first URL as content
-                                  if (urls.length > 0) {
-                                    setContent(urls[0]);
-                                  }
                                 }}
                                 maxImages={1}
                                 className="mt-3"

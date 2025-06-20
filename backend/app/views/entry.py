@@ -230,15 +230,11 @@ class EntryViewSet(viewsets.ModelViewSet):
             else:
                 current_author = user
             
-            print(f"FEED DEBUG - Current author: {current_author}")
-            
             # Get all users that the current user is following with ACCEPTED status
             following_ids = set(Follow.objects.filter(
                 follower=current_author,
                 status=Follow.ACCEPTED
             ).values_list("followed__id", flat=True))
-            
-            print(f"FEED DEBUG - Following IDs: {following_ids}")
             
             # Get all users that follow the current user with ACCEPTED status
             followers_ids = set(Follow.objects.filter(
@@ -246,20 +242,8 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=Follow.ACCEPTED
             ).values_list("follower__id", flat=True))
             
-            print(f"FEED DEBUG - Followers IDs: {followers_ids}")
-            
             # Friends are users who mutually follow each other (intersection)
             friends_ids = following_ids & followers_ids
-            
-            print(f"FEED DEBUG - Friends IDs (mutual follows): {friends_ids}")
-            
-            # Debug: Let's also check the raw follow relationships
-            all_follows = Follow.objects.filter(
-                Q(follower=current_author) | Q(followed=current_author),
-                status=Follow.ACCEPTED
-            )
-            for follow in all_follows:
-                print(f"FEED DEBUG - Follow: {follow.follower.username} -> {follow.followed.username} (status: {follow.status})")
             
             # Get all entries from friends (all their posts, regardless of visibility)
             entries = Entry.objects.filter(
@@ -267,8 +251,6 @@ class EntryViewSet(viewsets.ModelViewSet):
             ).exclude(
                 visibility=Entry.DELETED
             ).order_by("-created_at")
-            
-            print(f"FEED DEBUG - Found {entries.count()} entries from friends")
             
             # Paginate the results
             page = self.paginate_queryset(entries)
