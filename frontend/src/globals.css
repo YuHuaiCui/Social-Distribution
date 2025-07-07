@@ -1291,3 +1291,80 @@ button:focus-within {
   --tw-ring-offset-width: 0px !important;
   --tw-ring-width: 0px !important;
 }
+
+/* GPU Acceleration Optimizations */
+/* Apply will-change to animated elements for better performance */
+.motion-safe\:animate-* {
+  will-change: transform, opacity;
+}
+
+/* Optimize Framer Motion elements */
+[data-framer-motion] {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimize animated gradients */
+.animated-gradient,
+[class*="animate"][class*="gradient"] {
+  will-change: background-position;
+  transform: translateZ(0);
+}
+
+/* Optimize hover states on interactive elements */
+button:hover,
+a:hover,
+.hoverable:hover {
+  will-change: transform, opacity;
+}
+
+/* Optimize PostCard animations */
+.card-layout {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimize ShareModal animations */
+[role="dialog"] {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Optimize frequently animated elements */
+.glass-card-main,
+.glass-card-subtle,
+.glass-card-prominent {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Force GPU acceleration on transform animations */
+@supports (transform: translateZ(0)) {
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+}
+
+/* Optimize floating animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateZ(0);
+  }
+  50% {
+    transform: translateY(-20px) translateZ(0);
+  }
+}
+
+/* Optimize rotating animations */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg) translateZ(0);
+  }
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
