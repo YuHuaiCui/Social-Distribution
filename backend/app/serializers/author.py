@@ -23,8 +23,11 @@ class AuthorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Author
         fields = [
+            "type",
             "id",
             "url",
+            "host",
+            "web",
             "username",
             "email",
             "first_name",
@@ -46,7 +49,7 @@ class AuthorSerializer(serializers.ModelSerializer):
             "password_confirm",
             "is_following",
         ]
-        read_only_fields = ["id", "url", "created_at", "updated_at"]
+        read_only_fields = ["type", "id", "url", "host", "web", "created_at", "updated_at"]
         extra_kwargs = {
             "email": {"required": True},
             "username": {"required": True},
@@ -114,6 +117,26 @@ class AuthorSerializer(serializers.ModelSerializer):
         return Follow.objects.filter(
             follower=request.user, followed=obj, status=Follow.ACCEPTED
         ).exists()
+    
+    def to_representation(self, instance):
+        """
+        Customize the representation to match project spec format.
+        """
+        data = super().to_representation(instance)
+        
+        # Override id to be the full URL as per spec
+        data['id'] = instance.url
+        
+        # Convert github_username to full URL format
+        if instance.github_username:
+            data['github'] = f"https://github.com/{instance.github_username}"
+        else:
+            data['github'] = None
+            
+        # Remove the github_username field as it's replaced by github
+        data.pop('github_username', None)
+        
+        return data
 
 
 class AuthorListSerializer(serializers.ModelSerializer):
@@ -126,8 +149,11 @@ class AuthorListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Author
         fields = [
+            "type",
             "id",
             "url",
+            "host",
+            "web",
             "username",
             "email",
             "display_name",
@@ -142,7 +168,7 @@ class AuthorListSerializer(serializers.ModelSerializer):
             "following_count",
             "is_following",
         ]
-        read_only_fields = ["id", "url", "created_at"]
+        read_only_fields = ["type", "id", "url", "host", "web", "created_at"]
 
     def get_followers_count(self, obj):
         """Get count of users following this author"""
@@ -167,6 +193,26 @@ class AuthorListSerializer(serializers.ModelSerializer):
         return Follow.objects.filter(
             follower=request.user, followed=obj, status=Follow.ACCEPTED
         ).exists()
+    
+    def to_representation(self, instance):
+        """
+        Customize the representation to match project spec format.
+        """
+        data = super().to_representation(instance)
+        
+        # Override id to be the full URL as per spec
+        data['id'] = instance.url
+        
+        # Convert github_username to full URL format
+        if instance.github_username:
+            data['github'] = f"https://github.com/{instance.github_username}"
+        else:
+            data['github'] = None
+            
+        # Remove the github_username field as it's replaced by github
+        data.pop('github_username', None)
+        
+        return data
 
 
 class NodeSerializer(serializers.ModelSerializer):

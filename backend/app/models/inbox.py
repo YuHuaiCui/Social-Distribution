@@ -65,4 +65,10 @@ class Inbox(models.Model):
         ]
 
     def __str__(self):
+        """
+        String representation of the inbox item.
+        
+        Returns:
+            str: A human-readable string showing the inbox recipient and item type
+        """
         return f"Inbox item for {self.recipient}: {self.item_type}"

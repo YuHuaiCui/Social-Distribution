@@ -33,21 +33,21 @@ interface PrivacySelectorProps {
 
 const privacyOptions: PrivacyOption[] = [
   {
-    value: "public",
+    value: "PUBLIC",
     label: "Public",
     icon: Globe,
     description: "Anyone can see this post",
     color: "text-green-500",
   },
   {
-    value: "friends",
+    value: "FRIENDS",
     label: "Friends Only",
     icon: Users,
     description: "Only your friends can see this post",
     color: "text-blue-500",
   },
   {
-    value: "unlisted",
+    value: "UNLISTED",
     label: "Unlisted",
     icon: Link,
     description: "Visible to followers and friends, not shown in public feeds",

@@ -24,6 +24,7 @@ import { renderMarkdown } from "../utils/markdown";
 
 import AnimatedGradient from "./ui/AnimatedGradient";
 import { extractUUID } from "../utils/extractId";
+import { ShareModal } from "./ShareModal";
 
 interface PostCardProps {
   post: Entry;
@@ -52,6 +53,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
   const [commentCount, setCommentCount] = useState(post.comments_count || 0);
   const [showActions, setShowActions] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     async function fetchLikeData() {
@@ -156,15 +158,21 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const handleShare = () => {
-    const url = `${window.location.origin}/posts/${post.id}`;
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        showSuccess("Post link copied to clipboard!");
-      })
-      .catch(() => {
-        showError("Failed to copy link");
-      });
+    // For public posts, show the share modal with social media options
+    if (post.visibility === "PUBLIC") {
+      setShowShareModal(true);
+    } else {
+      // For non-public posts, just copy the link
+      const url = `${window.location.origin}/posts/${post.id}`;
+      navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          showSuccess("Post link copied to clipboard!");
+        })
+        .catch(() => {
+          showError("Failed to copy link");
+        });
+    }
   };
 
   const handleEdit = () => {
@@ -230,14 +238,14 @@ export const PostCard: React.FC<PostCardProps> = ({
     const badges = [];
     
     switch (post.visibility) {
-      case "friends":
+      case "FRIENDS":
         badges.push(
           <span key="friends" className="text-xs bg-cat-mint px-2 py-0.5 rounded-full">
             Friends
           </span>
         );
         break;
-      case "unlisted":
+      case "UNLISTED":
         badges.push(
           <span key="unlisted" className="text-xs bg-cat-yellow px-2 py-0.5 rounded-full">
             Unlisted
@@ -247,7 +255,7 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
     
     // Show admin visibility indicator if viewing a post that wouldn't normally be visible
-    if (isAdmin && !isOwnPost && post.visibility === "friends") {
+    if (isAdmin && !isOwnPost && post.visibility === "FRIENDS") {
       badges.push(
         <span key="admin" className="text-xs bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white px-2 py-0.5 rounded-full flex items-center gap-1">
           <Shield size={10} />
@@ -260,7 +268,8 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   return (
-    <Card variant="main" hoverable className="card-layout">
+    <>
+      <Card variant="main" hoverable className="card-layout">
       <div className="card-content">
         {/* Author info */}
         <div className="flex items-center mb-4">
@@ -584,7 +593,16 @@ export const PostCard: React.FC<PostCardProps> = ({
           </button>
         </div>
       </div>
-    </Card>
+      </Card>
+      
+      {/* Share Modal for public posts */}
+      <ShareModal 
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        post={post}
+        shareUrl={`${window.location.origin}/posts/${extractUUID(post.id)}`}
+      />
+    </>
   );
 };
 
