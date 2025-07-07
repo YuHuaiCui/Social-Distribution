@@ -39,4 +39,10 @@ class Follow(models.Model):
         ]
 
     def __str__(self):
+        """
+        String representation of the follow relationship.
+        
+        Returns:
+            str: A human-readable string showing follower -> followed (status)
+        """
         return f"{self.follower} -> {self.followed} ({self.status})"

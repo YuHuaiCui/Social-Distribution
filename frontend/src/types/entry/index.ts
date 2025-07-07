@@ -6,15 +6,19 @@ import type { Author } from "../author";
 import type { ContentType, Visibility, TimestampedModel } from "../common";
 
 export interface Entry extends TimestampedModel {
-  id: string;
+  type: "entry"; // Object type for federation
+  id: string; // Full URL as per spec
   url: string;
+  web: string; // Frontend URL where entry can be viewed
   author: Author | string; // Can be URL reference
   title: string;
+  description: string; // Brief description for preview
   content: string;
   content_type: ContentType;
   visibility: Visibility;
   source?: string;
   origin?: string;
+  published: string; // ISO 8601 timestamp
   // Frontend computed fields
   likes_count?: number;
   comments_count?: number;
@@ -26,6 +30,7 @@ export interface Entry extends TimestampedModel {
 
 export interface CreateEntryData {
   title: string;
+  description?: string; // Optional brief description
   content: string;
   content_type: ContentType;
   visibility: Visibility;

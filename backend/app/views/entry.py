@@ -51,19 +51,32 @@ class EntryViewSet(viewsets.ModelViewSet):
         return obj
 
     def get_queryset(self):
+        """
+        Get entries based on visibility rules and context.
+        
+        This method implements complex visibility logic based on:
+        - Whether the user is staff (can see all non-deleted entries)
+        - Whether viewing a specific author's profile or general feed
+        - The relationship between the viewer and the entry author
+        
+        Returns:
+            QuerySet: Filtered entries based on visibility permissions
+        """
         user = self.request.user
 
+        # Staff users can see all entries except deleted ones
         if user.is_staff:
             return Entry.objects.exclude(visibility=Entry.DELETED).order_by(
                 "-created_at"
             )
 
+        # Get the author instance for the current user
         if hasattr(user, "author"):
             user_author = user.author
         else:
             user_author = user
 
-        # Check if we're viewing a specific author's entries
+        # Check if we're viewing a specific author's entries (profile view)
         author_id = self.kwargs.get("author_id") or self.request.query_params.get(
             "author"
         )
@@ -81,7 +94,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                     .order_by("-created_at")
                 )
 
-            # Viewing someone else's profile: use proper visibility logic
+            # Viewing someone else's profile: apply visibility rules
             # Get all entries by the target author that are visible to the current user
             visible_entries = Entry.objects.visible_to_author(user_author)
             return visible_entries.filter(author=target_author).order_by("-created_at")
@@ -141,9 +154,25 @@ class EntryViewSet(viewsets.ModelViewSet):
         )
 
     def destroy(self, request, *args, **kwargs):
+        """
+        Soft-delete an entry by marking it as deleted.
+        
+        Instead of permanently removing the entry from the database, this method
+        sets the visibility to DELETED, preserving the data while hiding it from
+        normal queries. This allows for potential recovery and maintains referential
+        integrity.
+        
+        Args:
+            request: The HTTP DELETE request
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments
+            
+        Returns:
+            Response: 204 No Content on successful deletion
+        """
         entry = self.get_object()
 
-        # Only mark as deleted
+        # Only mark as deleted (soft delete)
         entry.visibility = Entry.DELETED
         entry.save()
 

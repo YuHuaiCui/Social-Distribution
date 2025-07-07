@@ -40,6 +40,12 @@ class Friendship(models.Model):
         ]
 
     def __str__(self):
+        """
+        String representation of the friendship.
+        
+        Returns:
+            str: A human-readable string showing the bidirectional friendship between two authors
+        """
         return f"Friendship: {self.author1} <-> {self.author2}"
 
     @classmethod

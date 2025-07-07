@@ -159,11 +159,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   const getVisibilityIcon = () => {
     switch (post.visibility) {
-      case 'public':
+      case 'PUBLIC':
         return Globe;
-      case 'friends':
+      case 'FRIENDS':
         return Users;
-      case 'unlisted':
+      case 'UNLISTED':
         return Lock;
       default:
         return Globe;
@@ -218,7 +218,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   </span>
                   <div className="flex items-center space-x-1">
                     <VisibilityIcon size={14} />
-                    <span className="capitalize">{post.visibility}</span>
+                    <span className="capitalize">{post.visibility.toLowerCase()}</span>
                   </div>
                 </div>
               </div>

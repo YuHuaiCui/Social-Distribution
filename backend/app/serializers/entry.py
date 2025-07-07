@@ -12,22 +12,26 @@ class EntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Entry
         fields = [
+            "type",
             "id",
             "url",
+            "web",
             "author",
             "title",
+            "description",
             "content",
             "content_type",
             "visibility",
             "source",
             "origin",
+            "published",
             "created_at",
             "updated_at",
             "comments_count",
             "likes_count",
             "image",
         ]
-        read_only_fields = ["id", "url", "author", "source", "origin", "created_at", "updated_at", "comments_count", "likes_count"]
+        read_only_fields = ["type", "id", "url", "web", "author", "source", "origin", "published", "created_at", "updated_at", "comments_count", "likes_count"]
 
     def create(self, validated_data):
         # The author will be set by the view's perform_create method
@@ -58,17 +62,15 @@ class EntrySerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """
-        Customize the representation to include author details.
+        Customize the representation to match project spec format.
         """
         data = super().to_representation(instance)
         
-        # Include author information
+        # Override id to be the full URL as per spec
+        data['id'] = instance.url
+        
+        # Include full author object as per spec
         if instance.author:
-            data['author'] = {
-                'id': str(instance.author.id),
-                'url': instance.author.url,
-                'username': instance.author.username,
-                'display_name': instance.author.display_name,
-            }
+            data['author'] = AuthorSerializer(instance.author, context=self.context).data
         
         return data
