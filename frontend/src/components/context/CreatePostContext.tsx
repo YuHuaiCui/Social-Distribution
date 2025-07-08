@@ -42,6 +42,8 @@ export const CreatePostProvider: React.FC<CreatePostProviderProps> = ({
   };
 
   const handleSuccess = (post: Entry) => {
+
+    // 📢 Notify parent (e.g. post feed)
     onPostCreated?.(post);
     closeCreatePost();
   };
@@ -60,3 +62,4 @@ export const CreatePostProvider: React.FC<CreatePostProviderProps> = ({
 };
 
 export default CreatePostProvider;
+

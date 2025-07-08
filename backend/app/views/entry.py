@@ -9,7 +9,8 @@ from django.db.models import Q
 from app.models import Entry, Author
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
-
+import uuid
+import os
 
 class EntryViewSet(viewsets.ModelViewSet):
     lookup_field = "id"
@@ -23,6 +24,12 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     serializer_class = EntrySerializer
     permission_classes = [IsAuthenticated]
+
+    def rename_uploaded_file(file):
+        ext = os.path.splitext(file.name)[1]
+        new_name = f"{uuid.uuid4().hex}{ext}"
+        file.name = new_name
+        return file
 
     def get_object(self):
         """

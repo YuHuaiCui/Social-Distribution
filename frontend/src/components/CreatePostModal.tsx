@@ -49,40 +49,44 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
+  const [replacingImage, setReplacingImage] = useState(false);
+  const [currentImage, setCurrentImage] = useState<string | null>(null);
+
   const [expandedSection, setExpandedSection] = useState<
     "content" | "tags" | "privacy" | null
   >("content");
   // Pre-fill form when editing
   React.useEffect(() => {
-    if (editingPost) {
-      setTitle(editingPost.title);
-      setContent(editingPost.content);
-      setContentType(editingPost.content_type || "text/markdown");
-      // Ensure visibility is one of our valid types ('public', 'friends', 'unlisted')
-      const validVisibilities: Visibility[] = ["public", "friends", "unlisted"];
-      setVisibility(
-        validVisibilities.includes(editingPost.visibility as Visibility)
-          ? (editingPost.visibility as Visibility)
-          : "public"
-      );
-      setCategories(editingPost.categories || []);
-    } else {
-      // Reset form when creating new post
-      setTitle("");
-      setContent("");
-      setContentType("text/markdown");
-      setVisibility(defaultVisibility);
-      setCategories([]);
-      setImages([]);
-    }
-  }, [editingPost, defaultVisibility]);
+  if (editingPost) {
+    setTitle(editingPost.title|| "");
+    setContent(editingPost.content|| "");
+    setContentType(editingPost.content_type || "text/markdown");
 
-  // Update visibility when default changes for new posts
-  React.useEffect(() => {
-    if (!editingPost) {
-      setVisibility(defaultVisibility);
-    }
-  }, [defaultVisibility, editingPost]);
+    const validVisibilities: Visibility[] = ["PUBLIC", "FRIENDS", "UNLISTED"];
+    setVisibility(
+      validVisibilities.includes(editingPost.visibility as Visibility)
+        ? (editingPost.visibility as Visibility)
+        : defaultVisibility
+    );
+
+    setCategories(editingPost.categories || []);
+    setReplacingImage(false);
+    // DO NOT reset images[] here
+    setImages([]);
+    setCurrentImage(editingPost.image || null);
+  } else {
+    setTitle("");
+    setContent("");
+    setContentType("text/markdown");
+    setVisibility(defaultVisibility);
+    setCategories([]);
+    setImages([]);
+    setReplacingImage(false);
+    setCurrentImage(null);
+  }
+}, [editingPost?.id, defaultVisibility]); // 🛠 use editingPost?.id to ensure clean re-run
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +109,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     if (
       contentType &&
       contentType.startsWith("image/") &&
-      images.length === 0
+      images.length === 0 &&
+      (!editingPost || !editingPost.image)
     ) {
       setError("Please upload at least one image");
       return;
@@ -145,7 +150,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
         onSuccess?.(updatedPost);
         triggerRefresh(); // Trigger posts refresh
-        handleClose();
+        setReplacingImage(false);
+        setImages([]); // clear images
+        setContent(updatedPost.content);
+        setContentType(updatedPost.content_type as ContentType);
+        setTitle(updatedPost.title);
+        setCategories(updatedPost.categories || []);
+        setVisibility(updatedPost.visibility as Visibility);
       } else {
         // Create new post
         const newPost = await entryService.createEntry(entryData);
@@ -349,14 +360,35 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         >
                           {contentType && contentType.startsWith("image/") ? (
                             <div>
+
+                              {replacingImage || images.length > 0 || !editingPost?.image  ? (
                               <ImageUploader
                                 onImagesChange={(newImages) => {
                                   setImages(newImages);
+                                  setReplacingImage(true); // hide uploader after user picks a file
+                                  setCurrentImage(null); // clear preview
                                 }}
                                 maxImages={1}
                                 className="mt-3"
                                 uploadToServer={false}
                               />
+                            ) : (
+                              <div className="mt-3 space-y-2">
+                                <img
+                                  key={editingPost.updated_at || Date.now()} // force rerender
+                                  src={editingPost.image}
+                                  alt="Current uploaded"
+                                  className="rounded-lg max-h-64 object-contain border border-border-1"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setReplacingImage(true)} // triggers file upload
+                                  className="text-sm text-primary hover:underline"
+                                >
+                                  Replace Image
+                                </button>
+                              </div>
+                            )}
                               {images.length > 0 && (
                                 <div className="mt-3">
                                   <textarea

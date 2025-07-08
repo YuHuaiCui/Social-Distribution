@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from app.models import Entry
 from app.models import Author
-from app.serializers.author import AuthorSerializer 
+from app.serializers.author import AuthorSerializer
+
 
 class EntrySerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)  
@@ -57,7 +58,7 @@ class EntrySerializer(serializers.ModelSerializer):
             import base64
             # Convert binary data to base64 data URL
             image_base64 = base64.b64encode(obj.image_data).decode('utf-8')
-            return f"data:{obj.content_type};base64,{image_base64}"
+            return f"data:{obj.content_type};base64,{image_base64}#v={obj.updated_at.timestamp()}"
         return None
 
     def to_representation(self, instance):
@@ -74,3 +75,44 @@ class EntrySerializer(serializers.ModelSerializer):
             data['author'] = AuthorSerializer(instance.author, context=self.context).data
         
         return data
+
+    from django.utils import timezone
+
+    def update(self, instance, validated_data):
+        for field in ['title', 'description', 'visibility']:
+            if field in validated_data:
+                setattr(instance, field, validated_data[field])
+
+        content_type = validated_data.get('content_type', instance.content_type)
+        content = validated_data.get('content', instance.content)
+
+        # Handle base64 image update if content_type is image/*
+        if content_type in ['image/png', 'image/jpeg'] and content.startswith("data:image/"):
+            import base64
+            import re
+
+            instance.content_type = content_type
+            instance.content = content
+
+            match = re.match(r"^data:image/\w+;base64,(.+)$", content)
+            if match:
+                try:
+                    image_bytes = base64.b64decode(match.group(1))
+                    instance.image_data = image_bytes
+
+                    # ✅ Force updated_at to change
+                    instance.updated_at = timezone.now()
+
+                except base64.binascii.Error:
+                    raise serializers.ValidationError("Invalid base64 image data.")
+        else:
+            if 'content_type' in validated_data:
+                instance.content_type = validated_data['content_type']
+            if 'content' in validated_data:
+                instance.content = validated_data['content']
+            if validated_data.get('content_type', '').startswith("text/"):
+                instance.image_data = None
+
+        instance.save()
+        return instance
+        

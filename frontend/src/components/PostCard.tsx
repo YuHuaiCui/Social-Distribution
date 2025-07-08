@@ -436,7 +436,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           post.image && (
             <div className="mb-4 rounded-lg overflow-hidden">
               <LoadingImage
-                src={post.image}
+                src={`${post.image}?v=${post.updated_at}`}
                 alt="Post attachment"
                 className="w-full h-auto max-h-96 object-cover"
                 loaderSize={24}
