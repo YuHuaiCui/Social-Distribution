@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import AnimatedGradient from './ui/AnimatedGradient';
 import type { Entry, Author, Comment } from '../types/models';
+import { useAuth } from "./context/AuthContext"; // adjust path as needed
+
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -28,6 +30,9 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
   const [results, setResults] = useState<SearchResults | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const { user } = useAuth();
+  const isAdmin = user?.is_staff || user?.is_superuser;
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -74,8 +79,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         try {
           const authorsResponse = await api.getAuthors({
             search: searchQuery,
-            is_approved: true,
             is_active: true,
+            ...(isAdmin ? {} : { is_approved: true }),
           });
           // Handle both paginated and direct array responses
           searchResults.authors = authorsResponse.results || authorsResponse || [];

@@ -465,6 +465,14 @@ class AuthorViewSet(viewsets.ModelViewSet):
         except Entry.DoesNotExist:
             return Response({"detail": "Image not found"}, status=404)
     
+    @action(detail=False, methods=["get"], permission_classes=[permissions.IsAdminUser])
+    def pending(self, request):
+        """List unapproved users (admin only)"""
+        unapproved = Author.objects.filter(is_approved=False, is_staff=False).order_by("-created_at")
+        serializer = AuthorListSerializer(unapproved, many=True, context={"request": request})
+        return Response(serializer.data)
+
+
     @action(detail=True, methods=["post"], url_path="inbox")
     def post_to_inbox(self, request, pk=None):
         """

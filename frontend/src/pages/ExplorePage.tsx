@@ -19,6 +19,8 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
+import { useAuth } from "../components/context/AuthContext";
+import { api } from "../services/api";
 
 type ViewMode = "grid" | "list";
 type ExploreTab = "trending" | "authors" | "categories" | "recent";
@@ -46,6 +48,8 @@ export const ExplorePage: React.FC = () => {
   const [followingAuthors, setFollowingAuthors] = useState<Set<string>>(
     new Set()
   );
+  const { user } = useAuth();
+  const isAdmin = user?.is_staff || user?.is_superuser;
   useEffect(() => {
     fetchExploreData();
   }, [activeTab, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -124,53 +128,21 @@ export const ExplorePage: React.FC = () => {
         ];
         setPosts(mockPosts);
       } else if (activeTab === "authors") {
-        const mockAuthors: TrendingAuthor[] = [
-          {
-            id: "c3d4e5f6-7g8h-9i0j-1k2l-m3n4o5p6q7r8",
-            url: "http://localhost:8000/api/authors/c3d4e5f6-7g8h-9i0j-1k2l-m3n4o5p6q7r8/",
-            username: "techexplorer",
-            email: "tech@example.com",
-            display_name: "Tech Explorer",
-            profile_image: "https://i.pravatar.cc/150?u=tech",
-            bio: "Exploring the latest in technology and sharing insights",
-            follower_count: 1234,
-            post_count: 45,
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "d4e5f6g7-8h9i-0j1k-2l3m-n4o5p6q7r8s9",
-            url: "http://localhost:8000/api/authors/d4e5f6g7-8h9i-0j1k-2l3m-n4o5p6q7r8s9/",
-            username: "designpro",
-            email: "design@example.com",
-            display_name: "Design Pro",
-            profile_image: "https://i.pravatar.cc/150?u=design",
-            bio: "UI/UX designer passionate about creating beautiful experiences",
-            follower_count: 892,
-            post_count: 32,
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "e5f6g7h8-9i0j-1k2l-3m4n-o5p6q7r8s9t0",
-            url: "http://localhost:8000/api/authors/e5f6g7h8-9i0j-1k2l-3m4n-o5p6q7r8s9t0/",
-            username: "codemaster",
-            email: "code@example.com",
-            display_name: "Code Master",
-            bio: "Full-stack developer sharing coding tips and tricks",
-            follower_count: 567,
-            post_count: 28,
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ];
-        setAuthors(mockAuthors);
+         const authorResponse = await api.getAuthors({
+        is_active: true,
+        ...(isAdmin ? {} : { is_approved: true }),
+        });
+      const fetchedAuthors = authorResponse.results || authorResponse || [];
+      // Map authors to TrendingAuthor type with default follower_count and post_count if missing
+      setAuthors(
+        fetchedAuthors.map((author: Author) => ({
+          ...author,
+          follower_count: (author as any).follower_count ?? 0,
+          post_count: (author as any).post_count ?? 0,
+        }))
+      );
+        
+      
       } else if (activeTab === "categories") {
         const mockCategories: Category[] = [
           { name: "Technology", count: 156, color: "var(--primary-blue)" },

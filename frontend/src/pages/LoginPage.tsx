@@ -158,11 +158,23 @@ export const LoginPage: React.FC = () => {
       showSuccess("Welcome back! Redirecting...");
       navigate("/home");
     } catch (err: unknown) {
+
+      if (
+      typeof err === "object" &&
+      err !== null &&
+      "response" in err &&
+      (err as any).response?.status === 403 &&
+      (err as any).response?.data?.message?.includes("approval")
+    ) {
+      showError("Your account is awaiting admin approval.");
+    } else {
       const errorMessage =
         err instanceof Error
           ? err.message
           : "Login failed. Please check your credentials.";
       showError(errorMessage);
+    }
+
     } finally {
       setIsLoading(false);
     }
