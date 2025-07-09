@@ -125,7 +125,9 @@ class AuthorSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         
         # Override id to be the full URL as per spec
-        data['id'] = instance.url
+        data['id'] = str(instance.id)
+        data['url'] = instance.url
+
         
         # Convert github_username to full URL format
         if instance.github_username:
@@ -200,8 +202,11 @@ class AuthorListSerializer(serializers.ModelSerializer):
         """
         data = super().to_representation(instance)
         
-        # Override id to be the full URL as per spec
-        data['id'] = instance.url
+        # Keep UUID for ID
+        data['id'] = str(instance.id)
+
+        # Add full URL separately
+        data['url'] = instance.url
         
         # Convert github_username to full URL format
         if instance.github_username:

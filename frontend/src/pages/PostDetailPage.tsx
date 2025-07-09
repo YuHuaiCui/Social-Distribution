@@ -156,22 +156,25 @@ export const PostDetailPage: React.FC = () => {
     }
 
     // Get like status using the API
-    try {
-      const response = await fetch(`/api/entries/${validPostId}/likes/`);
-      if (response.ok) {
-        const likeData = await response.json();
-        setIsLiked(likeData.liked_by_current_user);
-      } else {
-        // If the API call fails, use the is_liked property from the post
+    if(user?.id) {
+      try {
+        const response = await fetch(`/api/entries/${validPostId}/likes/`);
+        if (response.ok) {
+          const likeData = await response.json();
+          setIsLiked(likeData.liked_by_current_user);
+        } else {
+          // If the API call fails, use the is_liked property from the post
+          setIsLiked(fetchedPost.is_liked || false);
+        }
+      } catch (error) {
+        console.error("Error fetching like status:", error);
+        // Fallback to post data
         setIsLiked(fetchedPost.is_liked || false);
       }
-    } catch (error) {
-      console.error("Error fetching like status:", error);
-      // Fallback to post data
-      setIsLiked(fetchedPost.is_liked || false);
     }
 
     // Get bookmarked/saved status
+    if(user?.id) {
     try {
       const savedPostsResponse = await socialService.getSavedPosts();
       const isSaved = savedPostsResponse.results.some(
@@ -182,6 +185,7 @@ export const PostDetailPage: React.FC = () => {
       console.error("Error checking saved status:", error);
       setIsBookmarked(false);
     }
+  }
 
     // Always set loading to false at the end
     setIsLoading(false);
@@ -571,26 +575,35 @@ export const PostDetailPage: React.FC = () => {
           {/* Actions */}
           <div className="flex items-center justify-between pt-6 border-t border-border-1">
             <div className="flex items-center space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleLike}
-                className={`flex items-center space-x-2 ${
-                  isLiked
-                    ? "text-[var(--primary-pink)]"
-                    : "text-text-2 hover:text-text-1"
-                } transition-colors`}
-              >
-                <motion.div
-                  animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
-                  transition={{ duration: 0.3 }}
+              {user?.id ? (
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleLike}
+                  className={`flex items-center space-x-2 ${
+                    isLiked
+                      ? "text-[var(--primary-pink)]"
+                      : "text-text-2 hover:text-text-1"
+                  } transition-colors`}
                 >
-                  <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-                </motion.div>
-                <span className="text-sm font-medium">
-                  {post.likes_count || 0}
-                </span>
-              </motion.button>
+                  <motion.div
+                    animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+                  </motion.div>
+                  <span className="text-sm font-medium">
+                    {post.likes_count || 0}
+                  </span>
+                </motion.button>
+              ) : (
+                <div className="flex items-center space-x-2 text-text-2">
+                  <Heart size={20} />
+                  <span className="text-sm font-medium">
+                    {post.likes_count || 0}
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center space-x-2 text-text-2">
                 <MessageCircle size={20} />
@@ -637,6 +650,7 @@ export const PostDetailPage: React.FC = () => {
           </h2>
 
           {/* Comment Form */}
+          {user?.id && (
           <form onSubmit={handleSubmitComment} className="mb-6">
             {replyingTo && (
               <motion.div
@@ -720,6 +734,7 @@ export const PostDetailPage: React.FC = () => {
               </div>
             </div>
           </form>
+          )}
 
           {/* Comments List */}
           <AnimatePresence>

@@ -99,9 +99,7 @@ export const routes: RouteObject[] = [
       {
         path: "/posts/:postId",
         element: (
-          <Protected>
             <PostDetailPage />
-          </Protected>
         ),
       },
       {

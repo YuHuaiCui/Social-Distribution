@@ -16,6 +16,12 @@ class EntryManager(models.Manager):
         from .friendship import Friendship
         from .follow import Follow
 
+         # Anonymous users: only show PUBLIC and UNLISTED
+        if viewing_author is None:
+            return self.filter(
+                Q(visibility=Entry.PUBLIC) | Q(visibility=Entry.UNLISTED)
+            ).exclude(visibility=Entry.DELETED)
+
         # Use exists() subqueries for better performance
         friendship_exists = Friendship.objects.filter(
             Q(author1=viewing_author, author2=OuterRef("author"))

@@ -138,7 +138,7 @@ export class BaseApiService {
 
     return this.request<T>(endpoint, {
       ...otherOptions,
-      method: "POST",
+       method: options.method || "POST",
       headers: otherHeaders,
       body: formData,
     });

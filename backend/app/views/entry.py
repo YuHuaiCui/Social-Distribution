@@ -9,7 +9,8 @@ from django.db.models import Q
 from app.models import Entry, Author
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
-
+import uuid
+import os
 
 class EntryViewSet(viewsets.ModelViewSet):
     lookup_field = "id"
@@ -24,6 +25,12 @@ class EntryViewSet(viewsets.ModelViewSet):
     serializer_class = EntrySerializer
     permission_classes = [IsAuthenticated]
 
+    def rename_uploaded_file(file):
+        ext = os.path.splitext(file.name)[1]
+        new_name = f"{uuid.uuid4().hex}{ext}"
+        file.name = new_name
+        return file
+
     def get_object(self):
         """
         Override to exclude deleted entries and enforce visibility permissions.
@@ -34,21 +41,35 @@ class EntryViewSet(viewsets.ModelViewSet):
         if lookup_value is None:
             raise NotFound("No Entry ID provided.")
 
-        # Get the user's author instance
         user = self.request.user
-        if hasattr(user, "author"):
-            user_author = user.author
-        else:
-            user_author = user
+        user_author = getattr(user, "author", None) or user if user.is_authenticated else None
 
-        # Use the EntryManager's visibility logic to check if the entry is visible
         try:
-            obj = Entry.objects.visible_to_author(user_author).get(id=lookup_value)
+            obj = Entry.objects.get(id=lookup_value)
+            print("GET_OBJECT DEBUG - User:", user)
+            print("GET_OBJECT DEBUG - Author:", user_author)
+            print("GET_OBJECT DEBUG - Entry Author:", obj.author)
+
+
+            if user.is_staff:
+                return obj
+
+            # ✅ Allow author to edit/delete their own post
+            if self.request.method in ["PATCH", "PUT", "DELETE"]:
+                if user_author and obj.author == user_author:
+                    return obj
+                raise PermissionDenied("You cannot edit this post.")
+
+            # ✅ For other requests (e.g. GET), enforce visibility
+            if obj in Entry.objects.visible_to_author(user_author):
+                return obj
+
         except Entry.DoesNotExist:
             raise NotFound("Entry not found.")
 
-        self.check_object_permissions(self.request, obj)
-        return obj
+        raise PermissionDenied("You do not have permission to view this post.")
+
+
 
     def get_queryset(self):
         """
@@ -124,14 +145,15 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         Instantiate and return the list of permissions that this view requires.
         """
-        if self.action == "create":
-            permission_classes = [IsAuthenticated]
-        elif self.action in ["update", "partial_update", "destroy"]:
-            permission_classes = [IsAuthenticated, IsAuthorSelfOrReadOnly]
-        else:  # list, retrieve
-            permission_classes = [IsAuthenticated]
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            return [IsAuthenticated(), IsAuthorSelfOrReadOnly()]
+        elif self.action == "retrieve":
+            # Allow public access to individual entries
+            return []
+        else:
+            # For list, feed, liked, etc., still require login
+            return [IsAuthenticated()]
 
-        return [permission() for permission in permission_classes]
 
     def create(self, request, *args, **kwargs):
         """
@@ -345,3 +367,8 @@ class EntryViewSet(viewsets.ModelViewSet):
                 {"error": f"Could not save/unsave entry: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        
+    def partial_update(self, request, *args, **kwargs):
+        print("ENTRY PATCH DEBUG:", request.data)
+        return super().partial_update(request, *args, **kwargs)
+
