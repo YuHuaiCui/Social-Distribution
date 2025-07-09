@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Share2, Copy, Check, Mail, MessageCircle,
@@ -6,9 +6,19 @@ import {
   Globe, Lock, UserCheck, Send, Search
 } from 'lucide-react';
 import type { Entry, Author } from '../types/models';
+import { api } from '../services/api';
 import AnimatedButton from './ui/AnimatedButton';
 import Input from './ui/Input';
 import Avatar from './Avatar/Avatar';
+
+// Debounce utility
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout;
+  return ((...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  }) as T;
+}
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -25,7 +35,7 @@ interface ShareOption {
   action: () => void;
 }
 
-export const ShareModal: React.FC<ShareModalProps> = ({
+const ShareModalComponent: React.FC<ShareModalProps> = ({
   isOpen,
   onClose,
   post,
@@ -40,53 +50,74 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sentSuccess, setSentSuccess] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const postUrl = shareUrl || `${window.location.origin}/posts/${post.id}`;
   const shareText = `Check out "${post.title}" by ${
     typeof post.author === 'object' ? post.author.display_name : 'Unknown'
   }`;
 
-  useEffect(() => {
-    if (searchQuery && activeTab === 'internal') {
-      searchUsers();
-    } else {
-      setUsers([]);
+  const searchUsers = useCallback(async (query: string) => {
+    // Cancel previous request if it exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  }, [searchQuery, activeTab]);
 
-  const searchUsers = async () => {
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    
     setIsSearching(true);
     try {
-      // Mock user search - replace with API call
-      const mockUsers: Author[] = Array.from({ length: 5 }, (_, i) => ({
-        id: `user-${i}`,
-        url: `http://localhost:8000/api/authors/user-${i}/`,
-        username: `user${i}`,
-        email: `user${i}@example.com`,
-        display_name: `${searchQuery} User ${i}`,
-        profile_image: `https://i.pravatar.cc/150?u=${searchQuery}${i}`,
+      const response = await api.getAuthors({
+        search: query,
         is_approved: true,
         is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-      
-      setUsers(mockUsers);
-    } catch (error) {
-      console.error('Error searching users:', error);
+      });
+      // Handle both paginated and direct array responses
+      setUsers(response.results || response || []);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Error searching users:', error);
+        setUsers([]);
+      }
     } finally {
       setIsSearching(false);
     }
-  };
+  }, []);
 
-  const handleCopyLink = () => {
+  // Debounced search function
+  const debouncedSearch = useMemo(
+    () => debounce((query: string) => {
+      if (query && activeTab === 'internal') {
+        searchUsers(query);
+      } else {
+        setUsers([]);
+      }
+    }, 300),
+    [searchUsers, activeTab]
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchQuery);
+  }, [searchQuery, debouncedSearch]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const handleCopyLink = useCallback(() => {
     navigator.clipboard.writeText(postUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  };
+  }, [postUrl]);
 
-  const handleShare = (platform: string) => {
+  const handleShare = useCallback((platform: string) => {
     const encodedUrl = encodeURIComponent(postUrl);
     const encodedText = encodeURIComponent(shareText);
     
@@ -100,9 +131,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     if (urls[platform]) {
       window.open(urls[platform], '_blank', 'width=600,height=400');
     }
-  };
+  }, [postUrl, shareText]);
 
-  const handleSendToUsers = async () => {
+  const handleSendToUsers = useCallback(async () => {
     if (selectedUsers.length === 0) return;
     
     setIsSending(true);
@@ -123,9 +154,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     } finally {
       setIsSending(false);
     }
-  };
+  }, [selectedUsers, onClose]);
 
-  const shareOptions: ShareOption[] = [
+  const shareOptions: ShareOption[] = useMemo(() => [
     {
       id: 'copy',
       label: 'Copy Link',
@@ -161,22 +192,20 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       color: 'text-text-1',
       action: () => handleShare('email'),
     },
-  ];
+  ], [handleCopyLink, handleShare]);
 
-  const getVisibilityIcon = () => {
+  const VisibilityIcon = useMemo(() => {
     switch (post.visibility) {
-      case 'public':
+      case 'PUBLIC':
         return Globe;
-      case 'friends':
+      case 'FRIENDS':
         return Users;
-      case 'unlisted':
+      case 'UNLISTED':
         return Lock;
       default:
         return Globe;
     }
-  };
-
-  const VisibilityIcon = getVisibilityIcon();
+  }, [post.visibility]);
 
   return (
     <AnimatePresence>
@@ -224,7 +253,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   </span>
                   <div className="flex items-center space-x-1">
                     <VisibilityIcon size={14} />
-                    <span className="capitalize">{post.visibility}</span>
+                    <span className="capitalize">{post.visibility.toLowerCase()}</span>
                   </div>
                 </div>
               </div>
@@ -477,5 +506,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     </AnimatePresence>
   );
 };
+
+// Memoized ShareModal component
+export const ShareModal = React.memo(ShareModalComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.isOpen === nextProps.isOpen &&
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.shareUrl === nextProps.shareUrl
+  );
+});
 
 export default ShareModal;

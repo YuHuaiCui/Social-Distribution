@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, FileText, Hash, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from './context/ToastContext';
+
+import { api } from '../services/api';
 import AnimatedGradient from './ui/AnimatedGradient';
 import type { Entry, Author, Comment } from '../types/models';
 
@@ -21,12 +22,12 @@ interface SearchResults {
 
 const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const showError = () => console.error('Search error');
+  const showError = (message: string) => console.error('Search error:', message);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<SearchResults | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -60,41 +61,33 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
   const performSearch = async (searchQuery: string) => {
     setIsLoading(true);
     try {
-      // Mock search results - replace with actual API calls
-      const mockResults: SearchResults = {
-        posts: [
-          {
-            id: '1',
-            url: '/posts/1',
-            title: 'Introduction to React Hooks',
-            content: 'Learn about React hooks...',
-            content_type: 'text/markdown' as const,
-            visibility: 'public' as const,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            author: {
-              id: '1',
-              url: '/authors/1',
-              username: 'john_doe',
-              email: 'john@example.com',
-              display_name: 'John Doe',
-              bio: 'Software Developer',
-              is_approved: true,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }
-          }
-        ].filter(post => post.title.toLowerCase().includes(searchQuery.toLowerCase())),
+      const searchResults: SearchResults = {
+        posts: [],
         authors: [],
         comments: [],
-        tags: ['react', 'javascript', 'typescript'].filter(tag => 
-          tag.includes(searchQuery.toLowerCase())
-        ),
+        tags: [],
         remoteResults: []
       };
 
-      setResults(mockResults);
+      // Search authors
+      if (searchQuery.trim()) {
+        try {
+          const authorsResponse = await api.getAuthors({
+            search: searchQuery,
+            is_approved: true,
+            is_active: true,
+          });
+          // Handle both paginated and direct array responses
+          searchResults.authors = authorsResponse.results || authorsResponse || [];
+        } catch (error) {
+          console.error('Error searching authors:', error);
+        }
+      }
+
+      // TODO: Search posts when backend entry search is implemented
+      // TODO: Search tags when tag system is implemented
+
+      setResults(searchResults);
     } catch (error) {
       showError('Search failed. Please try again.');
     } finally {
@@ -250,9 +243,44 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
 
                   {!isLoading && hasResults && (
                     <div>
+                      {/* Authors */}
+                      {results.authors.length > 0 && (
+                        <div className="p-4">
+                          <h3 className="text-xs font-medium text-[var(--search-results-secondary)] uppercase tracking-wider mb-3">
+                            Authors
+                          </h3>
+                          <div className="space-y-2">
+                            {results.authors.map((author) => (
+                              <motion.button
+                                key={author.id}
+                                onClick={() => handleResultClick('author', author.id)}
+                                className="w-full p-3 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] hover:bg-[rgba(var(--glass-rgb),0.5)] text-left transition-all group"
+                                whileHover={{ x: 4 }}
+                                whileTap={{ scale: 0.98 }}
+                              >
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-pink)] flex items-center justify-center text-white font-semibold text-sm mr-3 shrink-0">
+                                    {author.display_name?.charAt(0).toUpperCase() || 'U'}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors">
+                                      {author.display_name || 'Unknown Author'}
+                                    </h4>
+                                    <p className="text-xs text-[var(--search-results-secondary)] truncate">
+                                      @{author.username || 'unknown'}
+                                    </p>
+                                  </div>
+                                  <ArrowRight size={14} className="text-[var(--search-results-secondary)] ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </motion.button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Posts */}
                       {results.posts.length > 0 && (
-                        <div className="p-4">
+                        <div className="p-4 border-t border-[var(--glass-border)]">
                           <h3 className="text-xs font-medium text-[var(--search-results-secondary)] uppercase tracking-wider mb-3">
                             Posts
                           </h3>

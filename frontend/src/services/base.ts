@@ -27,16 +27,7 @@ export class BaseApiService {
       ?.split("=")[1];
   }
 
-  /**
-   * Get auth token from localStorage or sessionStorage
-   */
-  protected getAuthToken(): string | undefined {
-    return (
-      localStorage.getItem("authToken") ||
-      sessionStorage.getItem("authToken") ||
-      undefined
-    );
-  }
+  // Auth tokens are not used - Django uses session authentication
 
   /**
    * Helper method for making HTTP requests
@@ -48,9 +39,12 @@ export class BaseApiService {
     const url = `${this.baseUrl}${endpoint}`;
     const { skipAuth = false, ...fetchOptions } = options;
 
-    const defaultHeaders: HeadersInit = {
-      "Content-Type": "application/json",
-    };
+    const defaultHeaders: HeadersInit = {};
+
+    // Only set Content-Type if not FormData
+    if (!(fetchOptions.body instanceof FormData)) {
+      defaultHeaders["Content-Type"] = "application/json";
+    }
 
     // Add CSRF token if available
     const csrfToken = this.getCsrfToken();
@@ -58,13 +52,8 @@ export class BaseApiService {
       defaultHeaders["X-CSRFToken"] = csrfToken;
     }
 
-    // Add auth token if available and not skipped
-    if (!skipAuth) {
-      const authToken = this.getAuthToken();
-      if (authToken) {
-        defaultHeaders["Authorization"] = `Token ${authToken}`;
-      }
-    }
+    // Remove auth token logic - Django uses session authentication
+    // The session cookie is automatically included with credentials: "include"
 
     const config: RequestInit = {
       ...fetchOptions,
@@ -79,9 +68,23 @@ export class BaseApiService {
       const response = await fetch(url, config);
 
       if (!response.ok) {
+        // Log detailed error information
+        console.error(`API Error: ${response.status} ${response.statusText}`);
+        console.error(`URL: ${url}`);
+        console.error(`Method: ${config.method || 'GET'}`);
+        console.error(`Headers:`, config.headers);
+        
+        // For POST requests, also log the body
+        if (config.method === 'POST' && config.body) {
+          console.error(`Request Body:`, config.body);
+        }
+        
         const error = await response.json().catch(() => ({
           message: `HTTP error! status: ${response.status}`,
         }));
+        
+        console.error(`Response Error:`, error);
+        
         throw new Error(
           error.message ||
             error.detail ||

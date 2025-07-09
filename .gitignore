@@ -67,6 +67,5 @@ Thumbs.db
 # === Secrets ===
 .env
 .env.local
-.env.*
 
 db.sqlite3

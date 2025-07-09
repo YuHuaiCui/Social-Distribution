@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Globe,
@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { FloatingDropdown } from "./ui/FloatingDropdown";
 
 type Visibility = "public" | "friends" | "unlisted";
 
@@ -32,24 +33,24 @@ interface PrivacySelectorProps {
 
 const privacyOptions: PrivacyOption[] = [
   {
-    value: "public",
+    value: "PUBLIC",
     label: "Public",
     icon: Globe,
     description: "Anyone can see this post",
     color: "text-green-500",
   },
   {
-    value: "friends",
+    value: "FRIENDS",
     label: "Friends Only",
     icon: Users,
     description: "Only your friends can see this post",
     color: "text-blue-500",
   },
   {
-    value: "unlisted",
+    value: "UNLISTED",
     label: "Unlisted",
     icon: Link,
-    description: "Only people with the link can see this post",
+    description: "Visible to followers and friends, not shown in public feeds",
     color: "text-yellow-500",
   },
 ];
@@ -63,6 +64,7 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const selectedOption =
     privacyOptions.find((opt) => opt.value === value) || privacyOptions[0];
@@ -82,6 +84,7 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
     >
       {/* Selected Option Button */}
       <motion.button
+        ref={triggerRef}
         whileHover={{ scale: disabled ? 1 : 1.02 }}
         whileTap={{ scale: disabled ? 1 : 0.98 }}
         onClick={(e) => {
@@ -132,33 +135,12 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
       )}
 
       {/* Dropdown */}
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            {/* Backdrop for mobile */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsOpen(false);
-              }}
-              className="fixed inset-0 z-40 md:hidden"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="absolute top-full left-0 right-0 mt-2 glass-card-prominent rounded-lg shadow-xl z-[60] max-h-[300px] overflow-y-auto"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
+      <FloatingDropdown
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        triggerRef={triggerRef}
+        className="glass-card-prominent rounded-lg shadow-xl max-h-[300px] overflow-y-auto"
+      >
               {/* Info Header */}
               <div className="flex items-center justify-between p-3 border-b border-border-1">
                 <span className="text-sm font-medium text-text-2">
@@ -209,8 +191,8 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                         <li className="flex items-start space-x-2">
                           <Link size={14} className="mt-0.5 flex-shrink-0" />
                           <span>
-                            <strong>Unlisted:</strong> Not shown in feeds,
-                            accessible via direct link
+                            <strong>Unlisted:</strong> Visible to followers and friends,
+                            not shown in public feeds
                           </span>
                         </li>
                         <li className="flex items-start space-x-2">
@@ -274,10 +256,7 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
                   );
                 })}
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      </FloatingDropdown>
     </div>
   );
 };

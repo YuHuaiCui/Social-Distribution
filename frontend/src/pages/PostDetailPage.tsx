@@ -13,8 +13,12 @@ import {
   Send,
   Clock,
   Hash,
+  FileText,
+  AlignLeft,
 } from "lucide-react";
 import { useAuth } from "../components/context/AuthContext";
+import { useToast } from "../components/context/ToastContext";
+import { triggerNotificationUpdate } from "../components/context/NotificationContext";
 import type { Entry, Comment, Author } from "../types/models";
 import AnimatedButton from "../components/ui/AnimatedButton";
 import Card from "../components/ui/Card";
@@ -22,6 +26,8 @@ import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
 import { entryService } from "../services/entry";
 import { socialService } from "../services/social";
+import { renderMarkdown } from "../utils/markdown";
+import { extractUUID } from "../utils/extractId";
 
 interface CommentWithReplies extends Comment {
   replies?: Comment[];
@@ -31,12 +37,14 @@ export const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showError } = useToast();
   const [post, setPost] = useState<Entry | null>(null);
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [commentContentType, setCommentContentType] = useState<"text/plain" | "text/markdown">("text/plain");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActions, setShowActions] = useState(false);
@@ -53,18 +61,30 @@ export const PostDetailPage: React.FC = () => {
 
     setIsLoading(true);
 
+    // Extract UUID if postId is a full URL
+    let extractedId = postId;
+    if (postId.includes('/')) {
+      // Extract the UUID from the URL (last segment)
+      const segments = postId.split('/');
+      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+    }
+
     // Validate UUID format
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(postId)) {
-      console.warn(`Invalid UUID format for postId: ${postId}`);
+    if (!uuidRegex.test(extractedId)) {
       setPost(null);
       setIsLoading(false);
       return;
-    } // Fetch the post details
+    }
+    
+    // Use the extracted UUID for all API calls
+    const validPostId = extractedId;
+    
+    // Fetch the post details
     let fetchedPost;
     try {
-      fetchedPost = await entryService.getEntry(postId);
+      fetchedPost = await entryService.getEntry(validPostId);
       setPost(fetchedPost);
     } catch (error) {
       // Check if it's a 404 error - could be the post doesn't exist or is not viewable due to permissions
@@ -74,24 +94,18 @@ export const PostDetailPage: React.FC = () => {
       // if the direct entry endpoint returns a 404
       if (user?.id) {
         try {
-          console.log("Trying to fetch post using author endpoint");
           // Try fetching through author's endpoint which might have different permissions
           const response = await entryService.getEntriesByAuthor(user.id);
           const authorPost = response.results.find(
-            (entry) => entry.id === postId
+            (entry) => entry.id === validPostId
           );
 
           if (authorPost) {
-            console.log("Found post via author endpoint");
             setPost(authorPost);
             setIsLoading(false);
             return;
           }
         } catch (authorError) {
-          console.error(
-            "Also failed to fetch via author endpoint:",
-            authorError
-          );
         }
       }
 
@@ -103,7 +117,7 @@ export const PostDetailPage: React.FC = () => {
 
     // Fetch comments for the post
     try {
-      const commentsResponse = await entryService.getComments(postId);
+      const commentsResponse = await entryService.getComments(validPostId);
 
       // Convert flat comments to threaded structure
       const parentComments: CommentWithReplies[] = [];
@@ -143,7 +157,7 @@ export const PostDetailPage: React.FC = () => {
 
     // Get like status using the API
     try {
-      const response = await fetch(`/api/entries/${postId}/likes/`);
+      const response = await fetch(`/api/entries/${validPostId}/likes/`);
       if (response.ok) {
         const likeData = await response.json();
         setIsLiked(likeData.liked_by_current_user);
@@ -161,7 +175,7 @@ export const PostDetailPage: React.FC = () => {
     try {
       const savedPostsResponse = await socialService.getSavedPosts();
       const isSaved = savedPostsResponse.results.some(
-        (savedPost) => savedPost.id === postId
+        (savedPost) => savedPost.id === validPostId
       );
       setIsBookmarked(isSaved);
     } catch (error) {
@@ -180,6 +194,9 @@ export const PostDetailPage: React.FC = () => {
   const handleLike = async () => {
     if (!postId || !post) return;
 
+    // Extract UUID from postId if it's a URL
+    const extractedId = extractUUID(postId);
+
     const newLikedState = !isLiked;
     setIsLiked(newLikedState);
 
@@ -194,9 +211,9 @@ export const PostDetailPage: React.FC = () => {
     try {
       // Make the actual API call using proper endpoints
       if (newLikedState) {
-        await socialService.likeEntry(postId);
+        await socialService.likeEntry(extractedId);
       } else {
-        await socialService.unlikeEntry(postId);
+        await socialService.unlikeEntry(extractedId);
       }
     } catch (err) {
       console.error("Error updating like status:", err);
@@ -214,15 +231,18 @@ export const PostDetailPage: React.FC = () => {
   const handleBookmark = async () => {
     if (!postId) return;
 
+    // Extract UUID from postId if it's a URL
+    const extractedId = extractUUID(postId);
+
     const newBookmarkState = !isBookmarked;
     setIsBookmarked(newBookmarkState);
 
     try {
       // Make the actual API call
       if (newBookmarkState) {
-        await socialService.savePost(postId);
+        await socialService.savePost(extractedId);
       } else {
-        await socialService.unsavePost(postId);
+        await socialService.unsavePost(extractedId);
       }
     } catch (err) {
       console.error("Error updating bookmark status:", err);
@@ -230,16 +250,54 @@ export const PostDetailPage: React.FC = () => {
       setIsBookmarked(!newBookmarkState);
     }
   };
+
+  const handleShare = async () => {
+    if (!post) return;
+
+    const shareUrl = `${window.location.origin}/posts/${extractUUID(post.id)}`;
+    const shareText = `Check out this post: ${post.title}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post.title,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Error sharing:', err);
+        }
+      }
+    } else {
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        // You might want to show a toast notification here
+        alert('Link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy link:', err);
+      }
+    }
+  };
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim() || !postId) return;
+
+    // Extract UUID from postId if it's a URL
+    let extractedId = postId;
+    if (postId.includes('/')) {
+      const segments = postId.split('/');
+      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+    }
+
 
     setIsSubmitting(true);
     try {
       // Create the comment data with the correct type format
       const commentData = {
         content: commentText,
-        content_type: "text/plain" as "text/plain" | "text/markdown", // Use the exact string format expected by the backend with proper type assertion
+        content_type: commentContentType,
       };
 
       // If replying to another comment, add it as parent
@@ -247,7 +305,7 @@ export const PostDetailPage: React.FC = () => {
         // In a real implementation this would include parent reference
         // For now we'll submit it as a regular comment
         const newComment = await entryService.createComment(
-          postId,
+          extractedId,
           commentData
         );
 
@@ -265,7 +323,7 @@ export const PostDetailPage: React.FC = () => {
       } else {
         // Create a new top-level comment
         const newComment = await entryService.createComment(
-          postId,
+          extractedId,
           commentData
         );
 
@@ -279,27 +337,21 @@ export const PostDetailPage: React.FC = () => {
 
       // Update the comment count
       if (post) {
-        setPost({ ...post, comments_count: (post.comments_count || 0) + 1 });
+        const newCommentCount = (post.comments_count || 0) + 1;
+        setPost({ ...post, comments_count: newCommentCount });
+        
+        // Dispatch custom event to update comment count in other components
+        window.dispatchEvent(new CustomEvent('post-update', {
+          detail: { postId: post.id, updates: { comments_count: newCommentCount } }
+        }));
+        
+        // Trigger notification update in case the post author receives a notification
+        triggerNotificationUpdate();
       }
     } catch (err) {
-      console.error("Error submitting comment:", err);
 
-      // Provide detailed error logging to help troubleshooting
-      if (err instanceof Error) {
-        console.error("Error message:", err.message);
-      }
-
-      // Log request data for debugging
-      console.log("Comment request data:", {
-        postId,
-        commentData: {
-          content: commentText,
-          content_type: "text/plain",
-        },
-      });
-
-      // Could add user-facing error notification here
-      alert("Failed to submit comment. Please try again.");
+      // Show user-friendly error message
+      showError("Failed to submit comment. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -329,35 +381,31 @@ export const PostDetailPage: React.FC = () => {
 
   const renderContent = (content: string, contentType: string) => {
     if (contentType === "text/markdown") {
-      // Simple markdown rendering
-      const htmlContent = content
-        .replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold mb-4">$1</h1>')
-        .replace(
-          /^## (.*$)/gim,
-          '<h2 class="text-2xl font-semibold mb-3 mt-6">$1</h2>'
-        )
-        .replace(
-          /^### (.*$)/gim,
-          '<h3 class="text-xl font-semibold mb-2 mt-4">$1</h3>'
-        )
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(
-          /\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" class="text-[var(--primary-violet)] hover:underline" target="_blank" rel="noopener noreferrer">$1</a>'
-        )
-        .replace(/^- (.*$)/gim, '<li class="ml-6 list-disc">$1</li>')
-        .replace(/^\d+\. (.*$)/gim, '<li class="ml-6 list-decimal">$1</li>')
-        .replace(/\n\n/g, '</p><p class="mb-4">')
-        .replace(/\n/g, "<br>");
-
       return (
         <div
           className="prose prose-lg max-w-none text-text-1"
-          dangerouslySetInnerHTML={{
-            __html: `<p class="mb-4">${htmlContent}</p>`,
-          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
         />
+      );
+    }
+
+    // For image posts, display the image and caption
+    if (contentType === "image/png" || contentType === "image/jpeg") {
+      return (
+        <div className="space-y-4">
+          {post?.image && (
+            <div className="rounded-lg overflow-hidden">
+              <img 
+                src={post.image} 
+                alt={post?.title}
+                className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
+              />
+            </div>
+          )}
+          {content && content !== "Image post" && (
+            <p className="text-text-1 text-center italic">{content}</p>
+          )}
+        </div>
       );
     }
 
@@ -554,6 +602,7 @@ export const PostDetailPage: React.FC = () => {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
+                onClick={handleShare}
                 className="text-text-2 hover:text-text-1 transition-colors"
               >
                 <Share2 size={20} />
@@ -613,13 +662,49 @@ export const PostDetailPage: React.FC = () => {
                 size="md"
               />
               <div className="flex-1">
+                {/* Content Type Toggle */}
+                <div className="flex items-center space-x-2 mb-2">
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setCommentContentType("text/plain")}
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                      commentContentType === "text/plain"
+                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                        : "text-text-2 hover:text-text-1 border border-transparent"
+                    }`}
+                  >
+                    <AlignLeft size={14} />
+                    <span>Plain</span>
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setCommentContentType("text/markdown")}
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                      commentContentType === "text/markdown"
+                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                        : "text-text-2 hover:text-text-1 border border-transparent"
+                    }`}
+                  >
+                    <FileText size={14} />
+                    <span>Markdown</span>
+                  </motion.button>
+                </div>
                 <textarea
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Write a comment..."
-                  className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none"
+                  placeholder={commentContentType === "text/markdown" ? "Write a comment in Markdown..." : "Write a comment..."}
+                  className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none font-mono"
                   rows={3}
                 />
+                {commentContentType === "text/markdown" && (
+                  <p className="text-xs text-text-2 mt-1">
+                    Supports **bold**, *italic*, [links](url), and more
+                  </p>
+                )}
                 <div className="flex justify-end mt-2">
                   <AnimatedButton
                     type="submit"
@@ -680,7 +765,14 @@ export const PostDetailPage: React.FC = () => {
                           Reply
                         </button>
                       </div>
-                      <p className="text-text-1">{comment.content}</p>
+                      {comment.content_type === "text/markdown" ? (
+                        <div
+                          className="prose prose-sm max-w-none text-text-1"
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(comment.content) }}
+                        />
+                      ) : (
+                        <p className="text-text-1">{comment.content}</p>
+                      )}
                     </div>
 
                     {/* Replies */}
@@ -717,9 +809,16 @@ export const PostDetailPage: React.FC = () => {
                                   {formatTime(reply.created_at)}
                                 </span>
                               </div>
-                              <p className="text-sm text-text-1">
-                                {reply.content}
-                              </p>
+                              {reply.content_type === "text/markdown" ? (
+                                <div
+                                  className="prose prose-sm max-w-none text-text-1 text-sm"
+                                  dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.content) }}
+                                />
+                              ) : (
+                                <p className="text-sm text-text-1">
+                                  {reply.content}
+                                </p>
+                              )}
                             </div>
                           </motion.div>
                         ))}

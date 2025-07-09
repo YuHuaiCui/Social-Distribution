@@ -793,8 +793,17 @@
   input[type="number"],
   textarea,
   select {
-    background-color: var(--input-bg);
     color: var(--text-1);
+  }
+  
+  /* Light mode specific input background */
+  :root[data-theme='light'] input[type="text"],
+  :root[data-theme='light'] input[type="email"],
+  :root[data-theme='light'] input[type="password"],
+  :root[data-theme='light'] input[type="number"],
+  :root[data-theme='light'] textarea,
+  :root[data-theme='light'] select {
+    background-color: var(--input-bg);
   }
 
   /* Placeholder styles */
@@ -1247,4 +1256,115 @@
 
 .animate-fadeOut {
   animation: fadeOut 0.3s ease-in-out;
+}
+
+/* Remove focus outlines on buttons */
+button:focus {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+button:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Remove outline from buttons but keep shadows for effect */
+button {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+/* Specifically target AnimatedButton components in inbox */
+.glass-card-main button,
+.glass-card-subtle button,
+.glass-card-prominent button {
+  outline: none !important;
+  outline-offset: 0 !important;
+  border-color: transparent !important;
+}
+
+/* Override any Tailwind focus states */
+button:focus-within {
+  outline: none !important;
+  --tw-ring-offset-width: 0px !important;
+  --tw-ring-width: 0px !important;
+}
+
+/* GPU Acceleration Optimizations */
+/* Apply will-change to animated elements for better performance */
+.motion-safe\:animate-* {
+  will-change: transform, opacity;
+}
+
+/* Optimize Framer Motion elements */
+[data-framer-motion] {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimize animated gradients */
+.animated-gradient,
+[class*="animate"][class*="gradient"] {
+  will-change: background-position;
+  transform: translateZ(0);
+}
+
+/* Optimize hover states on interactive elements */
+button:hover,
+a:hover,
+.hoverable:hover {
+  will-change: transform, opacity;
+}
+
+/* Optimize PostCard animations */
+.card-layout {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Optimize ShareModal animations */
+[role="dialog"] {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Optimize frequently animated elements */
+.glass-card-main,
+.glass-card-subtle,
+.glass-card-prominent {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Force GPU acceleration on transform animations */
+@supports (transform: translateZ(0)) {
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+}
+
+/* Optimize floating animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateZ(0);
+  }
+  50% {
+    transform: translateY(-20px) translateZ(0);
+  }
+}
+
+/* Optimize rotating animations */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg) translateZ(0);
+  }
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
 }

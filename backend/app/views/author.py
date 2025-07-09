@@ -88,12 +88,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         elif author_type == "remote":
             queryset = queryset.filter(node__isnull=False)
 
-        # Search by username or display name
+        # Search by username, display name, github username, or email
         search = self.request.query_params.get("search", None)
         if search:
             queryset = queryset.filter(
                 Q(username__icontains=search)
                 | Q(display_name__icontains=search)
+                | Q(github_username__icontains=search)
                 | Q(email__icontains=search)
             )
 
@@ -108,7 +109,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         author = serializer.save()
 
         # Return the created author data
-        response_serializer = AuthorListSerializer(author)
+        response_serializer = AuthorListSerializer(author, context={"request": request})
         return Response(
             {
                 "message": "Author created successfully",
@@ -127,7 +128,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "message": f"Author {author.username} has been approved",
-                "author": AuthorListSerializer(author).data,
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
             }
         )
 
@@ -141,7 +144,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "message": f"Author {author.username} has been deactivated",
-                "author": AuthorListSerializer(author).data,
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
             }
         )
 
@@ -155,7 +160,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "message": f"Author {author.username} has been activated",
-                "author": AuthorListSerializer(author).data,
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
             }
         )
 
@@ -187,7 +194,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         follows = Follow.objects.filter(followed=author, status=Follow.ACCEPTED)
         followers = [follow.follower for follow in follows]
 
-        serializer = AuthorListSerializer(followers, many=True)
+        serializer = AuthorListSerializer(
+            followers, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])
@@ -199,7 +208,22 @@ class AuthorViewSet(viewsets.ModelViewSet):
         follows = Follow.objects.filter(follower=author, status=Follow.ACCEPTED)
         following = [follow.followed for follow in follows]
 
-        serializer = AuthorListSerializer(following, many=True)
+        serializer = AuthorListSerializer(
+            following, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"])
+    def friends(self, request, pk=None):
+        """Get all friends of this author (mutual follows)"""
+        author = self.get_object()
+
+        # Get friends using the model method
+        friends = author.get_friends()
+
+        serializer = AuthorListSerializer(
+            friends, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     @action(
@@ -226,10 +250,21 @@ class AuthorViewSet(viewsets.ModelViewSet):
             ).first()
 
             if existing_follow:
-                return Response(
-                    {"error": "Follow request already exists"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                # If already accepted, return error
+                if existing_follow.status == Follow.ACCEPTED:
+                    return Response(
+                        {"error": "Already following this user"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                # If pending, return error
+                elif existing_follow.status == Follow.PENDING:
+                    return Response(
+                        {"error": "Follow request already pending"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                # If rejected, delete the old one and create a new one
+                elif existing_follow.status == Follow.REJECTED:
+                    existing_follow.delete()
 
             # Create follow request
             follow = Follow.objects.create(
@@ -249,11 +284,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         "id": follow.follower.url,
                         "display_name": follow.follower.display_name,
                         "username": follow.follower.username,
-                        "profile_image": (
-                            follow.follower.profile_image.url
-                            if follow.follower.profile_image
-                            else None
-                        ),
+                        "profile_image": follow.follower.profile_image if follow.follower.profile_image else None,
                     },
                     "object": follow.followed.url,
                     "status": follow.status,
@@ -282,17 +313,31 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get", "post"], url_path="entries")
-    def public_entries(self, request, pk=None):
-        """GET = List public entries, POST = Create a new entry (must be owner)"""
+    def entries(self, request, pk=None):
+        """GET = List entries visible to current user, POST = Create a new entry (must be owner)"""
         author = self.get_object()
 
         if request.method == "GET":
-            if request.user.is_authenticated and str(request.user.id) == str(author.id):
+            # Admin can see all posts regardless of visibility
+            if request.user.is_staff:
+                entries = Entry.objects.filter(author=author).exclude(
+                    visibility=Entry.DELETED
+                )
+            elif request.user.is_authenticated and str(request.user.id) == str(author.id):
+                # Viewing your own profile: show all entries except deleted
                 entries = Entry.objects.filter(author=author).exclude(
                     visibility=Entry.DELETED
                 )
             else:
-                entries = Entry.objects.filter(author=author, visibility=Entry.PUBLIC)
+                # Viewing someone else's profile: use proper visibility logic
+                # Get entries by this author that are visible to the current user
+                if hasattr(request.user, "author"):
+                    user_author = request.user.author
+                else:
+                    user_author = request.user
+
+                visible_entries = Entry.objects.visible_to_author(user_author)
+                entries = visible_entries.filter(author=author)
 
             serializer = EntrySerializer(entries, many=True)
             return Response(serializer.data)
@@ -418,3 +463,71 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
         except Entry.DoesNotExist:
             return Response({"detail": "Image not found"}, status=404)
+    
+    @action(detail=True, methods=["post"], url_path="inbox")
+    def post_to_inbox(self, request, pk=None):
+        """
+        Post an item to an author's inbox
+        POST /api/authors/{id}/inbox/
+        
+        Expected data:
+        {
+            "content_type": "entry" | "comment" | "like" | "follow" | "report",
+            "content_id": "id of the content",
+            "content_data": { ... additional data ... }
+        }
+        """
+        from app.models import Inbox
+        from app.serializers.inbox import InboxItemSerializer
+        
+        try:
+            # Get the recipient author
+            recipient = self.get_object()
+            
+            # Get the content type and data
+            content_type = request.data.get('content_type')
+            content_id = request.data.get('content_id')
+            content_data = request.data.get('content_data', {})
+            
+            # Validate content type
+            valid_types = ['entry', 'comment', 'like', 'follow', 'report']
+            if content_type not in valid_types:
+                return Response(
+                    {"error": f"Invalid content_type. Must be one of: {', '.join(valid_types)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # For reports, we just store the data in raw_data
+            if content_type == 'report':
+                inbox_item = Inbox.objects.create(
+                    recipient=recipient,
+                    item_type='report',
+                    raw_data={
+                        'content_type': 'report',
+                        'content_id': content_id,
+                        **content_data
+                    }
+                )
+                serializer = InboxItemSerializer(inbox_item)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            # For other types, we'd need to handle them appropriately
+            # For now, just create with raw_data
+            inbox_item = Inbox.objects.create(
+                recipient=recipient,
+                item_type=content_type,
+                raw_data={
+                    'content_type': content_type,
+                    'content_id': content_id,
+                    **content_data
+                }
+            )
+            
+            serializer = InboxItemSerializer(inbox_item)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

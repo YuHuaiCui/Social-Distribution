@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, Search, Bell, Sun, Moon, User, LogOut, Settings, MessageCircle } from 'lucide-react';
+import { Menu, Search, Bell, Sun, Moon, User, LogOut, Settings, MessageCircle, Heart, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../../lib/theme';
+import { useNotifications } from '../context/NotificationContext';
 import LoadingImage from '../ui/LoadingImage';
 import Button from '../ui/Button';
 import AnimatedGradient from '../ui/AnimatedGradient';
+import { NotificationBadge } from '../NotificationBadge';
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -15,18 +17,12 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { notifications, unreadCount, markAsRead, refreshNotifications } = useNotifications();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
-  
-  // Mock notifications data
-  const notifications = [
-    { id: 1, type: 'follow', user: 'Alice Chen', time: '5m ago', read: false },
-    { id: 2, type: 'like', user: 'Bob Smith', post: 'Your post about React', time: '1h ago', read: false },
-    { id: 3, type: 'comment', user: 'Carol Johnson', post: 'TypeScript Tips', time: '2h ago', read: true },
-  ];
 
   const handleLogout = async () => {
     await logout();
@@ -53,11 +49,30 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
   const handleNotificationClick = () => {
     setShowNotifications(!showNotifications);
     setShowUserMenu(false);
+    if (!showNotifications) {
+      refreshNotifications();
+    }
   };
 
   const handleUserMenuClick = () => {
     setShowUserMenu(!showUserMenu);
     setShowNotifications(false);
+  };
+
+  // Helper function to format time ago
+  const formatTimeAgo = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
   };
 
   // Search is handled by the modal now
@@ -124,8 +139,12 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                 onClick={handleNotificationClick}
               >
                 <Bell size={20} />
-                {user && notifications.some(n => !n.read) && (
-                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                {user && unreadCount > 0 && (
+                  <NotificationBadge 
+                    count={unreadCount} 
+                    size="sm" 
+                    className="absolute -top-1 -right-1"
+                  />
                 )}
               </Button>
               
@@ -142,45 +161,85 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                     </div>
                     {notifications.length > 0 ? (
                       <div>
-                        {notifications.map((notif) => (
-                          <motion.div
-                            key={notif.id}
-                            className={`px-4 py-3 hover:bg-glass-low transition-colors cursor-pointer ${
-                              !notif.read ? 'bg-glass-low/50' : ''
-                            }`}
-                            whileHover={{ x: 2 }}
-                          >
-                            <div className="flex items-start space-x-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                notif.type === 'follow' ? 'bg-[var(--primary-purple)]/20' :
-                                notif.type === 'like' ? 'bg-[var(--primary-pink)]/20' :
-                                'bg-[var(--primary-teal)]/20'
-                              }`}>
-                                {notif.type === 'follow' ? <User size={16} className="text-[var(--primary-purple)]" /> :
-                                 notif.type === 'like' ? <motion.div
-                                   animate={{ scale: [1, 1.2, 1] }}
-                                   transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
-                                 >❤️</motion.div> :
-                                 <MessageCircle size={16} className="text-[var(--primary-teal)]" />}
+                        {notifications.map((notif) => {
+                          const senderName = typeof notif.sender === 'object' && notif.sender 
+                            ? notif.sender.display_name 
+                            : 'Someone';
+                          
+                          const timeAgo = formatTimeAgo(notif.created_at);
+                          
+                          return (
+                            <motion.div
+                              key={notif.id}
+                              className={`px-4 py-3 hover:bg-glass-low transition-colors cursor-pointer ${
+                                !notif.is_read ? 'bg-glass-low/50' : ''
+                              }`}
+                              whileHover={{ x: 2 }}
+                              onClick={() => {
+                                if (!notif.is_read) {
+                                  markAsRead([notif.id]);
+                                }
+                                if (notif.item_type === 'follow') {
+                                  navigate('/inbox');
+                                } else if (notif.item_type === 'comment' || notif.item_type === 'like') {
+                                  // Navigate to the related post if we have the data
+                                  if (notif.content_data && notif.content_data.type === notif.item_type) {
+                                    const data = notif.content_data.data as any;
+                                    const entryId = typeof data.entry === 'string' 
+                                      ? data.entry.split('/').filter(Boolean).pop()
+                                      : data.entry?.id;
+                                    if (entryId) {
+                                      navigate(`/posts/${entryId}`);
+                                    }
+                                  }
+                                } else if (notif.item_type === 'entry') {
+                                  // For entry notifications, navigate to the entry itself
+                                  if (notif.content_data && notif.content_data.type === 'entry') {
+                                    const entryData = notif.content_data.data as any;
+                                    const entryId = typeof entryData.id === 'string' 
+                                      ? entryData.id.split('/').filter(Boolean).pop()
+                                      : entryData.id;
+                                    if (entryId) {
+                                      navigate(`/posts/${entryId}`);
+                                    }
+                                  }
+                                }
+                                setShowNotifications(false);
+                              }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                  notif.item_type === 'follow' ? 'bg-[var(--primary-purple)]/20' :
+                                  notif.item_type === 'like' ? 'bg-[var(--primary-pink)]/20' :
+                                  notif.item_type === 'comment' ? 'bg-[var(--primary-teal)]/20' :
+                                  'bg-[var(--primary-yellow)]/20'
+                                }`}>
+                                  {notif.item_type === 'follow' ? <UserPlus size={16} className="text-[var(--primary-purple)]" /> :
+                                   notif.item_type === 'like' ? <Heart size={16} className="text-[var(--primary-pink)]" /> :
+                                   notif.item_type === 'comment' ? <MessageCircle size={16} className="text-[var(--primary-teal)]" /> :
+                                   <Bell size={16} className="text-[var(--primary-yellow)]" />}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm text-text-1">
+                                    <span className="font-medium">{senderName}</span>
+                                    {notif.item_type === 'follow' && ' wants to follow you'}
+                                    {notif.item_type === 'like' && ' liked your post'}
+                                    {notif.item_type === 'comment' && ' commented on your post'}
+                                    {notif.item_type === 'entry' && ' shared a post with you'}
+                                    {notif.item_type === 'entry_link' && ' shared a link'}
+                                  </p>
+                                  <p className="text-xs text-text-2 mt-1">{timeAgo}</p>
+                                </div>
                               </div>
-                              <div className="flex-1">
-                                <p className="text-sm text-text-1">
-                                  <span className="font-medium">{notif.user}</span>
-                                  {notif.type === 'follow' && ' started following you'}
-                                  {notif.type === 'like' && ` liked ${notif.post}`}
-                                  {notif.type === 'comment' && ` commented on ${notif.post}`}
-                                </p>
-                                <p className="text-xs text-text-2 mt-1">{notif.time}</p>
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))}
+                            </motion.div>
+                          );
+                        })}
                         <Link
-                          to="/notifications"
+                          to="/inbox"
                           className="block px-4 py-2 text-center text-sm text-[var(--primary-purple)] hover:bg-glass-low transition-colors"
                           onClick={() => setShowNotifications(false)}
                         >
-                          View all notifications
+                          View all in inbox
                         </Link>
                       </div>
                     ) : (
@@ -249,13 +308,13 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                     {user.profile_image ? (
                       <LoadingImage
                         src={user.profile_image}
-                        alt={user.display_name}
+                        alt={user.display_name || 'Unknown'}
                         className="w-full h-full"
                         loaderSize={16}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white">
-                        {user.display_name.charAt(0).toUpperCase()}
+                        {user.display_name ? user.display_name.charAt(0).toUpperCase() : 'U'}
                       </div>
                     )}
                   </div>

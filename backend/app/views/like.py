@@ -8,36 +8,106 @@ from app.serializers.like import LikeSerializer
 
 
 class EntryLikeView(APIView):
+    """
+    API endpoint for managing likes on entries (posts).
+    
+    This view handles the like/unlike functionality for entries in the social
+    distribution platform. Authenticated users can like entries, remove their
+    likes, and view like counts for entries. Each user can only like an entry
+    once, and duplicate like attempts are handled gracefully.
+    
+    Attributes:
+        permission_classes: Requires authentication for all operations
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, entry_id):
+        """
+        Create a like for an entry.
+        
+        Allows an authenticated user to like an entry. If the user has already
+        liked the entry, returns a success response without creating a duplicate.
+        This ensures idempotent behavior for like operations.
+        
+        Args:
+            request: The HTTP request from the authenticated user
+            entry_id: UUID of the entry to be liked
+            
+        Returns:
+            Response:
+                - 201 Created with like data if new like created
+                - 200 OK if entry was already liked by this user
+                - 404 Not Found if entry doesn't exist
+        """
         entry = get_object_or_404(Entry, id=entry_id)
         author = request.user
 
+        # Check if user has already liked this entry to prevent duplicates
         if Like.objects.filter(author=author, entry=entry).exists():
             return Response({"detail": "Already liked."}, status=status.HTTP_200_OK)
 
+        # Create new like record
         like = Like.objects.create(author=author, entry=entry)
         serializer = LikeSerializer(like)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, entry_id):
+        """
+        Remove a like from an entry.
+        
+        Allows an authenticated user to unlike an entry they previously liked.
+        If no like exists, returns success anyway to maintain idempotent behavior.
+        This prevents errors when users attempt to unlike entries multiple times.
+        
+        Args:
+            request: The HTTP request from the authenticated user
+            entry_id: UUID of the entry to be unliked
+            
+        Returns:
+            Response:
+                - 200 OK if like was found and deleted
+                - 204 No Content if no like was found (treated as success)
+                - 404 Not Found if entry doesn't exist
+        """
         author = request.user
         entry = get_object_or_404(Entry, id=entry_id)
 
+        # Find and delete the like if it exists
         like = Like.objects.filter(author=author, entry=entry).first()
         if like:
             like.delete()
             return Response({"detail": "Unliked."}, status=status.HTTP_200_OK)
-        # If no like found, just return success anyway
+        # If no like found, return success for idempotent behavior
         return Response({"detail": "Like not found, treated as success."}, status=status.HTTP_204_NO_CONTENT)
 
 
     def get(self, request, entry_id):
+        """
+        Get like statistics for an entry.
+        
+        Returns the total number of likes for an entry and whether the current
+        authenticated user has liked it. This is useful for displaying like
+        counts and the like button state in the UI.
+        
+        Args:
+            request: The HTTP request (authentication optional)
+            entry_id: UUID of the entry to get like stats for
+            
+        Returns:
+            Response:
+                - 200 OK with like_count and liked_by_current_user
+                - 404 Not Found if entry doesn't exist
+                
+        Response format:
+            {
+                "like_count": int,
+                "liked_by_current_user": bool
+            }
+        """
         entry = get_object_or_404(Entry, id=entry_id)
         like_count = Like.objects.filter(entry=entry).count()
 
-        # Check if current user liked this entry
+        # Check if current user has liked this entry
         liked_by_current_user = False
         
         if request.user.is_authenticated:

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Inbox, UserPlus, Share2, Heart, MessageCircle, 
-  Check, X, Clock, Bell 
+  Check, X, Clock, Bell, Shield 
 } from 'lucide-react';
 import AnimatedButton from '../components/ui/AnimatedButton';
 import Card from '../components/ui/Card';
@@ -10,8 +11,9 @@ import Avatar from '../components/Avatar/Avatar';
 import Loader from '../components/ui/Loader';
 import { inboxService } from '../services/inbox';
 import type { InboxItem as ApiInboxItem } from '../types/inbox';
+import { useAuth } from '../components/context/AuthContext';
 
-type InboxItemType = 'follow_request' | 'post_share' | 'like' | 'comment' | 'mention';
+type InboxItemType = 'follow_request' | 'post_share' | 'like' | 'comment' | 'mention' | 'report';
 
 interface FrontendInboxItem {
   id: string;
@@ -62,17 +64,28 @@ const inboxTypeConfig = {
     bgColor: 'bg-[var(--primary-coral)]/10',
     title: 'mentioned you',
   },
+  report: {
+    icon: Shield,
+    color: 'text-red-500',
+    bgColor: 'bg-red-500/10',
+    title: 'reported a user',
+  },
 };
 
 export const InboxPage: React.FC = () => {
+  const { user } = useAuth();
   const [items, setItems] = useState<FrontendInboxItem[]>([]);
   const [filter, setFilter] = useState<InboxItemType | 'all'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
+  const [showAllRequests, setShowAllRequests] = useState(false);
+  
+  // Check if current user is admin
+  const isAdmin = user?.is_staff || user?.is_superuser;
 
   useEffect(() => {
     fetchInboxItems();
-  }, [filter]);
+  }, [filter, showAllRequests]);
 
   const fetchInboxItems = async () => {
     setIsLoading(true);
@@ -86,9 +99,17 @@ export const InboxPage: React.FC = () => {
           'post_share': 'entry_link',
           'like': 'like',
           'comment': 'comment',
-          'mention': 'entry' // mentions would be entries that mention the user
+          'mention': 'entry', // mentions would be entries that mention the user
+          'report': 'report'
         };
         params.content_type = typeMapping[filter as keyof typeof typeMapping];
+      }
+      
+      // If admin and showing all requests, use a different endpoint
+      if (isAdmin && showAllRequests && filter === 'follow_request') {
+        // For now, we'll use the same endpoint but you could add a backend endpoint
+        // to fetch all follow requests across the system
+        params.all_requests = true;
       }
 
       const response = await inboxService.getInbox(params);
@@ -178,6 +199,24 @@ export const InboxPage: React.FC = () => {
               data.post_title = (apiItem.content_data.data as any)?.title;
             }
             break;
+          case 'report':
+            type = 'report';
+            // For reports, extract reporter and reported user info from content_data
+            if (apiItem.content_data) {
+              from_author = {
+                id: apiItem.content_data.reporter_id || '',
+                display_name: apiItem.content_data.reporter_name || 'Unknown Reporter',
+                username: apiItem.content_data.reporter_name || 'unknown',
+                profile_image: undefined
+              };
+              data = {
+                reported_user_id: apiItem.content_data.reported_user_id,
+                reported_user_name: apiItem.content_data.reported_user_name,
+                report_time: apiItem.content_data.report_time,
+                report_type: apiItem.content_data.report_type
+              };
+            }
+            break;
           default:
             type = 'mention';
         }
@@ -192,7 +231,12 @@ export const InboxPage: React.FC = () => {
         };
       });
 
-      setItems(transformedItems);
+      // Filter out report items for non-admin users
+      const filteredItems = isAdmin 
+        ? transformedItems 
+        : transformedItems.filter(item => item.type !== 'report');
+      
+      setItems(filteredItems);
     } catch (error) {
       console.error('Error fetching inbox:', error);
       // Fallback to empty array on error
@@ -256,12 +300,13 @@ export const InboxPage: React.FC = () => {
     { value: 'post_share', label: 'Shared Posts' },
     { value: 'like', label: 'Likes' },
     { value: 'comment', label: 'Comments' },
+    ...(isAdmin ? [{ value: 'report', label: 'Reports' }] : []),
   ];
 
   const unreadCount = items.filter(item => !item.is_read).length;
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-5xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 flex flex-col flex-1">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -269,8 +314,8 @@ export const InboxPage: React.FC = () => {
         className="flex items-center justify-between mb-6"
       >
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-full gradient-secondary flex items-center justify-center">
-            <Inbox className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-pink)] flex items-center justify-center shadow-lg">
+            <Inbox className="w-6 h-6 text-white" strokeWidth={2} />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-text-1">Inbox</h1>
@@ -328,21 +373,42 @@ export const InboxPage: React.FC = () => {
             {btn.label}
           </motion.button>
         ))}
+        
+        {/* Admin toggle for viewing all follow requests */}
+        {isAdmin && filter === 'follow_request' && (
+          <motion.button
+            onClick={() => setShowAllRequests(!showAllRequests)}
+            className={`ml-auto px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
+              showAllRequests
+                ? 'bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white'
+                : 'glass-card-subtle text-text-2 hover:text-text-1'
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Shield size={14} />
+            <span>{showAllRequests ? 'All Requests' : 'My Requests'}</span>
+          </motion.button>
+        )}
       </motion.div>
 
+
       {/* Inbox Items */}
+      <div className="flex-1 flex flex-col">
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex-1 flex justify-center items-center py-16">
           <Loader size="lg" message="Loading notifications..." />
         </div>
       ) : items.length === 0 ? (
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center py-12"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col"
         >
-          <Card variant="main" className="inline-block p-12 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl">
-            <Inbox className="w-16 h-16 text-text-2 mx-auto mb-4" />
+          <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full">
+            <div className="flex justify-center text-text-2 mb-4">
+              <Inbox className="w-16 h-16" strokeWidth={1.5} />
+            </div>
             <h3 className="text-lg font-medium text-text-1 mb-2">No notifications</h3>
             <p className="text-text-2">
               {filter === 'all' 
@@ -371,9 +437,9 @@ export const InboxPage: React.FC = () => {
                 <Card
                   variant={item.is_read ? 'subtle' : 'main'}
                   hoverable
-                  className={`card-layout ${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''} bg-[rgba(var(--glass-rgb),${item.is_read ? '0.3' : '0.4'})] backdrop-blur-lg`}
+                  className={`${!item.is_read ? 'border-l-4 border-[var(--primary-purple)]' : ''} bg-[rgba(var(--glass-rgb),${item.is_read ? '0.3' : '0.4'})] backdrop-blur-lg`}
                 >
-                  <div className="flex items-start space-x-4">
+                  <div className="flex items-start space-x-4 h-full">
                     {/* Author Avatar */}
                     <motion.div
                       whileHover={{ scale: 1.05 }}
@@ -386,8 +452,8 @@ export const InboxPage: React.FC = () => {
                     </motion.div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0 flex flex-col">
-                      <div className="flex items-start justify-between card-content">
+                    <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
+                      <div className="flex items-start justify-between">
                         <div className="flex-1 mr-4">
                           <p className="text-text-1">
                             <span className="font-semibold">
@@ -407,6 +473,33 @@ export const InboxPage: React.FC = () => {
                               {item.data.comment_text}
                             </p>
                           )}
+                          
+                          {/* Report Details */}
+                          {item.type === 'report' && item.data && (
+                            <div className="mt-2 p-3 glass-card-subtle rounded-lg space-y-2">
+                              <p className="text-sm text-text-2">
+                                Reported User:{' '}
+                                <Link 
+                                  to={`/authors/${item.data.reported_user_id}`}
+                                  className="text-[var(--primary-purple)] hover:underline font-medium"
+                                >
+                                  {item.data.reported_user_name}
+                                </Link>
+                              </p>
+                              <p className="text-sm text-text-2">
+                                Reporter:{' '}
+                                <Link 
+                                  to={`/authors/${item.from_author.id}`}
+                                  className="text-[var(--primary-purple)] hover:underline font-medium"
+                                >
+                                  {item.from_author.display_name}
+                                </Link>
+                              </p>
+                              <p className="text-xs text-text-2">
+                                Type: {item.data.report_type?.replace('_', ' ')}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Type Icon */}
@@ -416,7 +509,7 @@ export const InboxPage: React.FC = () => {
                       </div>
 
                       {/* Footer - Always at bottom */}
-                      <div className="card-footer mt-3">
+                      <div className="mt-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <span className="text-xs text-text-2 flex items-center">
@@ -444,15 +537,17 @@ export const InboxPage: React.FC = () => {
                                 disabled={isProcessing}
                                 loading={isProcessing}
                                 icon={<Check size={16} />}
+                                className="!outline-none !ring-0"
                               >
                                 Accept
                               </AnimatedButton>
                               <AnimatedButton
                                 size="sm"
-                                variant="ghost"
+                                variant="secondary"
                                 onClick={() => handleFollowRequest(item.id, false)}
                                 disabled={isProcessing}
                                 icon={<X size={16} />}
+                                className="!outline-none !ring-0"
                               >
                                 Decline
                               </AnimatedButton>
@@ -468,6 +563,7 @@ export const InboxPage: React.FC = () => {
           })}
         </AnimatePresence>
       )}
+      </div>
     </div>
   );
 };

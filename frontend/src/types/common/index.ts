@@ -34,4 +34,4 @@ export interface Node {
 }
 
 export type ContentType = 'text/plain' | 'text/markdown' | 'image/png' | 'image/jpeg';
-export type Visibility = 'public' | 'unlisted' | 'friends' | 'deleted';
+export type Visibility = 'PUBLIC' | 'UNLISTED' | 'FRIENDS' | 'DELETED';

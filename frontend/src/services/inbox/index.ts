@@ -68,6 +68,15 @@ export class InboxService extends BaseApiService {
   }
 
   /**
+   * Delete a single inbox item
+   */
+  async deleteItem(id: string): Promise<void> {
+    await this.request(`/api/inbox/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
    * Clear all inbox items
    */
   async clearInbox(): Promise<{ success: boolean; deleted: number }> {

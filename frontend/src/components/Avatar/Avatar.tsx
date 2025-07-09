@@ -1,10 +1,12 @@
 import LoadingImage from "../ui/LoadingImage";
+import { Shield, User } from 'lucide-react';
 
 interface AvatarProps {
   imgSrc?: string | null;
   alt?: string;
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
+  isAdmin?: boolean;
 }
 
 const sizeClasses = {
@@ -19,9 +21,22 @@ export default function Avatar({
   alt = "User",
   size = "lg",
   className = "",
+  isAdmin = false,
 }: AvatarProps) {
   const sizeClass = sizeClasses[size];
   const loaderSize = size === 'sm' ? 12 : size === 'md' ? 16 : size === 'lg' ? 24 : 32;
+  const iconSize = size === 'sm' ? 16 : size === 'md' ? 20 : size === 'lg' ? 32 : 40;
+
+  // Special handling for admin without profile image
+  if (isAdmin && !imgSrc) {
+    return (
+      <div
+        className={`${sizeClass} rounded-full bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-pink)] text-white flex items-center justify-center neumorphism ${className}`}
+      >
+        <Shield size={iconSize} strokeWidth={2} />
+      </div>
+    );
+  }
 
   if (imgSrc) {
     return (
@@ -34,7 +49,7 @@ export default function Avatar({
           aspectRatio="1/1"
           fallback={
             <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-              {alt.charAt(0).toUpperCase()}
+              {isAdmin ? <Shield size={iconSize} strokeWidth={2} /> : alt.charAt(0).toUpperCase()}
             </div>
           }
         />
@@ -42,7 +57,7 @@ export default function Avatar({
     );
   }
 
-  // Default avatar with initials
+  // Default avatar with initials or user icon
   const initials = alt
     .split(" ")
     .map((name) => name[0])
@@ -54,7 +69,7 @@ export default function Avatar({
     <div
       className={`${sizeClass} rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center neumorphism font-bold ${className}`}
     >
-      {initials || "U"}
+      {initials ? initials : <User size={iconSize} strokeWidth={2} />}
     </div>
   );
 }

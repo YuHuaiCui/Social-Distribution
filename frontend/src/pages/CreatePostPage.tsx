@@ -17,14 +17,14 @@ import ImageUploader from "../components/ImageUploader";
 import CategoryTags from "../components/CategoryTags";
 import PrivacySelector from "../components/PrivacySelector";
 import { entryService } from "../services/entry/index";
+import { useDefaultVisibility, type Visibility } from "../utils/privacy";
 
 import type { CreateEntryData } from "../types/entry/index";
-
-type ContentType = "text/plain" | "text/markdown" | "image";
-type Visibility = "public" | "friends" | "unlisted";
+import type { ContentType } from "../types/common/index";
 
 export const CreatePostPage: React.FC = () => {
   const navigate = useNavigate();
+  const defaultVisibility = useDefaultVisibility();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,25 +32,29 @@ export const CreatePostPage: React.FC = () => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState<ContentType>("text/markdown");
-  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
 
+  // Update visibility when default changes
+  React.useEffect(() => {
+    setVisibility(defaultVisibility);
+  }, [defaultVisibility]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submit triggered");
 
     if (!title.trim()) {
       setError("Please enter a title");
       return;
     }
 
-    if (!content.trim() && contentType !== "image") {
+    if (!content.trim() && !contentType.startsWith("image/")) {
       setError("Please enter some content");
       return;
     }
 
-    if (contentType === "image" && images.length === 0) {
+    if (contentType.startsWith("image/") && images.length === 0) {
       setError("Please upload at least one image");
       return;
     }
@@ -68,10 +72,8 @@ export const CreatePostPage: React.FC = () => {
     };
 
     try {
-      console.log("Sending entry data:", entryData);
 
       const response = await entryService.createEntry(entryData);
-      console.log("Post created successfully:", response);
 
       // Mock success
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -79,7 +81,6 @@ export const CreatePostPage: React.FC = () => {
       // Navigate to the new post or home
       navigate("/home");
     } catch (err: any) {
-      console.error("Error creating post:", err);
       setError("Something went wrong.");
     } finally {
       setIsLoading(false);
@@ -89,7 +90,7 @@ export const CreatePostPage: React.FC = () => {
   const contentTypeOptions = [
     { value: "text/markdown", label: "Markdown", icon: FileText },
     { value: "text/plain", label: "Plain Text", icon: FileText },
-    { value: "image", label: "Image Post", icon: ImageIcon },
+    { value: "image/png", label: "Image Post", icon: ImageIcon },
   ];
 
   return (
@@ -220,7 +221,7 @@ export const CreatePostPage: React.FC = () => {
             transition={{ delay: 0.3 }}
           >
             <Card variant="prominent" className="p-6">
-              {contentType === "image" ? (
+              {contentType.startsWith("image/") ? (
                 <div>
                   <label className="block text-sm font-medium text-text-2 mb-4">
                     Upload Images

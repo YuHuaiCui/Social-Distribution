@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, UserPlus, UserCheck, Search, Loader } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Users, UserPlus, UserCheck, Search, Loader, Bell, ArrowRight } from "lucide-react";
 import type { Author } from "../types/models";
+import { api } from "../services/api";
+import { socialService } from "../services/social";
+import { useAuth } from "../components/context/AuthContext";
 import AuthorCard from "../components/AuthorCard";
 import Input from "../components/ui/Input";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
@@ -9,135 +13,85 @@ import Card from "../components/ui/Card";
 
 type FilterType = "friends" | "following" | "followers";
 
-// Mock data for demonstration
-const generateMockAuthors = (): Author[] => {
-  const names = [
-    "Alice Chen",
-    "Bob Smith",
-    "Carol Johnson",
-    "David Lee",
-    "Emma Wilson",
-    "Frank Brown",
-    "Grace Davis",
-    "Henry Martinez",
-    "Iris Taylor",
-    "Jack Anderson",
-    "Katie Moore",
-    "Liam Jackson",
-  ];
-
-  return names.map((name, index) => ({
-    id: `author-${index}`,
-    url: `http://localhost:8000/api/authors/author-${index}/`,
-    username: name.toLowerCase().replace(" ", ""),
-    email: `${name.toLowerCase().replace(" ", "")}@example.com`,
-    display_name: name,
-    bio: `Hi, I'm ${name}. I love sharing my thoughts on technology and innovation.`,
-    profile_image: `https://i.pravatar.cc/150?u=${name}`,
-    is_approved: true,
-    is_active: true,
-    created_at: new Date(
-      Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
-    ).toISOString(),
-    updated_at: new Date().toISOString(),
-  }));
-};
-
 export const FriendsPage: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [filter, setFilter] = useState<FilterType>("friends");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
-  const [followerIds, setFollowerIds] = useState<Set<string>>(new Set());
+  const [friendsCount, setFriendsCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   useEffect(() => {
-    fetchAuthors();
-  }, [filter]);
+    if (currentUser) {
+      fetchAuthors();
+      loadAllCounts();
+    }
+  }, [filter, currentUser]);
+
+  const loadAllCounts = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const [friends, following, followers, pendingRequests] = await Promise.all([
+        api.getFriends(currentUser.id),
+        api.getFollowing(currentUser.id),
+        api.getFollowers(currentUser.id),
+        socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
+      ]);
+      
+      setFriendsCount(friends.length);
+      setFollowingCount(following.length);
+      setFollowersCount(followers.length);
+      setPendingRequestsCount(pendingRequests.count || 0);
+    } catch (error) {
+      console.error("Error loading counts:", error);
+    }
+  };
 
   const fetchAuthors = async () => {
+    if (!currentUser) return;
+    
     setIsLoading(true);
     try {
-      // Mock data - replace with API calls
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const allAuthors = generateMockAuthors();
-
-      // Mock following/follower relationships
-      const mockFollowingIds = new Set([
-        "author-0",
-        "author-1",
-        "author-2",
-        "author-3",
-        "author-4",
-      ]);
-      const mockFollowerIds = new Set([
-        "author-1",
-        "author-2",
-        "author-5",
-        "author-6",
-        "author-7",
-      ]);
-
-      setFollowingIds(mockFollowingIds);
-      setFollowerIds(mockFollowerIds);
-
-      // Filter based on selected tab
-      let filteredAuthors: Author[] = [];
+      let fetchedAuthors: Author[] = [];
 
       switch (filter) {
         case "friends":
-          // Friends are mutual followers
-          filteredAuthors = allAuthors.filter(
-            (author) =>
-              mockFollowingIds.has(author.id) && mockFollowerIds.has(author.id)
-          );
+          fetchedAuthors = await api.getFriends(currentUser.id);
           break;
         case "following":
-          filteredAuthors = allAuthors.filter((author) =>
-            mockFollowingIds.has(author.id)
-          );
+          fetchedAuthors = await api.getFollowing(currentUser.id);
           break;
         case "followers":
-          filteredAuthors = allAuthors.filter((author) =>
-            mockFollowerIds.has(author.id)
-          );
+          fetchedAuthors = await api.getFollowers(currentUser.id);
           break;
       }
 
-      setAuthors(filteredAuthors);
+      setAuthors(fetchedAuthors);
     } catch (error) {
       console.error("Error fetching authors:", error);
+      setAuthors([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFollowToggle = async (authorId: string) => {
-    try {
-      if (followingIds.has(authorId)) {
-        // Unfollow
-        const newFollowingIds = new Set(followingIds);
-        newFollowingIds.delete(authorId);
-        setFollowingIds(newFollowingIds);
-      } else {
-        // Follow
-        const newFollowingIds = new Set(followingIds);
-        newFollowingIds.add(authorId);
-        setFollowingIds(newFollowingIds);
-      }
-
-      // In real implementation, make API call here
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    } catch (error) {
-      console.error("Error toggling follow:", error);
-    }
+  const handleFollowToggle = async (isFollowing: boolean) => {
+    // Refresh the current list and counts after follow/unfollow action
+    await Promise.all([
+      fetchAuthors(),
+      loadAllCounts(),
+    ]);
   };
 
   const filteredAuthors = authors.filter(
     (author) =>
       author.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      author.username.toLowerCase().includes(searchQuery.toLowerCase())
+      author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (author.github_username && author.github_username.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const getEmptyMessage = () => {
@@ -163,7 +117,7 @@ export const FriendsPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-6xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-6xl mx-auto flex flex-col flex-1">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-1 mb-2">Connections</h1>
@@ -172,7 +126,7 @@ export const FriendsPage: React.FC = () => {
 
       {/* Filter Tabs */}
       <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-hide">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
           {filter === "friends" ? (
             <AnimatedGradient
               gradientColors={[
@@ -187,35 +141,27 @@ export const FriendsPage: React.FC = () => {
             >
               <Users size={18} />
               <span className="font-medium">Friends</span>
-              {!isLoading && (
-                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                  {
-                    authors.filter(
-                      (a) => followingIds.has(a.id) && followerIds.has(a.id)
-                    ).length
-                  }
-                </span>
-              )}
+              <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                {friendsCount}
+              </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("friends")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <Users size={18} />
-              <span className="font-medium">Friends</span>
-              {!isLoading && (
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Users size={18} />
+                <span className="font-medium">Friends</span>
                 <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                  {
-                    authors.filter(
-                      (a) => followingIds.has(a.id) && followerIds.has(a.id)
-                    ).length
-                  }
+                  {friendsCount}
                 </span>
-              )}
-            </motion.div>
+              </motion.div>
+            </div>
           )}
 
           {filter === "following" ? (
@@ -233,22 +179,26 @@ export const FriendsPage: React.FC = () => {
               <UserPlus size={18} />
               <span className="font-medium">Following</span>
               <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                {followingIds.size}
+                {followingCount}
               </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("following")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <UserPlus size={18} />
-              <span className="font-medium">Following</span>
-              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followingIds.size}
-              </span>
-            </motion.div>
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <UserPlus size={18} />
+                <span className="font-medium">Following</span>
+                <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                  {followingCount}
+                </span>
+              </motion.div>
+            </div>
           )}
 
           {filter === "followers" ? (
@@ -266,22 +216,26 @@ export const FriendsPage: React.FC = () => {
               <UserCheck size={18} />
               <span className="font-medium">Followers</span>
               <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                {followerIds.size}
+                {followersCount}
               </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("followers")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <UserCheck size={18} />
-              <span className="font-medium">Followers</span>
-              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followerIds.size}
-              </span>
-            </motion.div>
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <UserCheck size={18} />
+                <span className="font-medium">Followers</span>
+                <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                  {followersCount}
+                </span>
+              </motion.div>
+            </div>
           )}
         </div>
 
@@ -297,9 +251,50 @@ export const FriendsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Follow Requests Notification */}
+      {pendingRequestsCount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <Link to="/follow-requests">
+            <Card
+              variant="prominent"
+              className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
+                         border border-[var(--primary-violet)]/20 hover:border-[var(--primary-violet)]/40 
+                         transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
+                    <Bell size={20} className="text-[var(--primary-violet)]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-text-1">
+                      {pendingRequestsCount} pending follow {pendingRequestsCount === 1 ? 'request' : 'requests'}
+                    </h3>
+                    <p className="text-sm text-text-2">
+                      Review and manage who can follow you
+                    </p>
+                  </div>
+                </div>
+                <motion.div
+                  animate={{ x: [0, 5, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <ArrowRight size={20} className="text-[var(--primary-violet)]" />
+                </motion.div>
+              </div>
+            </Card>
+          </Link>
+        </motion.div>
+      )}
+
       {/* Content */}
+      <div className="flex-1 flex flex-col">
       {isLoading ? (
-        <div className="flex justify-center items-center py-16">
+        <div className="flex-1 flex justify-center items-center py-16">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -309,19 +304,25 @@ export const FriendsPage: React.FC = () => {
           </motion.div>
         </div>
       ) : filteredAuthors.length === 0 ? (
-        <Card variant="main" className="text-center py-16">
-          <div className="text-text-2 mb-4">{getIcon()}</div>
-          <h3 className="font-medium text-lg mb-2 text-text-1">
-            {searchQuery ? "No results found" : `No ${filter} yet`}
-          </h3>
-          <p className="text-text-2 max-w-md mx-auto">
-            {searchQuery
-              ? `Try searching with a different term.`
-              : getEmptyMessage()}
-          </p>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col"
+        >
+          <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full">
+            <div className="flex justify-center text-text-2 mb-4">{getIcon()}</div>
+            <h3 className="font-medium text-lg mb-2 text-text-1">
+              {searchQuery ? "No results found" : `No ${filter} yet`}
+            </h3>
+            <p className="text-text-2 max-w-md mx-auto">
+              {searchQuery
+                ? `Try searching with a different term.`
+                : getEmptyMessage()}
+            </p>
+          </Card>
+        </motion.div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 flex-1">
           <AnimatePresence mode="popLayout">
             {filteredAuthors.map((author, index) => (
               <motion.div
@@ -334,20 +335,18 @@ export const FriendsPage: React.FC = () => {
               >
                 <AuthorCard
                   author={author}
-                  isFollowing={followingIds.has(author.id)}
-                  isFriend={
-                    followingIds.has(author.id) && followerIds.has(author.id)
-                  }
-                  showFollowButton={
-                    filter !== "followers" || !followingIds.has(author.id)
-                  }
-                  onFollowToggle={() => handleFollowToggle(author.id)}
+                  variant="default"
+                  showStats={true}
+                  showBio={true}
+                  showActions={true}
+                  onFollow={handleFollowToggle}
                 />
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
       )}
+      </div>
     </div>
   );
 };

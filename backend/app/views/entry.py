@@ -3,7 +3,9 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import models
+from django.db.models import Q
 from app.models import Entry, Author
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
@@ -11,6 +13,7 @@ from app.permissions import IsAuthorSelfOrReadOnly
 
 class EntryViewSet(viewsets.ModelViewSet):
     lookup_field = "id"
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     ...
 
     """
@@ -25,53 +28,55 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         Override to exclude deleted entries and enforce visibility permissions.
         """
-        queryset = Entry.objects.exclude(visibility=Entry.DELETED)
         lookup_url_kwarg = self.lookup_field
         lookup_value = self.kwargs.get(lookup_url_kwarg)
 
         if lookup_value is None:
             raise NotFound("No Entry ID provided.")
 
-        try:
-            obj = queryset.get(id=lookup_value)
-        except Entry.DoesNotExist:
-            raise NotFound("Entry not found.")
-
-        # Check if user can access this entry
+        # Get the user's author instance
         user = self.request.user
         if hasattr(user, "author"):
             user_author = user.author
         else:
             user_author = user
 
-        # Allow access if:
-        # 1. Entry is public
-        # 2. User is the author of the entry
-        # 3. Entry is friends-only and user is a friend (simplified for now)
-        if (
-            obj.visibility == Entry.PUBLIC
-            or obj.author == user_author
-            or (obj.visibility == Entry.FRIENDS_ONLY and obj.author == user_author)
-        ):
-            self.check_object_permissions(self.request, obj)
-            return obj
-        else:
+        # Use the EntryManager's visibility logic to check if the entry is visible
+        try:
+            obj = Entry.objects.visible_to_author(user_author).get(id=lookup_value)
+        except Entry.DoesNotExist:
             raise NotFound("Entry not found.")
 
+        self.check_object_permissions(self.request, obj)
+        return obj
+
     def get_queryset(self):
+        """
+        Get entries based on visibility rules and context.
+        
+        This method implements complex visibility logic based on:
+        - Whether the user is staff (can see all non-deleted entries)
+        - Whether viewing a specific author's profile or general feed
+        - The relationship between the viewer and the entry author
+        
+        Returns:
+            QuerySet: Filtered entries based on visibility permissions
+        """
         user = self.request.user
 
+        # Staff users can see all entries except deleted ones
         if user.is_staff:
             return Entry.objects.exclude(visibility=Entry.DELETED).order_by(
                 "-created_at"
             )
 
+        # Get the author instance for the current user
         if hasattr(user, "author"):
             user_author = user.author
         else:
             user_author = user
 
-        # Check if we're viewing a specific author's entries
+        # Check if we're viewing a specific author's entries (profile view)
         author_id = self.kwargs.get("author_id") or self.request.query_params.get(
             "author"
         )
@@ -82,28 +87,20 @@ class EntryViewSet(viewsets.ModelViewSet):
                 return Entry.objects.none()
 
             if user_author == target_author:
-                # ✅ Viewing your own profile: show all entries except deleted
+                # Viewing your own profile: show all entries except deleted
                 return (
                     Entry.objects.filter(author=target_author)
                     .exclude(visibility=Entry.DELETED)
                     .order_by("-created_at")
                 )
 
-            # Viewing someone else's profile: only show public entries
-            return (
-                Entry.objects.filter(author=target_author, visibility="public")
-                .exclude(visibility=Entry.DELETED)
-                .order_by("-created_at")
-            )
+            # Viewing someone else's profile: apply visibility rules
+            # Get all entries by the target author that are visible to the current user
+            visible_entries = Entry.objects.visible_to_author(user_author)
+            return visible_entries.filter(author=target_author).order_by("-created_at")
 
-        # General feed (not profile)
-        return (
-            Entry.objects.filter(
-                models.Q(author=user_author) | models.Q(visibility="public")
-            )
-            .exclude(visibility=Entry.DELETED)
-            .order_by("-created_at")
-        )
+        # General feed (not profile) - show all entries visible to the user
+        return Entry.objects.visible_to_author(user_author).order_by("-created_at")
 
     def perform_create(self, serializer):
         """
@@ -157,15 +154,64 @@ class EntryViewSet(viewsets.ModelViewSet):
         )
 
     def destroy(self, request, *args, **kwargs):
+        """
+        Soft-delete an entry by marking it as deleted.
+        
+        Instead of permanently removing the entry from the database, this method
+        sets the visibility to DELETED, preserving the data while hiding it from
+        normal queries. This allows for potential recovery and maintains referential
+        integrity.
+        
+        Args:
+            request: The HTTP DELETE request
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments
+            
+        Returns:
+            Response: 204 No Content on successful deletion
+        """
         entry = self.get_object()
 
-        # Only mark as deleted
+        # Only mark as deleted (soft delete)
         entry.visibility = Entry.DELETED
         entry.save()
 
         return Response(
             {"detail": "Entry soft-deleted."}, status=status.HTTP_204_NO_CONTENT
         )
+
+    @action(detail=False, methods=["get"], url_path="liked")
+    def liked_entries(self, request):
+        """Get entries that the current user has liked"""
+        from app.models import Like
+
+        # Get the current user's author
+        user = request.user
+        
+        try:
+            # Get entries that this user has liked
+            liked_entry_ids = Like.objects.filter(
+                author=user,  # User is already an Author object
+            ).values_list("entry__id", flat=True)
+
+            entries = Entry.objects.filter(id__in=liked_entry_ids).order_by(
+                "-created_at"
+            )
+
+            # Paginate the results
+            page = self.paginate_queryset(entries)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(entries, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Could not retrieve liked entries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(detail=False, methods=["get"], url_path="saved")
     def saved_entries(self, request):
@@ -196,6 +242,57 @@ class EntryViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {"error": f"Could not retrieve saved entries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"], url_path="feed")
+    def feed_entries(self, request):
+        """Get entries from friends (mutually following users) for the home feed"""
+        from app.models import Follow
+        
+        user = request.user
+        
+        try:
+            # Use the user's author instance if available
+            if hasattr(user, 'author'):
+                current_author = user.author
+            else:
+                current_author = user
+            
+            # Get all users that the current user is following with ACCEPTED status
+            following_ids = set(Follow.objects.filter(
+                follower=current_author,
+                status=Follow.ACCEPTED
+            ).values_list("followed__id", flat=True))
+            
+            # Get all users that follow the current user with ACCEPTED status
+            followers_ids = set(Follow.objects.filter(
+                followed=current_author,
+                status=Follow.ACCEPTED
+            ).values_list("follower__id", flat=True))
+            
+            # Friends are users who mutually follow each other (intersection)
+            friends_ids = following_ids & followers_ids
+            
+            # Get all entries from friends (all their posts, regardless of visibility)
+            entries = Entry.objects.filter(
+                author__id__in=friends_ids
+            ).exclude(
+                visibility=Entry.DELETED
+            ).order_by("-created_at")
+            
+            # Paginate the results
+            page = self.paginate_queryset(entries)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            serializer = self.get_serializer(entries, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Could not retrieve feed entries: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

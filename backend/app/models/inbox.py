@@ -16,12 +16,14 @@ class Inbox(models.Model):
     COMMENT = "comment"
     LIKE = "like"
     FOLLOW = "follow"
+    REPORT = "report"
 
     ITEM_TYPE_CHOICES = [
         (ENTRY, "Entry"),
         (COMMENT, "Comment"),
         (LIKE, "Like"),
         (FOLLOW, "Follow Request"),
+        (REPORT, "Report"),
     ]
 
     # Recipient of the inbox item
@@ -63,4 +65,10 @@ class Inbox(models.Model):
         ]
 
     def __str__(self):
+        """
+        String representation of the inbox item.
+        
+        Returns:
+            str: A human-readable string showing the inbox recipient and item type
+        """
         return f"Inbox item for {self.recipient}: {self.item_type}"

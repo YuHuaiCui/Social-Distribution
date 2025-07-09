@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Hash, X, Plus, TrendingUp, Search
 } from 'lucide-react';
+import { FloatingDropdown } from './ui/FloatingDropdown';
 
 interface CategoryTagsProps {
   value: string[];
@@ -54,6 +55,7 @@ export const CategoryTags: React.FC<CategoryTagsProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Filter suggestions based on input
@@ -75,17 +77,7 @@ export const CategoryTags: React.FC<CategoryTagsProps> = ({
     }
   }, [inputValue, value, suggestions]);
 
-  useEffect(() => {
-    // Handle click outside
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // Removed click outside handler as FloatingDropdown handles it
 
   const handleAddTag = (tag: string) => {
     const normalizedTag = tag.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -148,6 +140,7 @@ export const CategoryTags: React.FC<CategoryTagsProps> = ({
     <div ref={containerRef} className={`relative ${className}`}>
       {/* Tag Input Container */}
       <div 
+        ref={triggerRef}
         className={`
           min-h-[48px] px-4 py-2 bg-input-bg border border-border-1 rounded-lg
           transition-all duration-200
@@ -223,14 +216,12 @@ export const CategoryTags: React.FC<CategoryTagsProps> = ({
       </p>
 
       {/* Suggestions Dropdown */}
-      <AnimatePresence>
-        {showSuggestions && filteredSuggestions.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute top-full left-0 right-0 mt-2 glass-card-prominent rounded-lg shadow-xl overflow-hidden z-50"
-          >
+      <FloatingDropdown
+        isOpen={showSuggestions && filteredSuggestions.length > 0}
+        onClose={() => setShowSuggestions(false)}
+        triggerRef={triggerRef}
+        className="glass-card-prominent rounded-lg shadow-xl overflow-hidden"
+      >
             {/* Header */}
             <div className="flex items-center space-x-2 px-4 py-2 border-b border-border-1">
               {inputValue ? (
@@ -293,9 +284,7 @@ export const CategoryTags: React.FC<CategoryTagsProps> = ({
                 </span>
               </motion.button>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </FloatingDropdown>
     </div>
   );
 };

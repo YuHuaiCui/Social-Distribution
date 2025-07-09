@@ -6,6 +6,8 @@ import {
   Image as ImageIcon,
   Save,
   ChevronDown,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 import { entryService } from "../services";
@@ -13,11 +15,13 @@ import type { Entry, CreateEntryData } from "../types";
 import AnimatedButton from "./ui/AnimatedButton";
 import MarkdownEditor from "./MarkdownEditor";
 import ImageUploader from "./ImageUploader";
+import type { ImageUploadResponse } from "../services/image";
 import CategoryTags from "./CategoryTags";
 import PrivacySelector from "./PrivacySelector";
+import { useDefaultVisibility, type Visibility } from "../utils/privacy";
+import { usePosts } from "./context/PostsContext";
 
 type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg";
-type Visibility = "public" | "friends" | "unlisted";
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -32,14 +36,17 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onSuccess,
   editingPost,
 }) => {
+  const defaultVisibility = useDefaultVisibility();
+  const { triggerRefresh } = usePosts();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState<ContentType>("text/markdown");
-  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [expandedSection, setExpandedSection] = useState<
@@ -64,11 +71,18 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setTitle("");
       setContent("");
       setContentType("text/markdown");
-      setVisibility("public");
+      setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
     }
-  }, [editingPost]);
+  }, [editingPost, defaultVisibility]);
+
+  // Update visibility when default changes for new posts
+  React.useEffect(() => {
+    if (!editingPost) {
+      setVisibility(defaultVisibility);
+    }
+  }, [defaultVisibility, editingPost]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,22 +117,22 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     try {
       const entryData: CreateEntryData = {
         title,
-        content,
+        content: contentType.startsWith("image/") 
+          ? (content || "Image post")  // Use caption for image posts
+          : content,
         content_type: contentType,
         visibility,
         categories,
+        // Include image file for image posts
         ...(images.length > 0 && { image: images[0] }),
       };
       if (editingPost) {
         // Update existing post
-        console.log("editingPost:", editingPost);
         if (!editingPost.id) {
-          console.error("Editing post is missing an ID");
           setError("Cannot update: missing post ID");
           return;
         }
         const id = editingPost.id.includes("/") ? editingPost.id.split("/").pop() : editingPost.id;
-        console.log("[PATCH] Entry ID used for update:", id);
         if (!id) {
           setError("Cannot update: invalid post ID");
           setIsLoading(false);
@@ -130,14 +144,16 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         );
 
         onSuccess?.(updatedPost);
+        triggerRefresh(); // Trigger posts refresh
         handleClose();
-        console.log("Post updated successfully");
       } else {
         // Create new post
         const newPost = await entryService.createEntry(entryData);
 
         onSuccess?.(newPost);
-        console.log("Reloading...");
+        triggerRefresh(); // Trigger posts refresh
+        // Dispatch event for other components to update
+        window.dispatchEvent(new Event('post-created'));
         handleClose();
       }
     } catch (err: unknown) {
@@ -157,11 +173,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setTitle("");
       setContent("");
       setContentType("text/markdown");
-      setVisibility("public");
+      setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
       setError("");
       setExpandedSection("content");
+      setIsFullscreen(false);
       onClose();
     }
   };
@@ -191,10 +208,28 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] glass-card-prominent rounded-lg shadow-xl z-50 overflow-hidden flex flex-col"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ 
+              opacity: 1, 
+              scale: 1,
+              // Animate the style properties
+              left: isFullscreen ? "0%" : "50%",
+              top: isFullscreen ? "0%" : "50%",
+              x: isFullscreen ? "0%" : "-50%",
+              y: isFullscreen ? "0%" : "-50%",
+              width: isFullscreen ? "100vw" : "min(48rem, 100vw)",
+              height: isFullscreen ? "100vh" : "auto",
+              maxHeight: isFullscreen ? "100vh" : "100vh",
+              borderRadius: isFullscreen ? "0px" : "8px",
+            }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 300,
+              damping: 30,
+              mass: 0.8,
+            }}
+            className="fixed glass-card-prominent shadow-xl z-50 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -202,19 +237,34 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
               <h2 className="text-xl font-semibold text-text-1">
                 {editingPost ? "Edit Post" : "Create New Post"}
               </h2>
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleClose}
-                className="p-2 rounded-lg hover:bg-glass-low transition-colors"
-              >
-                <X size={20} className="text-text-2" />
-              </motion.button>
+              <div className="flex items-center space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-2 rounded-lg hover:bg-glass-low transition-colors"
+                  title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 size={20} className="text-text-2" />
+                  ) : (
+                    <Maximize2 size={20} className="text-text-2" />
+                  )}
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleClose}
+                  className="p-2 rounded-lg hover:bg-glass-low transition-colors"
+                >
+                  <X size={20} className="text-text-2" />
+                </motion.button>
+              </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-              <form onSubmit={handleSubmit} className="space-y-4 relative">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Title */}
                 <div>
                   <input
@@ -300,9 +350,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                           {contentType && contentType.startsWith("image/") ? (
                             <div>
                               <ImageUploader
-                                onImagesChange={setImages}
-                                maxImages={4}
+                                onImagesChange={(newImages) => {
+                                  setImages(newImages);
+                                }}
+                                maxImages={1}
                                 className="mt-3"
+                                uploadToServer={false}
                               />
                               {images.length > 0 && (
                                 <div className="mt-3">
@@ -323,8 +376,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                                   value={content}
                                   onChange={setContent}
                                   placeholder="Write your post content..."
-                                  minHeight={200}
-                                  maxHeight={400}
+                                  minHeight={isFullscreen ? 400 : 200}
+                                  maxHeight={isFullscreen ? 800 : 400}
                                 />
                               ) : (
                                 <textarea
@@ -332,7 +385,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                                   onChange={(e) => setContent(e.target.value)}
                                   placeholder="Write your post content..."
                                   className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none font-mono"
-                                  rows={6}
+                                  rows={isFullscreen ? 20 : 6}
                                 />
                               )}
                             </div>

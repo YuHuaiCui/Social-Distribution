@@ -206,12 +206,52 @@ class EntryAPITest(BaseAPITestCase):
     # Not implemented
     def test_entry_like(self):
         """Test liking an entry"""
-        # TODO: Implement test cases
+        url = reverse("social-distribution:entry-likes", args=[self.public_entry.id])
+
+        # Unauthenticated like attempt
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Authenticated like
+        response = self.user_client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("id", response.data)
+        self.assertEqual(str(response.data["entry"]), str(self.public_entry.url))
+        self.assertEqual(str(response.data["author"]), str(self.regular_user.url))
+
+        # Duplicate like should either be ignored or handled gracefully
+        response = self.user_client.post(url)
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_200_OK, status.HTTP_204_NO_CONTENT, status.HTTP_400_BAD_REQUEST],
+        )
+
 
     # Not implemented
     def test_entry_unlike(self):
         """Test unliking an entry"""
-        # TODO: Implement test cases
+        url = reverse("social-distribution:entry-likes", args=[self.public_entry.id])
+
+        # First like the entry
+        self.user_client.post(url)
+
+        # Authenticated unlike
+        response = self.user_client.delete(url)
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_204_NO_CONTENT, status.HTTP_200_OK]
+        )
+
+        # Re-unlike (already unliked)
+        response = self.user_client.delete(url)
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_204_NO_CONTENT, status.HTTP_404_NOT_FOUND],
+        )
+
+        # Unauthenticated unlike attempt
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     # Not implemented
     def test_entry_comments(self):

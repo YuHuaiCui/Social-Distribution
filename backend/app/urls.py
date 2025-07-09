@@ -30,14 +30,25 @@ entry_detail = EntryViewSet.as_view({
     'patch': 'partial_update',
     'put': 'update',
     'delete': 'destroy',
-}
-)
+})
+entry_liked = EntryViewSet.as_view({
+    'get': 'liked_entries',
+})
+entry_feed = EntryViewSet.as_view({
+    'get': 'feed_entries',
+})
+entry_saved = EntryViewSet.as_view({
+    'get': 'saved_entries',
+})
 
 
 urlpatterns = [    # Router-based endpoints
     path("", include(router.urls)),
     # Entry endpoints (note: api/ prefix is added at project-level urls.py)
     path("entries/", entry_list, name="entry-list"),
+    path("entries/liked/", entry_liked, name="entry-liked"),
+    path("entries/feed/", entry_feed, name="entry-feed"),
+    path("entries/saved/", entry_saved, name="entry-saved"),
     path("entries/<uuid:id>/", entry_detail, name="entry-detail"),    
     
     # Like endpoint

@@ -40,7 +40,13 @@ class InboxViewSet(viewsets.ModelViewSet):
         # Filter by content type if specified
         content_type = self.request.query_params.get("content_type")
         if content_type:
-            queryset = queryset.filter(item_type=content_type)
+            # Map frontend content types to backend types
+            content_type_mapping = {
+                'entry_link': 'entry',  # For backward compatibility
+                # Other types map directly
+            }
+            mapped_type = content_type_mapping.get(content_type, content_type)
+            queryset = queryset.filter(item_type=mapped_type)
 
         # Filter by read status if specified
         is_read = self.request.query_params.get("read")

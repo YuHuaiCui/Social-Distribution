@@ -10,13 +10,18 @@ type ProtectedRouteProps = {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
+
   // Use MinLoadingWrapper to ensure smooth transitions
   return (
     <MinLoadingWrapper isLoading={loading} message="Verifying access...">
       {isAuthenticated ? (
-        <>{children}</>
+        <>
+          {children}
+        </>
       ) : (
-        <Navigate to="/" replace />
+        <>
+          <Navigate to="/" replace />
+        </>
       )}
     </MinLoadingWrapper>
   );

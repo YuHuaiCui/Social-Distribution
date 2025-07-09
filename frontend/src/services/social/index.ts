@@ -12,6 +12,7 @@ import type {
   FollowResponse,
   FriendshipStats,
   Author,
+  Entry,
   PaginatedResponse,
 } from "../../types";
 
@@ -89,27 +90,15 @@ export class SocialService extends BaseApiService {
   /**
    * Get followers of an author
    */
-  async getFollowers(
-    authorId: string,
-    params?: { page?: number; page_size?: number }
-  ): Promise<PaginatedResponse<Author>> {
-    const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Author>>(
-      `/api/authors/${authorId}/followers/${queryString}`
-    );
+  async getFollowers(authorId: string): Promise<Author[]> {
+    return this.request<Author[]>(`/api/authors/${authorId}/followers/`);
   }
 
   /**
    * Get authors that an author is following
    */
-  async getFollowing(
-    authorId: string,
-    params?: { page?: number; page_size?: number }
-  ): Promise<PaginatedResponse<Author>> {
-    const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Author>>(
-      `/api/authors/${authorId}/following/${queryString}`
-    );
+  async getFollowing(authorId: string): Promise<Author[]> {
+    return this.request<Author[]>(`/api/authors/${authorId}/following/`);
   }
 
   /**
@@ -148,14 +137,8 @@ export class SocialService extends BaseApiService {
   /**
    * Get friends of an author (mutual follows)
    */
-  async getFriends(
-    authorId: string,
-    params?: { page?: number; page_size?: number }
-  ): Promise<PaginatedResponse<Author>> {
-    const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Author>>(
-      `/api/authors/${authorId}/friends/${queryString}`
-    );
+  async getFriends(authorId: string): Promise<Author[]> {
+    return this.request<Author[]>(`/api/authors/${authorId}/friends/`);
   }
 
   /**

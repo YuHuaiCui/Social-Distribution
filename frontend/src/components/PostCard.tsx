@@ -1,24 +1,39 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  ThumbsUp,
+  Heart,
   MessageCircle,
   Share2,
   MoreHorizontal,
   Bookmark,
   Edit,
   Trash2,
+  FileText,
+  Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Entry, Author } from "../types/models";
 import { api } from "../services/api";
-import { useAuth } from "./context/AuthContext";
-import { useCreatePost } from "./context/CreatePostContext";
-import { useToast } from "./context/ToastContext";
+import { socialService } from "../services/social";
+import { useAuth } from "../components/context/AuthContext";
+import { useCreatePost } from "../components/context/CreatePostContext";
+import { useToast } from "../components/context/ToastContext";
 import LoadingImage from "./ui/LoadingImage";
 import Card from "./ui/Card";
+import { renderMarkdown } from "../utils/markdown";
 
 import AnimatedGradient from "./ui/AnimatedGradient";
+import { extractUUID } from "../utils/extractId";
+import { ShareModal } from "./ShareModal";
+
+// Debounce utility
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout;
+  return ((...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  }) as T;
+}
 
 interface PostCardProps {
   post: Entry;
@@ -30,7 +45,7 @@ interface PostCardProps {
   isSaved?: boolean;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({
+const PostCardComponent: React.FC<PostCardProps> = ({
   post,
   onLike,
   onSave,
@@ -41,57 +56,87 @@ export const PostCard: React.FC<PostCardProps> = ({
   const { user } = useAuth();
   const { openCreatePost } = useCreatePost();
   const { showSuccess, showError, showInfo } = useToast();
+  const navigate = useNavigate();
   const [liked, setLiked] = useState(isLiked);
   const [saved, setSaved] = useState(isSaved);
   const [likeCount, setLikeCount] = useState(post.likes_count || 0);
+  const [commentCount, setCommentCount] = useState(post.comments_count || 0);
   const [showActions, setShowActions] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    async function fetchLikeData() {
+  
+  // Memoize the debounced fetch function
+  const debouncedFetchLikeData = useMemo(
+    () => debounce(async (postId: string) => {
       try {
-        const data = await api.getEntryLikeStatus(post.id);
+        const extractedId = extractUUID(postId);
+        const data = await api.getEntryLikeStatus(extractedId);
         setLikeCount(data.like_count);
-        console.log("Like status from API:", data);
         setLiked(data.liked_by_current_user);
       } catch (error) {
-        console.warn("Failed to fetch like data:", error);
         // Use the data from the post itself as fallback
         setLikeCount(post.likes_count || 0);
-        setLiked(false); // Default to not liked if we can't fetch
+        setLiked(post.is_liked || false);
       }
-    }
+    }, 500),
+    [post.likes_count, post.is_liked]
+  );
 
-    // Only fetch if we have a valid post ID
+  // Consolidated useEffect for initialization and updates
+  useEffect(() => {
+    // Initialize state
+    setCommentCount(post.comments_count || 0);
+    
+    // Fetch like data if we have a valid post ID
     if (post.id) {
-      fetchLikeData();
+      debouncedFetchLikeData(post.id);
     } else {
       // Use fallback data if no valid ID
       setLikeCount(post.likes_count || 0);
-      setLiked(false);
+      setLiked(post.is_liked || false);
     }
-  }, [post.id, post.likes_count]);
 
-  // Get author info (handle both object and URL reference)
-  const author =
+    // Listen for post updates from other components
+    const handlePostUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { postId, updates } = customEvent.detail;
+      if (postId === post.id && updates.comments_count !== undefined) {
+        setCommentCount(updates.comments_count);
+      }
+    };
+
+    window.addEventListener('post-update', handlePostUpdate, { passive: true });
+    
+    // Cleanup function
+    return () => {
+      window.removeEventListener('post-update', handlePostUpdate);
+    };
+  }, [post.id, post.comments_count, post.likes_count, post.is_liked, debouncedFetchLikeData]);
+
+  // Memoize author info extraction
+  const author = useMemo(() => 
     typeof post.author === "string"
       ? ({ display_name: "Unknown", id: "" } as Author)
-      : post.author;
+      : post.author,
+    [post.author]
+  );
 
   const date = new Date(post.created_at);
   const timeAgo = getTimeAgo(date);
 
-  const handleLike = async () => {
+  const handleLike = useCallback(async () => {
+    const extractedId = extractUUID(post.id);
     const newLikedState = !liked;
     setLiked(newLikedState);
     setLikeCount((prev) => (newLikedState ? prev + 1 : Math.max(0, prev - 1)));
 
     try {
       if (newLikedState) {
-        await api.likeEntry(post.id);
+        await api.likeEntry(extractedId);
         showSuccess("Post liked!");
         setLiked(true);
       } else {
-        await api.unlikeEntry(post.id);
+        await api.unlikeEntry(extractedId);
         showInfo("Post unliked");
         setLiked(false);
       }
@@ -104,39 +149,53 @@ export const PostCard: React.FC<PostCardProps> = ({
       );
       showError("Failed to update like status");
     }
-  };
+  }, [liked, extractUUID, post.id, showSuccess, showInfo, showError, onLike]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(async () => {
+    const extractedId = extractUUID(post.id);
     const newSavedState = !saved;
     setSaved(newSavedState);
-    onSave?.(newSavedState);
 
-    if (newSavedState) {
-      showSuccess("Post saved to your collection");
-    } else {
-      showInfo("Post removed from collection");
+    try {
+      if (newSavedState) {
+        await socialService.savePost(extractedId);
+        showSuccess("Post saved to your collection");
+      } else {
+        await socialService.unsavePost(extractedId);
+        showInfo("Post removed from collection");
+      }
+      onSave?.(newSavedState);
+    } catch (error) {
+      // Revert on error
+      setSaved(!newSavedState);
+      showError("Failed to update saved status");
     }
-  };
+  }, [saved, extractUUID, post.id, showSuccess, showInfo, showError, onSave]);
 
-  const handleShare = () => {
-    const url = `${window.location.origin}/posts/${post.id}`;
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        showSuccess("Post link copied to clipboard!");
-      })
-      .catch(() => {
-        showError("Failed to copy link");
-      });
-  };
+  const handleShare = useCallback(() => {
+    // For public posts, show the share modal with social media options
+    if (post.visibility === "PUBLIC") {
+      setShowShareModal(true);
+    } else {
+      // For non-public posts, just copy the link
+      const url = `${window.location.origin}/posts/${post.id}`;
+      navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          showSuccess("Post link copied to clipboard!");
+        })
+        .catch(() => {
+          showError("Failed to copy link");
+        });
+    }
+  }, [post.visibility, post.id, showSuccess, showError]);
 
-  const handleEdit = () => {
-    console.log("Editing post:", post);
+  const handleEdit = useCallback(() => {
     setShowActions(false);
     openCreatePost(post);
-  };
+  }, [openCreatePost, post]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     setShowActions(false);
     if (window.confirm("Are you sure you want to delete this post?")) {
       try {
@@ -152,13 +211,17 @@ export const PostCard: React.FC<PostCardProps> = ({
         showError("Failed to delete post");
       }
     }
-  };
+  }, [post.id, showSuccess, showError, onDelete]);
 
   // Check if current user is the author
   const isOwnPost = user && author.id === user.id;
+  // Check if current user is admin
+  const isAdmin = user?.is_staff || user?.is_superuser;
 
-  // Handle click outside
-  React.useEffect(() => {
+  // Handle click outside with proper cleanup
+  useEffect(() => {
+    if (!showActions) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         actionsRef.current &&
@@ -168,29 +231,19 @@ export const PostCard: React.FC<PostCardProps> = ({
       }
     };
 
-    if (showActions) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", handleClickOutside, { passive: true });
+    
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [showActions]);
 
   const renderContent = () => {
     if (post.content_type === "text/markdown") {
-      // Simple markdown rendering - in production, use a proper markdown parser
-      const htmlContent = post.content
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(
-          /\[([^\]]+)\]\(([^)]+)\)/g,
-          '<a href="$2" class="text-brand-500 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>'
-        )
-        .replace(/\n/g, "<br>");
-
       return (
         <div
           className="prose prose-sm max-w-none text-text-1"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
         />
       );
     }
@@ -199,26 +252,41 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const getVisibilityBadge = () => {
+    const badges = [];
+    
     switch (post.visibility) {
-      case "friends":
-        return (
-          <span className="text-xs bg-cat-mint px-2 py-0.5 rounded-full">
+      case "FRIENDS":
+        badges.push(
+          <span key="friends" className="text-xs bg-cat-mint px-2 py-0.5 rounded-full">
             Friends
           </span>
         );
-      case "unlisted":
-        return (
-          <span className="text-xs bg-cat-yellow px-2 py-0.5 rounded-full">
+        break;
+      case "UNLISTED":
+        badges.push(
+          <span key="unlisted" className="text-xs bg-cat-yellow px-2 py-0.5 rounded-full">
             Unlisted
           </span>
         );
-      default:
-        return null;
+        break;
     }
+    
+    // Show admin visibility indicator if viewing a post that wouldn't normally be visible
+    if (isAdmin && !isOwnPost && post.visibility === "FRIENDS") {
+      badges.push(
+        <span key="admin" className="text-xs bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+          <Shield size={10} />
+          Admin View
+        </span>
+      );
+    }
+    
+    return badges.length > 0 ? badges : null;
   };
 
   return (
-    <Card variant="main" hoverable className="card-layout">
+    <>
+      <Card variant="main" hoverable className="card-layout">
       <div className="card-content">
         {/* Author info */}
         <div className="flex items-center mb-4">
@@ -250,14 +318,16 @@ export const PostCard: React.FC<PostCardProps> = ({
                 {getVisibilityBadge() && (
                   <>
                     <span className="mx-1">·</span>
-                    {getVisibilityBadge()}
+                    <div className="inline-flex items-center gap-1">
+                      {getVisibilityBadge()}
+                    </div>
                   </>
                 )}
               </div>
             </div>
           </Link>
 
-          {isOwnPost && (
+          {(isOwnPost || isAdmin) && (
             <div className="ml-auto relative" ref={actionsRef}>
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -277,19 +347,46 @@ export const PostCard: React.FC<PostCardProps> = ({
                     exit={{ opacity: 0, scale: 0.9, y: -10 }}
                     className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden z-dropdown"
                   >
-                    <motion.button
-                      whileHover={{ x: 4 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 30,
-                      }}
-                      onClick={handleEdit}
-                      className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Edit size={16} />
-                      <span>Edit Post</span>
-                    </motion.button>
+                    {isOwnPost && (
+                      <motion.button
+                        whileHover={{ x: 4 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 30,
+                        }}
+                        onClick={handleEdit}
+                        className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
+                      >
+                        <Edit size={16} />
+                        <span>Edit Post</span>
+                      </motion.button>
+                    )}
+                    
+                    {/* Admin controls */}
+                    {isAdmin && !isOwnPost && (
+                      <>
+                        <div className="border-t border-border-1 my-1" />
+                        <div className="px-3 py-1.5 text-xs text-text-2 font-medium flex items-center space-x-1">
+                          <Shield size={12} />
+                          <span>Admin Actions</span>
+                        </div>
+                        <motion.button
+                          whileHover={{ x: 4 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 30,
+                          }}
+                          onClick={handleEdit}
+                          className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
+                        >
+                          <Edit size={16} />
+                          <span>Modify Post</span>
+                        </motion.button>
+                      </>
+                    )}
+                    
                     <motion.button
                       whileHover={{ x: 4 }}
                       transition={{
@@ -301,7 +398,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                       className="w-full px-4 py-2.5 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2 cursor-pointer"
                     >
                       <Trash2 size={16} />
-                      <span>Delete Post</span>
+                      <span>{isAdmin && !isOwnPost ? 'Remove Post' : 'Delete Post'}</span>
                     </motion.button>
                   </motion.div>
                 )}
@@ -311,14 +408,27 @@ export const PostCard: React.FC<PostCardProps> = ({
         </div>
 
         {/* Post title */}
-        <Link to={`/posts/${post.id}`}>
-          <h2 className="text-xl font-semibold mb-2 text-text-1 hover:text-brand-500 transition-colors">
+        <Link to={`/posts/${extractUUID(post.id)}`}>
+          <h2 className="text-xl font-semibold mb-3 text-text-1 hover:text-brand-500 transition-colors">
             {post.title}
           </h2>
         </Link>
 
+        {/* Title/Content separator for markdown posts */}
+        {post.content_type === "text/markdown" && (
+          <div className="flex items-center mb-4">
+            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
+            <div className="mx-3 text-text-2">
+              <FileText size={14} className="opacity-50" />
+            </div>
+            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
+          </div>
+        )}
+
         {/* Post content */}
-        <div className="mb-4">{renderContent()}</div>
+        <div className={`mb-4 ${post.content_type === "text/markdown" ? "prose-sm" : ""}`}>
+          {renderContent()}
+        </div>
 
         {/* Post image if it's an image type */}
         {(post.content_type === "image/png" ||
@@ -368,7 +478,13 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Post stats and interaction buttons */}
       <div className="card-footer border-t border-border-1 -mx-5 -mb-5 px-0 rounded-b-xl overflow-hidden">
-        <div className="flex items-stretch divide-x divide-border-1">
+        <div className="flex items-stretch divide-x divide-border-1" style={{ borderColor: 'var(--border-1)' }}>
+          <style>{`
+            .card-footer .divide-x > :not([hidden]) ~ :not([hidden]) {
+              border-left-color: var(--border-1) !important;
+              border-left-width: 1px !important;
+            }
+          `}</style>
           {/* Like Button */}
           <button
             onClick={handleLike}
@@ -401,37 +517,36 @@ export const PostCard: React.FC<PostCardProps> = ({
               }
               transition={{ duration: 0.5 }}
             >
-              <ThumbsUp size={18} fill={liked ? "currentColor" : "none"} />
+              <Heart size={18} fill={liked ? "currentColor" : "none"} />
               <span className="text-sm font-medium">{likeCount}</span>
             </motion.div>
           </button>
 
           {/* Comment Button */}
-          <Link to={`/posts/${post.id}`} className="flex-1">
-            <button
-              className="w-full h-full flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-              aria-label="View comments"
+          <button
+            onClick={() => navigate(`/posts/${extractUUID(post.id)}`)}
+            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
+            aria-label="View comments"
+          >
+            {/* Gradient background on hover */}
+            <motion.div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)",
+              }}
+            />
+            <motion.div
+              className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
             >
-              {/* Gradient background on hover */}
-              <motion.div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)",
-                }}
-              />
-              <motion.div
-                className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <MessageCircle size={18} />
-                <span className="text-sm font-medium">
-                  {post.comments_count || 0}
-                </span>
-              </motion.div>
-            </button>
-          </Link>
+              <MessageCircle size={18} />
+              <span className="text-sm font-medium">
+                {commentCount}
+              </span>
+            </motion.div>
+          </button>
 
           {/* Share Button */}
           <button
@@ -495,7 +610,16 @@ export const PostCard: React.FC<PostCardProps> = ({
           </button>
         </div>
       </div>
-    </Card>
+      </Card>
+      
+      {/* Share Modal for public posts */}
+      <ShareModal 
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        post={post}
+        shareUrl={`${window.location.origin}/posts/${extractUUID(post.id)}`}
+      />
+    </>
   );
 };
 
@@ -519,5 +643,18 @@ function getTimeAgo(date: Date): string {
     return date.toLocaleDateString();
   }
 }
+
+// Memoized PostCard component
+export const PostCard = React.memo(PostCardComponent, (prevProps, nextProps) => {
+  // Custom comparison function for memo
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.post.likes_count === nextProps.post.likes_count &&
+    prevProps.post.comments_count === nextProps.post.comments_count &&
+    prevProps.post.visibility === nextProps.post.visibility &&
+    prevProps.isLiked === nextProps.isLiked &&
+    prevProps.isSaved === nextProps.isSaved
+  );
+});
 
 export default PostCard;

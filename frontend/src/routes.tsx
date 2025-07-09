@@ -15,8 +15,11 @@ import SettingsPage from "./pages/SettingsPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import FriendsPage from "./pages/FriendsPage";
-import CreatePostPage from "./pages/CreatePostPage";
 import AuthorProfilePage from "./pages/AuthorProfilePage";
+import SavedPostsPage from "./pages/SavedPostsPage";
+import LikedPostsPage from "./pages/LikedPostsPage";
+import FollowRequestsPage from "./pages/FollowRequestsPage";
+import DocsPage from "./pages/DocsPage";
 
 
 
@@ -109,14 +112,6 @@ export const routes: RouteObject[] = [
           </Protected>
         ),
       },
-      {
-      path: "/create",
-      element: (
-        <Protected>
-          <CreatePostPage />
-        </Protected>
-      ),
-    },
     {
     path: "/authors/:id",
     element: (
@@ -125,7 +120,34 @@ export const routes: RouteObject[] = [
       </Protected>
     ),
 },
-
+    {
+      path: "/saved",
+      element: (
+        <Protected>
+          <SavedPostsPage />
+        </Protected>
+      ),
+    },
+    {
+      path: "/liked",
+      element: (
+        <Protected>
+          <LikedPostsPage />
+        </Protected>
+      ),
+    },
+    {
+      path: "/follow-requests",
+      element: (
+        <Protected>
+          <FollowRequestsPage />
+        </Protected>
+      ),
+    },
+    {
+      path: "/docs",
+      element: <DocsPage />,
+    },
     ],
   },
   // Error pages with separate layout
@@ -134,10 +156,6 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: "/messages",
-        element: <NotFoundPage />,
-      },
-      {
-        path: "/saved",
         element: <NotFoundPage />,
       },
       {

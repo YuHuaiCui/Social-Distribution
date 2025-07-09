@@ -37,26 +37,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       try {
         setLoading(true);
 
-        
-
         // Check for active session with expiry
         const sessionData = localStorage.getItem("sessionData");
         const hasRememberMe = localStorage.getItem("rememberMe") === "true";
         const hasSession = document.cookie.includes("sessionid");
-        const hasStoredToken =
-          localStorage.getItem("authToken") ||
-          sessionStorage.getItem("authToken");
+        // Session authentication is handled by Django cookies
 
-        console.log(
-          "Auth check - hasRememberMe:",
-          hasRememberMe,
-          "sessionData:",
-          !!sessionData,
-          "hasSession:",
-          hasSession,
-          "hasStoredToken:",
-          !!hasStoredToken
-        );
+
+        // If we have a Django session cookie, we should check with the backend
+        // This is important for GitHub OAuth where Django sets the session
+        if (hasSession) {
+        }
 
         // Check if we have a valid session (either remember me or 24-hour session)
         let hasValidSession = false;
@@ -66,29 +57,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
             const now = Date.now();
             const sessionExpiry = parsed.expiry || 0;
 
+
             if (hasRememberMe || now < sessionExpiry) {
               hasValidSession = true;
             } else {
               // Session expired, clear it
-
               localStorage.removeItem("sessionData");
             }
           } catch {
             // Invalid session data, clear it
-
             localStorage.removeItem("sessionData");
           }
         }
 
+        // Check if we might have just come from GitHub OAuth
+        const mightBeFromGitHub = 
+          window.location.search.includes('code=') || 
+          window.location.search.includes('state=') ||
+          sessionStorage.getItem('githubAuthPending') === 'true';
+
         // Only skip auth check if there's absolutely no sign of authentication
+        // AND we're not potentially coming from GitHub OAuth
         if (
           !hasRememberMe &&
           !hasSession &&
-          !hasStoredToken &&
           !hasValidSession &&
+          !mightBeFromGitHub &&
           lastChecked === 0
         ) {
-          // User didn't choose to be remembered and has no active session or tokens, and this is initial load
           setIsAuthenticated(false);
           setUser(null);
           setLoading(false);
@@ -100,16 +96,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
         setIsAuthenticated(response.isAuthenticated);
         setUser(response.user || null);
+        
       } catch (error) {
-        console.error("Auth status check failed:", error);
         // If we get a 401/403, the interceptor will handle redirect
         // For other errors, just set as not authenticated
         setIsAuthenticated(false);
         setUser(null);
 
-        // Clear any stored auth tokens and session data
-        localStorage.removeItem("authToken");
-        sessionStorage.removeItem("authToken");
+        // Clear session data
         localStorage.removeItem("sessionData");
 
         // If auth check fails, also clear rememberMe
@@ -136,12 +130,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
           if (now >= sessionExpiry) {
             // Session expired, log out user
-            console.log("Session expired, logging out user");
             logout();
           }
         } catch {
           // Invalid session data, log out user
-          console.log("Invalid session data, logging out user");
           logout();
         }
       }
@@ -157,18 +149,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   }, [isAuthenticated]);
 
   const login = async (rememberMe: boolean = false, userData?: Author) => {
-    console.log(
-      "Login called - rememberMe:",
-      rememberMe,
-      "userData:",
-      !!userData
-    );
 
     setIsAuthenticated(true);
 
     // If user data is provided, set it immediately
     if (userData) {
       setUser(userData);
+    } else {
+      // If no user data provided, fetch it from the backend
+      try {
+        const response = await api.getAuthStatus();
+        if (response.isAuthenticated && response.user) {
+          setUser(response.user);
+          userData = response.user;
+        }
+      } catch (error) {
+      }
     }
 
     // Create session data with expiry
@@ -181,14 +177,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       userId: userData?.id,
     };
 
-    console.log("Creating session data:", sessionData);
     localStorage.setItem("sessionData", JSON.stringify(sessionData)); // Store auth persistence preference
     if (rememberMe) {
       localStorage.setItem("rememberMe", "true");
-      console.log("Remember me enabled");
     } else {
       localStorage.removeItem("rememberMe");
-      console.log("Remember me disabled - 24 hour session created");
     }
 
     // Update auth state immediately for better performance
@@ -206,9 +199,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       localStorage.removeItem("rememberMe");
       // Clear session data
       localStorage.removeItem("sessionData");
-      // Clear any stored auth tokens
-      localStorage.removeItem("authToken");
-      sessionStorage.removeItem("authToken");
+      // Clear auth check flags
+      sessionStorage.removeItem("authChecked");
+      sessionStorage.removeItem("githubAuthHandled");
+      sessionStorage.removeItem("githubAuthPending");
       // Update lastChecked to trigger the auth check effect
       setLastChecked(Date.now());
     } catch (error) {

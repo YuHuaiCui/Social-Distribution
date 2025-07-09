@@ -22,7 +22,8 @@ class EntryManager(models.Manager):
             | Q(author1=OuterRef("author"), author2=viewing_author)
         )
 
-        following_exists = Follow.objects.filter(
+        # Check if viewing_author is a follower of the post author
+        follower_exists = Follow.objects.filter(
             follower=viewing_author, followed=OuterRef("author"), status=Follow.ACCEPTED
         )
 
@@ -30,22 +31,24 @@ class EntryManager(models.Manager):
             Q(visibility=Entry.PUBLIC)  # Public entries
             | Q(visibility=Entry.UNLISTED, author=viewing_author)  # Own unlisted
             | Q(visibility=Entry.UNLISTED)
-            & Exists(following_exists)  # Unlisted from followed
+            & (
+                Exists(follower_exists) | Exists(friendship_exists)
+            )  # Unlisted visible to followers and friends
             | Q(
                 visibility=Entry.FRIENDS_ONLY, author=viewing_author
             )  # Own friends-only
             | Q(visibility=Entry.FRIENDS_ONLY)
-            & Exists(friendship_exists)  # Friends-only from friends
+            & Exists(friendship_exists)  # Friends-only from friends only
         ).exclude(visibility=Entry.DELETED)
 
 
 class Entry(models.Model):
     """Represents posts/entries in the social network"""
 
-    PUBLIC = "public"
-    UNLISTED = "unlisted"
-    FRIENDS_ONLY = "friends"
-    DELETED = "deleted"
+    PUBLIC = "PUBLIC"
+    UNLISTED = "UNLISTED"
+    FRIENDS_ONLY = "FRIENDS"
+    DELETED = "DELETED"
 
     VISIBILITY_CHOICES = [
         (PUBLIC, "Public"),
@@ -75,6 +78,10 @@ class Entry(models.Model):
     )
 
     title = models.CharField(max_length=255)
+    description = models.TextField(
+        blank=True, 
+        help_text="Brief description of the entry for preview purposes"
+    )
     content = models.TextField()
     content_type = models.CharField(
         max_length=50, choices=CONTENT_TYPE_CHOICES, default=TEXT_PLAIN
@@ -88,6 +95,25 @@ class Entry(models.Model):
     source = models.URLField(blank=True, help_text="Source URL (e.g., GitHub)")
     origin = models.URLField(blank=True, help_text="Origin URL")
 
+    # Additional fields for project spec compliance
+    type = models.CharField(
+        max_length=20, 
+        default="entry", 
+        help_text="Object type for federation (always 'entry')"
+    )
+    web = models.URLField(
+        blank=True, 
+        help_text="Frontend URL where this entry can be viewed"
+    )
+    published = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="ISO 8601 timestamp of when the entry was published"
+    )
+    
+    # Image data for image posts
+    image_data = models.BinaryField(null=True, blank=True, help_text="Image data stored as blob")
+    
     # Tracking for federation
     inboxes_sent_to = models.ManyToManyField(
         Author, through="InboxDelivery", related_name="received_entries"
@@ -116,25 +142,77 @@ class Entry(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        # Auto-generate URL
+        """
+        Save the entry and auto-generate URL if not provided.
+        
+        For local authors, automatically generates the API URL based on the
+        site URL and entry/author IDs. Remote entries should have their URL
+        provided during creation.
+        
+        Args:
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments
+        """
+        # Auto-generate URL for local entries
         if not self.url:
             if self.author.is_local:
                 self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/entries/{self.id}"
             else:
                 # For remote entries, URL should be provided
                 pass
+        
+        # Auto-generate web URL for local entries
+        if not self.web and self.author.is_local:
+            self.web = f"{settings.SITE_URL}/authors/{self.author.id}/entries/{self.id}"
+        
+        # Set published timestamp to created_at if not provided
+        if not self.published and not self.pk:
+            # This is a new entry, will use created_at after save
+            pass
+        
         super().save(*args, **kwargs)
+        
+        # Update published to match created_at if still not set
+        if not self.published and self.created_at:
+            self.published = self.created_at
+            # Save again only if we just set published
+            super().save(update_fields=['published'])
 
     @property
     def is_deleted(self):
+        """
+        Check if the entry has been soft-deleted.
+        
+        Returns:
+            bool: True if the entry's visibility is set to DELETED, False otherwise
+        """
         return self.visibility == self.DELETED
 
     def __str__(self):
+        """
+        String representation of the entry.
+        
+        Returns:
+            str: A human-readable string showing the entry title and author
+        """
         return f"{self.title} by {self.author}"
 
 
 class InboxDelivery(models.Model):
-    """Tracks which entries have been sent to which author inboxes"""
+    """
+    Tracks delivery of entries to author inboxes for federation.
+    
+    This model maintains a record of which entries have been delivered to
+    which authors' inboxes, supporting the distributed nature of the social
+    network. It helps prevent duplicate deliveries and provides an audit
+    trail for federation activities.
+    
+    Attributes:
+        entry: The entry that was delivered
+        recipient: The author who received the entry in their inbox
+        delivered_at: Timestamp of when the delivery occurred
+        success: Whether the delivery was successful
+    """
 
     entry = models.ForeignKey(Entry, on_delete=models.CASCADE)
     recipient = models.ForeignKey(Author, on_delete=models.CASCADE, to_field="url")

@@ -42,7 +42,24 @@ class Author(AbstractUser):
 
     # Override username to store full URL for remote authors
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")    # Profile information
+    url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")
+    
+    # Additional fields for project spec compliance
+    type = models.CharField(
+        max_length=20, 
+        default="author", 
+        help_text="Object type for federation (always 'author')"
+    )
+    host = models.URLField(
+        blank=True,
+        help_text="API host URL for this author's node"
+    )
+    web = models.URLField(
+        blank=True,
+        help_text="Frontend URL where this author's profile can be viewed"
+    )
+    
+    # Profile information
     display_name = models.CharField(max_length=255, blank=True)
     github_username = models.CharField(max_length=255, blank=True)
     profile_image = models.URLField(max_length=200, blank=True)
@@ -174,12 +191,27 @@ class Author(AbstractUser):
         if not self.url and not self.node:
             # This will be set after save when we have the ID
             pass
+            
         super().save(*args, **kwargs)
 
-        # Set URL after save for local authors
-        if not self.url and not self.node:
-            self.url = f"{settings.SITE_URL}/api/authors/{self.id}/"
-            super().save(update_fields=["url"])
+        # Set URL and related fields after save for local authors
+        if not self.node:  # Local author
+            update_fields = []
+            
+            if not self.url:
+                self.url = f"{settings.SITE_URL}/api/authors/{self.id}/"
+                update_fields.append("url")
+                
+            if not self.host:
+                self.host = f"{settings.SITE_URL}/api/"
+                update_fields.append("host")
+                
+            if not self.web:
+                self.web = f"{settings.SITE_URL}/authors/{self.id}"
+                update_fields.append("web")
+                
+            if update_fields:
+                super().save(update_fields=update_fields)
 
     @property
     def is_local(self):

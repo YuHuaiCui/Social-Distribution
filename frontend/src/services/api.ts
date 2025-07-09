@@ -127,6 +127,15 @@ class ApiService {
     );
   }
 
+  async searchAuthors(query: string, params?: {
+    is_approved?: boolean;
+    is_active?: boolean;
+    type?: "local" | "remote";
+    page?: number;
+  }): Promise<PaginatedResponse<Author>> {
+    return this.getAuthors({ ...params, search: query });
+  }
+
   async getAuthor(id: string): Promise<Author> {
     return this.request<Author>(`/api/authors/${id}/`);
   }
@@ -143,6 +152,8 @@ class ApiService {
     if (data.github_username !== undefined)
       backendData.github_username = data.github_username;
     if (data.bio !== undefined) backendData.bio = data.bio;
+    if (data.location !== undefined) backendData.location = data.location;
+    if (data.website !== undefined) backendData.website = data.website;
     if (data.profile_image !== undefined)
       backendData.profile_image = data.profile_image;
     if (data.email !== undefined) backendData.email = data.email;
@@ -150,6 +161,16 @@ class ApiService {
     return this.request<Author>("/api/authors/me/", {
       method: "PATCH",
       body: JSON.stringify(backendData),
+    });
+  }
+
+  async changePassword(data: {
+    password: string;
+    password_confirm: string;
+  }): Promise<Author> {
+    return this.request<Author>("/api/authors/me/", {
+      method: "PATCH",
+      body: JSON.stringify(data),
     });
   }
 
@@ -268,29 +289,46 @@ class ApiService {
     );
   }
 
-  // Follow endpoints (when implemented in backend)
+  // Follow endpoints - backend implemented
   async followAuthor(authorId: string): Promise<Follow> {
-    // This endpoint needs to be implemented in backend
     return this.request<Follow>(`/api/authors/${authorId}/follow/`, {
       method: "POST",
     });
   }
 
   async unfollowAuthor(authorId: string): Promise<void> {
-    // This endpoint needs to be implemented in backend
     await this.request(`/api/authors/${authorId}/follow/`, {
       method: "DELETE",
     });
   }
 
   async getFollowers(authorId: string): Promise<Author[]> {
-    // This endpoint needs to be implemented in backend
     return this.request<Author[]>(`/api/authors/${authorId}/followers/`);
   }
 
   async getFollowing(authorId: string): Promise<Author[]> {
-    // This endpoint needs to be implemented in backend
     return this.request<Author[]>(`/api/authors/${authorId}/following/`);
+  }
+
+  async getFriends(authorId: string): Promise<Author[]> {
+    return this.request<Author[]>(`/api/authors/${authorId}/friends/`);
+  }
+
+  // Admin endpoints
+  async approveAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/approve/`, { method: 'POST' });
+  }
+
+  async deactivateAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/deactivate/`, { method: 'POST' });
+  }
+
+  async activateAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/activate/`, { method: 'POST' });
+  }
+
+  async deleteAuthor(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/`, { method: 'DELETE' });
   }
 
   // Inbox endpoints (when implemented in backend)
@@ -318,6 +356,23 @@ class ApiService {
     await this.request("/api/inbox/clear/", {
       method: "POST",
     });
+  }
+
+  async getLikedEntries(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedResponse<Entry>> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    return this.request<PaginatedResponse<Entry>>(
+      `/api/entries/liked/?${queryParams.toString()}`
+    );
   }
 }
 
