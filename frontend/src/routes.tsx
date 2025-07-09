@@ -117,7 +117,24 @@ export const routes: RouteObject[] = [
         <AuthorProfilePage />
       </Protected>
     ),
+  },
+{
+  path: "/authors/:id/followers",
+  element: (
+    <Protected>
+      <FriendsPage defaultFilter="followers" />
+    </Protected>
+  ),
 },
+{
+  path: "/authors/:id/following",
+  element: (
+    <Protected>
+      <FriendsPage defaultFilter="following" />
+    </Protected>
+  ),
+},
+
     {
       path: "/saved",
       element: (

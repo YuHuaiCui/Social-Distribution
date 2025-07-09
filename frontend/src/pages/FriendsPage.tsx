@@ -10,12 +10,22 @@ import AuthorCard from "../components/AuthorCard";
 import Input from "../components/ui/Input";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
 import Card from "../components/ui/Card";
+import { useParams } from "react-router-dom";
+import { i } from "framer-motion/client";
+
 
 type FilterType = "friends" | "following" | "followers";
 
-export const FriendsPage: React.FC = () => {
+type FriendsPageProps = {
+  defaultFilter?: FilterType;
+};
+
+export const FriendsPage: React.FC<FriendsPageProps> = ({ defaultFilter = "friends" }) => {
   const { user: currentUser } = useAuth();
-  const [filter, setFilter] = useState<FilterType>("friends");
+  //const [filter, setFilter] = useState<FilterType>("friends");
+  const { id: authorId } = useParams()
+  const [filter, setFilter] = useState<FilterType>(defaultFilter);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [authors, setAuthors] = useState<Author[]>([]);
@@ -36,9 +46,9 @@ export const FriendsPage: React.FC = () => {
     
     try {
       const [friends, following, followers, pendingRequests] = await Promise.all([
-        api.getFriends(currentUser.id),
-        api.getFollowing(currentUser.id),
-        api.getFollowers(currentUser.id),
+        api.getFriends(authorId ?? currentUser.id),
+        api.getFollowing(authorId ?? currentUser.id),
+        api.getFollowers(authorId ?? currentUser.id),
         socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
       ]);
       
@@ -60,13 +70,13 @@ export const FriendsPage: React.FC = () => {
 
       switch (filter) {
         case "friends":
-          fetchedAuthors = await api.getFriends(currentUser.id);
+          fetchedAuthors = await api.getFriends(authorId ?? currentUser.id);
           break;
         case "following":
-          fetchedAuthors = await api.getFollowing(currentUser.id);
+          fetchedAuthors = await api.getFollowing(authorId ?? currentUser.id);
           break;
         case "followers":
-          fetchedAuthors = await api.getFollowers(currentUser.id);
+          fetchedAuthors = await api.getFollowers(authorId ?? currentUser.id);
           break;
       }
 
@@ -252,44 +262,47 @@ export const FriendsPage: React.FC = () => {
       </div>
 
       {/* Follow Requests Notification */}
-      {pendingRequestsCount > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <Link to="/follow-requests">
-            <Card
-              variant="prominent"
-              className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
-                         border border-[var(--primary-violet)]/20 hover:border-[var(--primary-violet)]/40 
-                         transition-all cursor-pointer group"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
-                    <Bell size={20} className="text-[var(--primary-violet)]" />
+      {(() => {
+        const isSelf = authorId === undefined || authorId === currentUser?.id;
+        return isSelf && pendingRequestsCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Link to="/follow-requests">
+              <Card
+                variant="prominent"
+                className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
+                           border border-[var(--primary-violet)]/20 hover:border-[var(--primary-violet)]/40 
+                           transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
+                      <Bell size={20} className="text-[var(--primary-violet)]" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-text-1">
+                        {pendingRequestsCount} pending follow {pendingRequestsCount === 1 ? 'request' : 'requests'}
+                      </h3>
+                      <p className="text-sm text-text-2">
+                        Review and manage who can follow you
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-text-1">
-                      {pendingRequestsCount} pending follow {pendingRequestsCount === 1 ? 'request' : 'requests'}
-                    </h3>
-                    <p className="text-sm text-text-2">
-                      Review and manage who can follow you
-                    </p>
-                  </div>
+                  <motion.div
+                    animate={{ x: [0, 5, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    <ArrowRight size={20} className="text-[var(--primary-violet)]" />
+                  </motion.div>
                 </div>
-                <motion.div
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                  <ArrowRight size={20} className="text-[var(--primary-violet)]" />
-                </motion.div>
-              </div>
-            </Card>
-          </Link>
-        </motion.div>
-      )}
+              </Card>
+            </Link>
+          </motion.div>
+        );
+      })()}
 
       {/* Content */}
       <div className="flex-1 flex flex-col">
@@ -324,25 +337,28 @@ export const FriendsPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 flex-1">
           <AnimatePresence mode="popLayout">
-            {filteredAuthors.map((author, index) => (
-              <motion.div
-                key={author.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                layout
-              >
-                <AuthorCard
-                  author={author}
-                  variant="default"
-                  showStats={true}
-                  showBio={true}
-                  showActions={true}
-                  onFollow={handleFollowToggle}
-                />
-              </motion.div>
-            ))}
+            {filteredAuthors.map((author, index) => {
+              const isSelf = !authorId || authorId === currentUser?.id;
+              return (
+                <motion.div
+                  key={author.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  layout
+                >
+                  <AuthorCard
+                    author={author}
+                    variant="default"
+                    showStats={true}
+                    showBio={true}
+                    showActions={isSelf}
+                    onFollow={handleFollowToggle}
+                  />
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
