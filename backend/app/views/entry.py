@@ -48,9 +48,13 @@ class EntryViewSet(viewsets.ModelViewSet):
         else:
             user_author = user
 
-        # Use the EntryManager's visibility logic to check if the entry is visible
         try:
-            obj = Entry.objects.visible_to_author(user_author).get(id=lookup_value)
+            if user.is_staff:
+                # Admins bypass visibility filtering
+                obj = Entry.objects.get(id=lookup_value)
+            else:
+                obj = Entry.objects.visible_to_author(user_author).get(id=lookup_value)
+
         except Entry.DoesNotExist:
             raise NotFound("Entry not found.")
 
