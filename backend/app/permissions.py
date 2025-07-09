@@ -7,6 +7,9 @@ class IsAuthorSelfOrReadOnly(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Read permissions are allowed for any request,
         # so we'll always allow GET, HEAD or OPTIONS requests.
+        print("PERMISSION DEBUG - Entry Author:", obj.author)
+        print("PERMISSION DEBUG - Request Author:", getattr(request.user, "author", None))
+
         if request.method in SAFE_METHODS:
             return True
 

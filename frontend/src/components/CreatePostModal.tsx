@@ -380,12 +380,12 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                                   alt="Current uploaded"
                                   className="rounded-lg max-h-64 object-contain border border-border-1"
                                 />
+                                
                                 <button
                                   type="button"
                                   onClick={() => setReplacingImage(true)} // triggers file upload
                                   className="text-sm text-primary hover:underline"
                                 >
-                                  Replace Image
                                 </button>
                               </div>
                             )}

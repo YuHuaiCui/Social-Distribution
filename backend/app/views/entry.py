@@ -41,25 +41,35 @@ class EntryViewSet(viewsets.ModelViewSet):
         if lookup_value is None:
             raise NotFound("No Entry ID provided.")
 
-        # Get the user's author instance
         user = self.request.user
-        if user.is_authenticated:
-            user_author = getattr(user, "author", None)
-        else:
-            user_author = None  # Anonymous access
+        user_author = getattr(user, "author", None) or user if user.is_authenticated else None
 
         try:
+            obj = Entry.objects.get(id=lookup_value)
+            print("GET_OBJECT DEBUG - User:", user)
+            print("GET_OBJECT DEBUG - Author:", user_author)
+            print("GET_OBJECT DEBUG - Entry Author:", obj.author)
+
+
             if user.is_staff:
-                # Admins bypass visibility filtering
-                obj = Entry.objects.get(id=lookup_value)
-            else:
-                obj = Entry.objects.visible_to_author(user_author).get(id=lookup_value)
+                return obj
+
+            # ✅ Allow author to edit/delete their own post
+            if self.request.method in ["PATCH", "PUT", "DELETE"]:
+                if user_author and obj.author == user_author:
+                    return obj
+                raise PermissionDenied("You cannot edit this post.")
+
+            # ✅ For other requests (e.g. GET), enforce visibility
+            if obj in Entry.objects.visible_to_author(user_author):
+                return obj
 
         except Entry.DoesNotExist:
             raise NotFound("Entry not found.")
 
-        self.check_object_permissions(self.request, obj)
-        return obj
+        raise PermissionDenied("You do not have permission to view this post.")
+
+
 
     def get_queryset(self):
         """
