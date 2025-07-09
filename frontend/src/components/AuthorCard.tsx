@@ -17,6 +17,7 @@ import { inboxService } from '../services/inbox';
 import { useAuth } from './context/AuthContext';
 import { triggerNotificationUpdate } from './context/NotificationContext';
 import { useToast } from './context/ToastContext';
+import { extractUUID } from "../utils/extractId";
 
 interface AuthorCardProps {
   author: Author & {
@@ -88,8 +89,8 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       setStatsLoading(true);
       try {
         const [followers, following] = await Promise.all([
-          api.getFollowers(author.id),
-          api.getFollowing(author.id),
+          api.getFollowers(extractUUID(author.id)),
+          api.getFollowing(extractUUID(author.id)),
         ]);
         
         setFollowerCount(followers.length);
@@ -113,7 +114,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
     try {
       if (followStatus === 'accepted' || isFollowing) {
         // Unfollow
-        await socialService.unfollowAuthor(author.id);
+        await socialService.unfollowAuthor(extractUUID(author.id));
         setIsFollowing(false);
         setFollowStatus('none');
         setFollowerCount(prev => Math.max(0, prev - 1));
@@ -122,7 +123,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         window.dispatchEvent(new Event('follow-update'));
       } else if (followStatus === 'none' || followStatus === 'rejected') {
         // Send follow request
-        await socialService.followAuthor(author.id);
+        await socialService.followAuthor(extractUUID(author.id));
         setFollowStatus('pending');
         onFollow?.(false);
         // Dispatch event for other components
@@ -188,7 +189,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       // Send report to all admin inboxes
       await Promise.all(
         admins.map(admin => 
-          inboxService.sendToInbox(admin.id, reportData).catch(err => {
+          inboxService.sendToInbox(extractUUID(admin.id), reportData).catch(err => {
             console.error(`Failed to send report to admin ${admin.id}:`, err);
           })
         )
@@ -209,17 +210,17 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
     try {
       switch (action) {
         case 'approve':
-          await api.approveAuthor(author.id);
+          await api.approveAuthor(extractUUID(author.id));
           break;
         case 'deactivate':
-          await api.deactivateAuthor(author.id);
+          await api.deactivateAuthor(extractUUID(author.id));
           break;
         case 'activate':
-          await api.activateAuthor(author.id);
+          await api.activateAuthor(extractUUID(author.id));
           break;
         case 'delete':
           if (window.confirm(`Are you sure you want to delete ${author.display_name}?`)) {
-            await api.deleteAuthor(author.id);
+            await api.deleteAuthor(extractUUID(author.id));
           }
           break;
       }
@@ -239,7 +240,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         whileHover={{ scale: 1.02 }}
         className={`flex items-center space-x-3 p-3 rounded-lg glass-card-subtle bg-[rgba(var(--glass-rgb),0.85)] backdrop-blur-md hover:bg-glass-low transition-all ${className}`}
       >
-        <Link to={`/authors/${author.id}`}>
+          <Link to={`/authors/${extractUUID(author.id)}`}>
           <Avatar
             imgSrc={author.profile_image}
             alt={author.display_name || 'Unknown'}
@@ -249,7 +250,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         </Link>
         
         <div className="flex-1 min-w-0">
-          <Link to={`/authors/${author.id}`} className="hover:underline">
+          <Link to={`/authors/${extractUUID(author.id)}`} className="hover:underline">
             <h4 className="font-medium text-text-1 truncate">{author.display_name || 'Unknown'}</h4>
           </Link>
           <p className="text-sm text-text-2 truncate">@{author.username}</p>
@@ -277,7 +278,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       <div className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
-          <Link to={`/authors/${author.id}`} className="flex items-center space-x-4">
+          <Link to={`/authors/${extractUUID(author.id)}`} className="flex items-center space-x-4">
             <motion.div whileHover={{ scale: 1.05 }}>
               <Avatar
                 imgSrc={author.profile_image}
@@ -402,7 +403,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
               <span className="text-text-2">posts</span>
             </div>
             
-            <Link to={`/authors/${author.id}/followers`} className="flex items-center space-x-1 hover:underline min-w-0">
+            <Link to={`/authors/${extractUUID(author.id)}/followers`} className="flex items-center space-x-1 hover:underline min-w-0">
               <Users size={16} className="text-text-2 flex-shrink-0" />
               <span className={`font-semibold text-text-1 ${statsLoading ? 'opacity-50' : ''}`}>
                 {formatCount(followerCount)}
@@ -410,7 +411,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
               <span className="text-text-2">followers</span>
             </Link>
             
-            <Link to={`/authors/${author.id}/following`} className="flex items-center space-x-1 hover:underline min-w-0">
+            <Link to={`/authors/${extractUUID(author.id)}/following`} className="flex items-center space-x-1 hover:underline min-w-0">
               <span className={`font-semibold text-text-1 ${statsLoading ? 'opacity-50' : ''}`}>
                 {formatCount(followingCount)}
               </span>

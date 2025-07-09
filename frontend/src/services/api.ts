@@ -72,6 +72,12 @@ class ApiService {
       );
     }
 
+    // Handle empty responses (like 204 No Content for DELETE operations)
+    const contentType = response.headers.get("content-type");
+    if (response.status === 204 || !contentType?.includes("application/json")) {
+      return {} as T;
+    }
+
     return response.json();
   }
 
@@ -127,12 +133,15 @@ class ApiService {
     );
   }
 
-  async searchAuthors(query: string, params?: {
-    is_approved?: boolean;
-    is_active?: boolean;
-    type?: "local" | "remote";
-    page?: number;
-  }): Promise<PaginatedResponse<Author>> {
+  async searchAuthors(
+    query: string,
+    params?: {
+      is_approved?: boolean;
+      is_active?: boolean;
+      type?: "local" | "remote";
+      page?: number;
+    }
+  ): Promise<PaginatedResponse<Author>> {
     return this.getAuthors({ ...params, search: query });
   }
 
@@ -316,19 +325,25 @@ class ApiService {
 
   // Admin endpoints
   async approveAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/approve/`, { method: 'POST' });
+    return this.request(`/api/authors/${authorId}/approve/`, {
+      method: "POST",
+    });
   }
 
   async deactivateAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/deactivate/`, { method: 'POST' });
+    return this.request(`/api/authors/${authorId}/deactivate/`, {
+      method: "POST",
+    });
   }
 
   async activateAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/activate/`, { method: 'POST' });
+    return this.request(`/api/authors/${authorId}/activate/`, {
+      method: "POST",
+    });
   }
 
   async deleteAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/`, { method: 'DELETE' });
+    return this.request(`/api/authors/${authorId}/`, { method: "DELETE" });
   }
 
   // Inbox endpoints (when implemented in backend)
