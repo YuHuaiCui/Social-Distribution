@@ -43,10 +43,10 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         # Get the user's author instance
         user = self.request.user
-        if hasattr(user, "author"):
-            user_author = user.author
+        if user.is_authenticated:
+            user_author = getattr(user, "author", None)
         else:
-            user_author = user
+            user_author = None  # Anonymous access
 
         try:
             if user.is_staff:
@@ -135,14 +135,15 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         Instantiate and return the list of permissions that this view requires.
         """
-        if self.action == "create":
-            permission_classes = [IsAuthenticated]
-        elif self.action in ["update", "partial_update", "destroy"]:
-            permission_classes = [IsAuthenticated, IsAuthorSelfOrReadOnly]
-        else:  # list, retrieve
-            permission_classes = [IsAuthenticated]
+        if self.action in ["create", "update", "partial_update", "destroy"]:
+            return [IsAuthenticated(), IsAuthorSelfOrReadOnly()]
+        elif self.action == "retrieve":
+            # Allow public access to individual entries
+            return []
+        else:
+            # For list, feed, liked, etc., still require login
+            return [IsAuthenticated()]
 
-        return [permission() for permission in permission_classes]
 
     def create(self, request, *args, **kwargs):
         """
