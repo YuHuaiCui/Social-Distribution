@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../components/context/AuthContext";
 import { useToast } from "../components/context/ToastContext";
+import { useCreatePost } from "../components/context/CreatePostContext";
 import { triggerNotificationUpdate } from "../components/context/NotificationContext";
 import type { Entry, Comment, Author } from "../types/models";
 import AnimatedButton from "../components/ui/AnimatedButton";
@@ -37,17 +38,21 @@ export const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
+  const { openCreatePost } = useCreatePost();
   const [post, setPost] = useState<Entry | null>(null);
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [commentContentType, setCommentContentType] = useState<"text/plain" | "text/markdown">("text/plain");
+  const [commentContentType, setCommentContentType] = useState<
+    "text/plain" | "text/markdown"
+  >("text/plain");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
   // Type guard to check if author is an Author object
   const isAuthorObject = (author: unknown): author is Author => {
     return (
@@ -63,10 +68,11 @@ export const PostDetailPage: React.FC = () => {
 
     // Extract UUID if postId is a full URL
     let extractedId = postId;
-    if (postId.includes('/')) {
+    if (postId.includes("/")) {
       // Extract the UUID from the URL (last segment)
-      const segments = postId.split('/');
-      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+      const segments = postId.split("/");
+      extractedId =
+        segments[segments.length - 1] || segments[segments.length - 2];
     }
 
     // Validate UUID format
@@ -77,10 +83,10 @@ export const PostDetailPage: React.FC = () => {
       setIsLoading(false);
       return;
     }
-    
+
     // Use the extracted UUID for all API calls
     const validPostId = extractedId;
-    
+
     // Fetch the post details
     let fetchedPost;
     try {
@@ -106,6 +112,7 @@ export const PostDetailPage: React.FC = () => {
             return;
           }
         } catch (authorError) {
+          console.error("Error fetching from author entries:", authorError);
         }
       }
 
@@ -156,7 +163,7 @@ export const PostDetailPage: React.FC = () => {
     }
 
     // Get like status using the API
-    if(user?.id) {
+    if (user?.id) {
       try {
         const response = await fetch(`/api/entries/${validPostId}/likes/`);
         if (response.ok) {
@@ -174,18 +181,18 @@ export const PostDetailPage: React.FC = () => {
     }
 
     // Get bookmarked/saved status
-    if(user?.id) {
-    try {
-      const savedPostsResponse = await socialService.getSavedPosts();
-      const isSaved = savedPostsResponse.results.some(
-        (savedPost) => savedPost.id === validPostId
-      );
-      setIsBookmarked(isSaved);
-    } catch (error) {
-      console.error("Error checking saved status:", error);
-      setIsBookmarked(false);
+    if (user?.id) {
+      try {
+        const savedPostsResponse = await socialService.getSavedPosts();
+        const isSaved = savedPostsResponse.results.some(
+          (savedPost) => savedPost.id === validPostId
+        );
+        setIsBookmarked(isSaved);
+      } catch (error) {
+        console.error("Error checking saved status:", error);
+        setIsBookmarked(false);
+      }
     }
-  }
 
     // Always set loading to false at the end
     setIsLoading(false);
@@ -194,6 +201,25 @@ export const PostDetailPage: React.FC = () => {
   useEffect(() => {
     fetchPostDetails();
   }, [fetchPostDetails]);
+
+  // Handle click outside to close actions menu
+  useEffect(() => {
+    if (!showActions) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        actionsRef.current &&
+        !actionsRef.current.contains(event.target as Node)
+      ) {
+        setShowActions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showActions]);
 
   const handleLike = async () => {
     if (!postId || !post) return;
@@ -269,8 +295,8 @@ export const PostDetailPage: React.FC = () => {
           url: shareUrl,
         });
       } catch (err) {
-        if (err instanceof Error && err.name !== 'AbortError') {
-          console.error('Error sharing:', err);
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("Error sharing:", err);
         }
       }
     } else {
@@ -278,9 +304,9 @@ export const PostDetailPage: React.FC = () => {
       try {
         await navigator.clipboard.writeText(shareUrl);
         // You might want to show a toast notification here
-        alert('Link copied to clipboard!');
+        alert("Link copied to clipboard!");
       } catch (err) {
-        console.error('Failed to copy link:', err);
+        console.error("Failed to copy link:", err);
       }
     }
   };
@@ -290,11 +316,11 @@ export const PostDetailPage: React.FC = () => {
 
     // Extract UUID from postId if it's a URL
     let extractedId = postId;
-    if (postId.includes('/')) {
-      const segments = postId.split('/');
-      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+    if (postId.includes("/")) {
+      const segments = postId.split("/");
+      extractedId =
+        segments[segments.length - 1] || segments[segments.length - 2];
     }
-
 
     setIsSubmitting(true);
     try {
@@ -343,21 +369,55 @@ export const PostDetailPage: React.FC = () => {
       if (post) {
         const newCommentCount = (post.comments_count || 0) + 1;
         setPost({ ...post, comments_count: newCommentCount });
-        
+
         // Dispatch custom event to update comment count in other components
-        window.dispatchEvent(new CustomEvent('post-update', {
-          detail: { postId: post.id, updates: { comments_count: newCommentCount } }
-        }));
-        
+        window.dispatchEvent(
+          new CustomEvent("post-update", {
+            detail: {
+              postId: post.id,
+              updates: { comments_count: newCommentCount },
+            },
+          })
+        );
+
         // Trigger notification update in case the post author receives a notification
         triggerNotificationUpdate();
       }
     } catch (err) {
-
+      console.error("Error submitting comment:", err);
       // Show user-friendly error message
       showError("Failed to submit comment. Please try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setShowActions(false);
+    // Open edit modal instead of navigating
+    if (post) {
+      openCreatePost(post);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!post || !postId) return;
+
+    setShowActions(false);
+    if (
+      window.confirm(
+        "Are you sure you want to delete this post? This action cannot be undone."
+      )
+    ) {
+      try {
+        const extractedId = extractUUID(postId);
+        await entryService.deleteEntry(extractedId);
+        showSuccess("Post deleted successfully");
+        navigate("/"); // Navigate back to home page
+      } catch (error) {
+        console.error("Error deleting post:", error);
+        showError("Failed to delete post");
+      }
     }
   };
 
@@ -399,8 +459,8 @@ export const PostDetailPage: React.FC = () => {
         <div className="space-y-4">
           {post?.image && (
             <div className="rounded-lg overflow-hidden">
-              <img 
-                src={post.image} 
+              <img
+                src={post.image}
                 alt={post?.title}
                 className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
               />
@@ -461,7 +521,7 @@ export const PostDetailPage: React.FC = () => {
         </button>
 
         {isAuthorObject(post.author) && post.author.id === user?.id && (
-          <div className="relative">
+          <div className="relative" ref={actionsRef}>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -477,13 +537,19 @@ export const PostDetailPage: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden"
+                  className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden z-10"
                 >
-                  <button className="w-full px-4 py-2 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2">
+                  <button
+                    onClick={handleEdit}
+                    className="w-full px-4 py-2 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2"
+                  >
                     <Edit size={16} />
                     <span>Edit Post</span>
                   </button>
-                  <button className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2">
+                  <button
+                    onClick={handleDelete}
+                    className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2"
+                  >
                     <Trash2 size={16} />
                     <span>Delete Post</span>
                   </button>
@@ -651,89 +717,93 @@ export const PostDetailPage: React.FC = () => {
 
           {/* Comment Form */}
           {user?.id && (
-          <form onSubmit={handleSubmitComment} className="mb-6">
-            {replyingTo && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="mb-2 text-sm text-text-2"
-              >
-                Replying to comment...
-                <button
-                  type="button"
-                  onClick={() => setReplyingTo(null)}
-                  className="ml-2 text-[var(--primary-violet)] hover:underline"
+            <form onSubmit={handleSubmitComment} className="mb-6">
+              {replyingTo && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mb-2 text-sm text-text-2"
                 >
-                  Cancel
-                </button>
-              </motion.div>
-            )}
+                  Replying to comment...
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="ml-2 text-[var(--primary-violet)] hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </motion.div>
+              )}
 
-            <div className="flex space-x-3">
-              <Avatar
-                imgSrc={user?.profile_image}
-                alt={user?.display_name || "User"}
-                size="md"
-              />
-              <div className="flex-1">
-                {/* Content Type Toggle */}
-                <div className="flex items-center space-x-2 mb-2">
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setCommentContentType("text/plain")}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
-                      commentContentType === "text/plain"
-                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
-                        : "text-text-2 hover:text-text-1 border border-transparent"
-                    }`}
-                  >
-                    <AlignLeft size={14} />
-                    <span>Plain</span>
-                  </motion.button>
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setCommentContentType("text/markdown")}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
-                      commentContentType === "text/markdown"
-                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
-                        : "text-text-2 hover:text-text-1 border border-transparent"
-                    }`}
-                  >
-                    <FileText size={14} />
-                    <span>Markdown</span>
-                  </motion.button>
-                </div>
-                <textarea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder={commentContentType === "text/markdown" ? "Write a comment in Markdown..." : "Write a comment..."}
-                  className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none font-mono"
-                  rows={3}
+              <div className="flex space-x-3">
+                <Avatar
+                  imgSrc={user?.profile_image}
+                  alt={user?.display_name || "User"}
+                  size="md"
                 />
-                {commentContentType === "text/markdown" && (
-                  <p className="text-xs text-text-2 mt-1">
-                    Supports **bold**, *italic*, [links](url), and more
-                  </p>
-                )}
-                <div className="flex justify-end mt-2">
-                  <AnimatedButton
-                    type="submit"
-                    size="sm"
-                    variant="primary"
-                    loading={isSubmitting}
-                    disabled={!commentText.trim()}
-                    icon={<Send size={16} />}
-                  >
-                    Post Comment
-                  </AnimatedButton>
+                <div className="flex-1">
+                  {/* Content Type Toggle */}
+                  <div className="flex items-center space-x-2 mb-2">
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setCommentContentType("text/plain")}
+                      className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                        commentContentType === "text/plain"
+                          ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                          : "text-text-2 hover:text-text-1 border border-transparent"
+                      }`}
+                    >
+                      <AlignLeft size={14} />
+                      <span>Plain</span>
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setCommentContentType("text/markdown")}
+                      className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                        commentContentType === "text/markdown"
+                          ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                          : "text-text-2 hover:text-text-1 border border-transparent"
+                      }`}
+                    >
+                      <FileText size={14} />
+                      <span>Markdown</span>
+                    </motion.button>
+                  </div>
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder={
+                      commentContentType === "text/markdown"
+                        ? "Write a comment in Markdown..."
+                        : "Write a comment..."
+                    }
+                    className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none font-mono"
+                    rows={3}
+                  />
+                  {commentContentType === "text/markdown" && (
+                    <p className="text-xs text-text-2 mt-1">
+                      Supports **bold**, *italic*, [links](url), and more
+                    </p>
+                  )}
+                  <div className="flex justify-end mt-2">
+                    <AnimatedButton
+                      type="submit"
+                      size="sm"
+                      variant="primary"
+                      loading={isSubmitting}
+                      disabled={!commentText.trim()}
+                      icon={<Send size={16} />}
+                    >
+                      Post Comment
+                    </AnimatedButton>
+                  </div>
                 </div>
               </div>
-            </div>
-          </form>
+            </form>
           )}
 
           {/* Comments List */}
@@ -783,7 +853,9 @@ export const PostDetailPage: React.FC = () => {
                       {comment.content_type === "text/markdown" ? (
                         <div
                           className="prose prose-sm max-w-none text-text-1"
-                          dangerouslySetInnerHTML={{ __html: renderMarkdown(comment.content) }}
+                          dangerouslySetInnerHTML={{
+                            __html: renderMarkdown(comment.content),
+                          }}
                         />
                       ) : (
                         <p className="text-text-1">{comment.content}</p>
@@ -827,7 +899,9 @@ export const PostDetailPage: React.FC = () => {
                               {reply.content_type === "text/markdown" ? (
                                 <div
                                   className="prose prose-sm max-w-none text-text-1 text-sm"
-                                  dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.content) }}
+                                  dangerouslySetInnerHTML={{
+                                    __html: renderMarkdown(reply.content),
+                                  }}
                                 />
                               ) : (
                                 <p className="text-sm text-text-1">
