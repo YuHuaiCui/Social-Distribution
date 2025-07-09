@@ -432,6 +432,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for author updates"""
+        print("ENTRY PATCH PAYLOAD:", request.data)
         kwargs["partial"] = True
         return self.update(request, *args, **kwargs)
 

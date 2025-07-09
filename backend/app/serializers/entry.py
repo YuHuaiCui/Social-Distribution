@@ -2,6 +2,8 @@ from rest_framework import serializers
 from app.models import Entry
 from app.models import Author
 from app.serializers.author import AuthorSerializer
+from urllib.parse import urlparse
+
 
 
 class EntrySerializer(serializers.ModelSerializer):
@@ -67,8 +69,12 @@ class EntrySerializer(serializers.ModelSerializer):
         """
         data = super().to_representation(instance)
         
-        # Override id to be the full URL as per spec
-        data['id'] = instance.url
+        # ✅ Use UUID as the `id`
+        data['id'] = str(instance.id)
+
+        # ✅ Provide full URL separately
+        data['url'] = instance.url
+
         
         # Include full author object as per spec
         if instance.author:
@@ -79,6 +85,7 @@ class EntrySerializer(serializers.ModelSerializer):
     from django.utils import timezone
 
     def update(self, instance, validated_data):
+        print("ENTRY UPDATE VALIDATED DATA:", validated_data)
         for field in ['title', 'description', 'visibility']:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
@@ -115,4 +122,15 @@ class EntrySerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+    
+    def to_internal_value(self, data):
+        """
+        Handle conversion of 'author' URL to UUID if it's included.
+        """
+        if 'author' in data and isinstance(data['author'], str) and data['author'].startswith("http"):
+            parsed = urlparse(data['author'])
+            author_id = parsed.path.rstrip('/').split('/')[-1]
+            data['author'] = author_id
+        return super().to_internal_value(data)
+
         

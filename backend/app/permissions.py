@@ -10,6 +10,10 @@ class IsAuthorSelfOrReadOnly(permissions.BasePermission):
         if request.method in SAFE_METHODS:
             return True
 
+        # ✅ Allow staff users to edit/delete any entry
+        if request.user.is_staff:
+            return True
+        
         # Write permissions are only allowed to the owner of the entry.
         # Get the author from the request user
         if hasattr(request.user, "author"):

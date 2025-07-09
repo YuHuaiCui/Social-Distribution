@@ -352,3 +352,8 @@ class EntryViewSet(viewsets.ModelViewSet):
                 {"error": f"Could not save/unsave entry: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        
+    def partial_update(self, request, *args, **kwargs):
+        print("ENTRY PATCH DEBUG:", request.data)
+        return super().partial_update(request, *args, **kwargs)
+
