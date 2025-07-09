@@ -37,26 +37,31 @@ class BaseAPITestCase(APITestCase):
             is_approved=True
         )
         
+        # Ensure authors have URLs set
+        self.admin_user.refresh_from_db()
+        self.regular_user.refresh_from_db()
+        self.another_user.refresh_from_db()
+        
         # Create test entries
         self.public_entry = Entry.objects.create(
             author=self.regular_user,
             title='Public Entry',
             content='This is a public entry',
-            visibility='public'
+            visibility=Entry.PUBLIC
         )
         
         self.private_entry = Entry.objects.create(
             author=self.regular_user,
             title='Private Entry',
             content='This is a private entry',
-            visibility='friends'
+            visibility=Entry.FRIENDS_ONLY
         )
 
         self.private_entry_2 = Entry.objects.create(
             author=self.another_user,
             title='Private Entry 2',
             content='This is a private entry 2',
-            visibility='friends'
+            visibility=Entry.FRIENDS_ONLY
         )
         
         # Set up API clients

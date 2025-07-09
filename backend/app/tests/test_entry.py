@@ -27,7 +27,7 @@ class EntryAPITest(BaseAPITestCase):
 
         # Private Entry
         self.assertEqual(response.data["results"][0]["title"], "Private Entry")
-        self.assertEqual(response.data["results"][0]["visibility"], "friends")
+        self.assertEqual(response.data["results"][0]["visibility"], "FRIENDS")
         self.assertEqual(
             response.data["results"][0]["content"], "This is a private entry"
         )
@@ -35,7 +35,7 @@ class EntryAPITest(BaseAPITestCase):
 
         # Public Entry
         self.assertEqual(response.data["results"][1]["title"], "Public Entry")
-        self.assertEqual(response.data["results"][1]["visibility"], "public")
+        self.assertEqual(response.data["results"][1]["visibility"], "PUBLIC")
         self.assertEqual(
             response.data["results"][1]["content"], "This is a public entry"
         )
@@ -53,7 +53,7 @@ class EntryAPITest(BaseAPITestCase):
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["title"], "Public Entry")
-        self.assertEqual(response.data["visibility"], "public")
+        self.assertEqual(response.data["visibility"], "PUBLIC")
         self.assertEqual(response.data["content"], "This is a public entry")
         self.assertEqual(response.data["author"]["username"], "testuser")
 
@@ -62,7 +62,7 @@ class EntryAPITest(BaseAPITestCase):
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["title"], "Private Entry")
-        self.assertEqual(response.data["visibility"], "friends")
+        self.assertEqual(response.data["visibility"], "FRIENDS")
         self.assertEqual(response.data["content"], "This is a private entry")
         self.assertEqual(response.data["author"]["username"], "testuser")
 
@@ -87,7 +87,7 @@ class EntryAPITest(BaseAPITestCase):
         data = {
             "title": "Test Entry",
             "content": "This is a test entry",
-            "visibility": "public",
+            "visibility": "PUBLIC",
             "content_type": "text/plain",
         }
 
@@ -100,7 +100,7 @@ class EntryAPITest(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["title"], "Test Entry")
         self.assertEqual(response.data["content"], "This is a test entry")
-        self.assertEqual(response.data["visibility"], "public")
+        self.assertEqual(response.data["visibility"], "PUBLIC")
         self.assertEqual(response.data["content_type"], "text/plain")
 
         # Test required fields validation handling
@@ -108,7 +108,7 @@ class EntryAPITest(BaseAPITestCase):
         data = {
             "title": "",
             "content": "something",
-            "visibility": "public",
+            "visibility": "PUBLIC",
         }
         response = self.user_client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -118,7 +118,7 @@ class EntryAPITest(BaseAPITestCase):
         data = {
             "title": "Test Entry",
             "content": "",
-            "visibility": "public",
+            "visibility": "PUBLIC",
         }
         response = self.user_client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -161,14 +161,14 @@ class EntryAPITest(BaseAPITestCase):
         data = {
             "title": "Completely New Title",
             "content": "Completely new content",
-            "visibility": "friends",
+            "visibility": "FRIENDS",
             "content_type": "text/markdown",
         }
         response = self.user_client.put(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["title"], "Completely New Title")
         self.assertEqual(response.data["content"], "Completely new content")
-        self.assertEqual(response.data["visibility"], "friends")
+        self.assertEqual(response.data["visibility"], "FRIENDS")
         self.assertEqual(response.data["content_type"], "text/markdown")
 
     def test_entry_delete(self):
