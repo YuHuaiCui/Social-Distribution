@@ -12,6 +12,8 @@ import AuthorCard from '../components/AuthorCard';
 import AnimatedButton from '../components/ui/AnimatedButton';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
+import { useAuth } from "../components/context/AuthContext"; 
+
 
 type SearchType = 'all' | 'posts' | 'authors' | 'tags';
 
@@ -38,11 +40,15 @@ export const SearchResultsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
+  const { user } = useAuth();
+  const isAdmin = user?.is_staff || user?.is_superuser;
+  const [showUnapprovedOnly, setShowUnapprovedOnly] = useState(false);
+
   useEffect(() => {
     if (query || tag) {
       performSearch();
     }
-  }, [query, tag, searchType]);
+  }, [query, tag, searchType, showUnapprovedOnly]);
 
   const performSearch = async () => {
     setIsLoading(true);
@@ -58,10 +64,17 @@ export const SearchResultsPage: React.FC = () => {
       // Search authors if needed
       if ((searchType === 'all' || searchType === 'authors') && searchQuery) {
         try {
+
           const authorsResponse = await api.getAuthors({
-            search: searchQuery,
-            is_approved: true,
-            is_active: true,
+          search: searchQuery,
+          is_active: true,
+          ...(isAdmin
+            ? showUnapprovedOnly
+              ? { is_approved: false }
+              : {} // show all (default filters may apply)
+            : { is_approved: true } // regular users only see approved
+          ),
+
           });
           // Handle both paginated and direct array responses
           searchResults.authors = authorsResponse.results || authorsResponse || [];
@@ -144,6 +157,17 @@ export const SearchResultsPage: React.FC = () => {
 
       {/* Results Header */}
       <div className="flex items-center justify-between mb-6">
+        {isAdmin && searchType === "authors" && (
+        <label className="flex items-center space-x-2 text-sm text-text-2 ml-4">
+          <input
+            type="checkbox"
+            checked={showUnapprovedOnly}
+            onChange={(e) => setShowUnapprovedOnly(e.target.checked)}
+            className="accent-[var(--primary-purple)]"
+          />
+          <span>Only Unapproved</span>
+        </label>
+      )}
         <div>
           <h1 className="text-2xl font-bold text-text-1">
             {tag ? `Posts tagged with #${tag}` : `Search results for "${query}"`}

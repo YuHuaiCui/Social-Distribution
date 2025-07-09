@@ -73,7 +73,10 @@ def signup(request):
             bio=data.get('bio', ''),
             location=data.get('location', ''),
             website=data.get('website', ''),
-            is_approved=True,  # Auto-approve for now
+
+            is_approved=getattr(settings, "AUTO_APPROVE_NEW_USERS", False),
+
+
             is_active=True
         )
         
@@ -107,6 +110,9 @@ def login_view(request):
     
     if user is not None:
         # Login the user with the default Django backend
+        if not getattr(user, "is_approved", False) and not user.is_staff:
+            return Response({'message': 'Your account is awaiting admin approval.'}, status=403)
+    
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         
         # Set session timeout based on remember_me preference
