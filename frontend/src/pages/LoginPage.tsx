@@ -189,9 +189,7 @@ export const LoginPage: React.FC = () => {
     
     // Add a small delay to show the loading state
     setTimeout(() => {
-      window.location.href = `${
-        import.meta.env.VITE_API_URL
-      }/accounts/github/login/`;
+      window.location.href = `${import.meta.env.VITE_API_URL}/accounts/github/login/`;
     }, 500);
   };
 

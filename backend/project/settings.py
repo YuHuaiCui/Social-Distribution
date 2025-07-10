@@ -103,11 +103,6 @@ SOCIALACCOUNT_PROVIDERS = {
         "SCOPE": [
             "user:email",
         ],
-        "APP": {
-            "client_id": os.getenv("GITHUB_CLIENT_ID"),
-            "secret": os.getenv("GITHUB_CLIENT_SECRET"),
-            "key": "",
-        },
     }
 }
 
