@@ -625,8 +625,6 @@ class EntryAPITest(BaseAPITestCase):
         self.assertIn('Public Markdown Post', stranger_visible_titles)
         self.assertIn('Public Image Post', stranger_visible_titles)
 
-
-
     def test_visibility_rules(self):
         """Test visibility rules across all user relationships"""
         # Create users with different relationships
@@ -697,7 +695,7 @@ class EntryAPITest(BaseAPITestCase):
                                     [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
                                     f"{user_type} should NOT see {entry_type} entry")
 
-    def test_likes_visibility_on_public_entries(self):
+    def test_likes_visibility(self):
         """Test seeing likes on received public entries"""
         # Create users and a public entry
         liker_user1 = Author.objects.create_user(
@@ -736,7 +734,7 @@ class EntryAPITest(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['likes_count'], 3)
 
-    def test_github_activity_comprehensive(self):
+    def test_github_activity(self):
         """Test auto-generating public entries from GitHub activity"""
         # Test basic GitHub entry creation
         basic_github_entry = Entry.objects.create(
