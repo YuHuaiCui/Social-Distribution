@@ -32,6 +32,8 @@ import { extractUUID } from "../utils/extractId";
 
 interface CommentWithReplies extends Comment {
   replies?: Comment[];
+  likes_count?: number;
+  is_liked?: boolean;
 }
 
 export const PostDetailPage: React.FC = () => {
@@ -156,7 +158,24 @@ export const PostDetailPage: React.FC = () => {
         }
       });
 
-      setComments(parentComments);
+      // Fetch like status for each comment
+      const commentsWithLikes = await Promise.all(
+        parentComments.map(async (comment) => {
+          try {
+            const likeStatus = await socialService.getCommentLikeStatus(comment.id);
+            return {
+              ...comment,
+              likes_count: likeStatus.like_count,
+              is_liked: likeStatus.liked_by_current_user,
+            };
+          } catch (error) {
+            console.error(`Error fetching like status for comment ${comment.id}:`, error);
+            return comment;
+          }
+        })
+      );
+
+      setComments(commentsWithLikes);
     } catch (error) {
       console.error("Error fetching comments:", error);
       // Continue with other operations even if comments fail
@@ -417,6 +436,60 @@ export const PostDetailPage: React.FC = () => {
       } catch (error) {
         console.error("Error deleting post:", error);
         showError("Failed to delete post");
+      }
+    }
+  };
+
+  const handleCommentLike = async (commentId: string) => {
+    if (!user?.id) {
+      showError("Please sign in to like comments");
+      return;
+    }
+
+    try {
+      // Find the comment
+      const commentIndex = comments.findIndex((c) => c.id === commentId);
+      if (commentIndex === -1) return;
+
+      const comment = comments[commentIndex];
+      const wasLiked = comment.is_liked;
+
+      // Optimistic update
+      const updatedComments = [...comments];
+      updatedComments[commentIndex] = {
+        ...comment,
+        is_liked: !wasLiked,
+        likes_count: wasLiked
+          ? (comment.likes_count || 1) - 1
+          : (comment.likes_count || 0) + 1,
+      };
+      setComments(updatedComments);
+
+      // API call
+      if (wasLiked) {
+        await socialService.unlikeComment(commentId);
+      } else {
+        await socialService.likeComment(commentId);
+      }
+    } catch (error) {
+      console.error("Error liking comment:", error);
+      showError("Failed to like comment");
+      // Revert on error
+      const comment = comments.find((c) => c.id === commentId);
+      if (comment) {
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === commentId
+              ? {
+                  ...c,
+                  is_liked: !c.is_liked,
+                  likes_count: c.is_liked
+                    ? (c.likes_count || 1) - 1
+                    : (c.likes_count || 0) + 1,
+                }
+              : c
+          )
+        );
       }
     }
   };
@@ -860,6 +933,47 @@ export const PostDetailPage: React.FC = () => {
                       ) : (
                         <p className="text-text-1">{comment.content}</p>
                       )}
+                      
+                      {/* Comment Actions */}
+                      <div className="flex items-center space-x-4 mt-3">
+                        <button
+                          onClick={() => handleCommentLike(comment.id)}
+                          className="relative overflow-hidden rounded-full px-3 py-1 group transition-all"
+                        >
+                          {/* Gradient background on hover or when liked */}
+                          <motion.div
+                            className={`absolute inset-0 transition-opacity ${
+                              comment.is_liked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            }`}
+                            style={{
+                              background:
+                                "linear-gradient(135deg, var(--primary-pink) 0%, var(--primary-purple) 100%)",
+                            }}
+                          />
+                          <motion.div
+                            className={`relative z-10 flex items-center gap-1.5 ${
+                              comment.is_liked ? "text-white" : "text-text-2 group-hover:text-white"
+                            } transition-colors`}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            animate={
+                              comment.is_liked
+                                ? {
+                                    rotate: [0, -20, 20, -10, 10, 0],
+                                    scale: [1, 1.2, 1.1, 1.15, 1.05, 1],
+                                  }
+                                : {}
+                            }
+                            transition={{ duration: 0.5 }}
+                          >
+                            <Heart
+                              size={16}
+                              fill={comment.is_liked ? "currentColor" : "none"}
+                            />
+                            <span className="text-sm font-medium">{comment.likes_count || 0}</span>
+                          </motion.div>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Replies */}
