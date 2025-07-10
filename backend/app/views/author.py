@@ -166,6 +166,50 @@ class AuthorViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def promote_to_admin(self, request, pk=None):
+        """Promote an author to admin (admin only)"""
+        # Check if current user is admin
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response(
+                {"error": "Only admins can promote other users"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        author = self.get_object()
+
+        # Don't allow self-promotion
+        if author.id == request.user.id:
+            return Response(
+                {"error": "Cannot promote yourself"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if already admin
+        if author.is_staff:
+            return Response(
+                {"error": "User is already an admin"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Promote to admin
+        author.is_staff = True
+        author.is_approved = True  # Also approve them
+        author.is_active = True  # Also activate them
+        author.save()
+
+        return Response(
+            {
+                "message": f"Author {author.username} has been promoted to admin",
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
+            }
+        )
+
     @action(detail=False, methods=["get"])
     def stats(self, request):
         """Get author statistics"""
@@ -284,7 +328,11 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         "id": follow.follower.url,
                         "display_name": follow.follower.display_name,
                         "username": follow.follower.username,
-                        "profile_image": follow.follower.profile_image if follow.follower.profile_image else None,
+                        "profile_image": (
+                            follow.follower.profile_image
+                            if follow.follower.profile_image
+                            else None
+                        ),
                     },
                     "object": follow.followed.url,
                     "status": follow.status,
@@ -314,23 +362,33 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get", "post"], url_path="entries")
     def entries(self, request, pk=None):
-        """GET = List entries visible to current user, POST = Create a new entry (must be owner)"""
+        """
+        GET = List entries visible to current user
+        POST = Create a new entry (must be owner)
+
+        For GET requests, applies visibility rules based on the relationship
+        between the requesting user and the author whose entries are being viewed.
+
+        For POST requests, ensures only the author can create entries for themselves
+        to prevent spoofing.
+        """
         author = self.get_object()
 
         if request.method == "GET":
-            # Admin can see all posts regardless of visibility
+            # Staff can see all posts regardless of visibility
             if request.user.is_staff:
                 entries = Entry.objects.filter(author=author).exclude(
                     visibility=Entry.DELETED
                 )
-            elif request.user.is_authenticated and str(request.user.id) == str(author.id):
+            elif request.user.is_authenticated and str(request.user.id) == str(
+                author.id
+            ):
                 # Viewing your own profile: show all entries except deleted
                 entries = Entry.objects.filter(author=author).exclude(
                     visibility=Entry.DELETED
                 )
             else:
-                # Viewing someone else's profile: use proper visibility logic
-                # Get entries by this author that are visible to the current user
+                # Viewing someone else's profile: apply visibility rules
                 if hasattr(request.user, "author"):
                     user_author = request.user.author
                 else:
@@ -343,14 +401,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         if request.method == "POST":
-            print(
-                "USER DEBUG:",
-                request.user,
-                request.user.id,
-                request.user.is_authenticated,
-                request.user.is_staff,
-            )
-
             # Ensure only the author can post their own entry
             if not request.user.is_authenticated:
                 return Response(
@@ -358,11 +408,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     status=403,
                 )
 
-            author = request.user  # Override to ensure no spoofing
+            # Override author to ensure no spoofing
+            author = request.user
             data = request.data.copy()
-            data["author"] = str(author.id)  # Set author ID explicitly
+            data["author"] = str(author.id)
 
-            # Optional: auto-set source/origin if needed
+            # Auto-set source/origin URLs if not provided
             data["source"] = data.get(
                 "source", f"{settings.SITE_URL}/api/authors/{author.id}/entries/"
             )
@@ -377,8 +428,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get", "patch"], url_path="me")
     def me(self, request):
         """
-        Get or update the current user's profile
+        Get or update the current user's profile.
+
         This endpoint is more permissive than the regular update endpoint
+        and handles profile image uploads via multipart/form-data.
         """
         try:
             author = Author.objects.get(id=request.user.id)
@@ -388,30 +441,39 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 return Response(serializer.data)
 
             elif request.method in ["PATCH", "PUT"]:
-                # Check if there's an uploaded file
+                # Prepare clean data for serializer (excluding file data)
+                update_data = {}
+
+                # Copy non-file fields from request data
+                for key, value in request.data.items():
+                    if key != "profile_image_file":
+                        update_data[key] = value
+
+                # Handle profile image upload if present
                 if "profile_image_file" in request.FILES:
-                    # Create an image entry for the profile image
                     image_file = request.FILES["profile_image_file"]
-                    content_type = f"image/{image_file.name.split('.')[-1].lower()}"
 
-                    # Create entry
-                    from app.models import Entry
+                    # Convert uploaded image to base64 data URL (consistent with post images)
+                    import base64
 
-                    entry = Entry.objects.create(
-                        author=author,
-                        title="Profile Image",
-                        content=base64.b64encode(image_file.read()).decode("utf-8"),
-                        content_type=content_type,
-                        visibility=Entry.UNLISTED,  # Make it unlisted
+                    # Determine content type from file extension
+                    content_type = "image/jpeg"  # default
+                    if image_file.name.lower().endswith(".png"):
+                        content_type = "image/png"
+                    elif image_file.name.lower().endswith((".jpg", ".jpeg")):
+                        content_type = "image/jpeg"
+
+                    # Read image data and convert to base64 data URL
+                    image_data = image_file.read()
+                    image_base64 = base64.b64encode(image_data).decode("utf-8")
+                    profile_image_data_url = (
+                        f"data:{content_type};base64,{image_base64}"
                     )
 
-                    # Update profile_image to point to the entry's image URL
-                    request.data["profile_image"] = (
-                        f"{settings.SITE_URL}/api/authors/{author.id}/entries/{entry.id}/image"
-                    )
+                    update_data["profile_image"] = profile_image_data_url
 
                 # Update the author profile
-                serializer = AuthorSerializer(author, data=request.data, partial=True)
+                serializer = AuthorSerializer(author, data=update_data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
                     return Response(serializer.data)
@@ -422,9 +484,8 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return Response({"message": "Author profile not found"}, status=404)
 
     def update(self, request, *args, **kwargs):
-        """Handle PUT/PATCH requests with debugging"""
-
-        # Check permission explicitly
+        """Handle PUT/PATCH requests for author updates"""
+        # Get the object to update and check permissions
         instance = self.get_object()
 
         # Call parent class's update method
@@ -436,41 +497,30 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return self.update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
-        """Perform the update"""
+        """Perform the actual update operation"""
         serializer.save()
 
-    @action(detail=True, methods=["get"], url_path="entries/(?P<entry_id>[^/.]+)/image")
-    def entry_image(self, request, pk=None, entry_id=None):
-        """
-        Return the image content for a specific entry
-        This is used for profile images stored as entries
-        """
-        try:
-            # Get the author and entry
-            author = self.get_object()
-            entry = Entry.objects.get(id=entry_id, author=author)
+    @action(detail=False, methods=["get"], permission_classes=[permissions.IsAdminUser])
+    def pending(self, request):
+        """List unapproved users (admin only)"""
+        unapproved = Author.objects.filter(is_approved=False, is_staff=False).order_by(
+            "-created_at"
+        )
+        serializer = AuthorListSerializer(
+            unapproved, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
 
-            # Check that this is an image entry
-            if not entry.content_type.startswith("image/"):
-                return Response({"detail": "Not an image entry"}, status=400)
-
-            # Get the content and decode from base64
-            image_data = base64.b64decode(entry.content)
-
-            # Return as raw image response
-            response = HttpResponse(content=image_data, content_type=entry.content_type)
-            return response
-
-        except Entry.DoesNotExist:
-            return Response({"detail": "Image not found"}, status=404)
-    
     @action(detail=True, methods=["post"], url_path="inbox")
     def post_to_inbox(self, request, pk=None):
         """
-        Post an item to an author's inbox
-        POST /api/authors/{id}/inbox/
-        
-        Expected data:
+        Post an item to an author's inbox for federation support.
+
+        This endpoint supports the ActivityPub-style inbox pattern where
+        remote instances can deliver activities (follows, likes, comments, etc.)
+        to local users.
+
+        Expected data format:
         {
             "content_type": "entry" | "comment" | "like" | "follow" | "report",
             "content_id": "id of the content",
@@ -479,55 +529,41 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """
         from app.models import Inbox
         from app.serializers.inbox import InboxItemSerializer
-        
+
         try:
             # Get the recipient author
             recipient = self.get_object()
-            
-            # Get the content type and data
-            content_type = request.data.get('content_type')
-            content_id = request.data.get('content_id')
-            content_data = request.data.get('content_data', {})
-            
+
+            # Extract content information from request
+            content_type = request.data.get("content_type")
+            content_id = request.data.get("content_id")
+            content_data = request.data.get("content_data", {})
+
             # Validate content type
-            valid_types = ['entry', 'comment', 'like', 'follow', 'report']
+            valid_types = ["entry", "comment", "like", "follow", "report"]
             if content_type not in valid_types:
                 return Response(
-                    {"error": f"Invalid content_type. Must be one of: {', '.join(valid_types)}"},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {
+                        "error": f"Invalid content_type. Must be one of: {', '.join(valid_types)}"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            
-            # For reports, we just store the data in raw_data
-            if content_type == 'report':
-                inbox_item = Inbox.objects.create(
-                    recipient=recipient,
-                    item_type='report',
-                    raw_data={
-                        'content_type': 'report',
-                        'content_id': content_id,
-                        **content_data
-                    }
-                )
-                serializer = InboxItemSerializer(inbox_item)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-            # For other types, we'd need to handle them appropriately
-            # For now, just create with raw_data
+
+            # Create inbox item with the provided data
             inbox_item = Inbox.objects.create(
                 recipient=recipient,
                 item_type=content_type,
                 raw_data={
-                    'content_type': content_type,
-                    'content_id': content_id,
-                    **content_data
-                }
+                    "content_type": content_type,
+                    "content_id": content_id,
+                    **content_data,
+                },
             )
-            
+
             serializer = InboxItemSerializer(inbox_item)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
+
         except Exception as e:
             return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

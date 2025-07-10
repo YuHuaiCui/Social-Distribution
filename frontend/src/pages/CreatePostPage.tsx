@@ -43,7 +43,6 @@ export const CreatePostPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submit triggered");
 
     if (!title.trim()) {
       setError("Please enter a title");
@@ -73,10 +72,8 @@ export const CreatePostPage: React.FC = () => {
     };
 
     try {
-      console.log("Sending entry data:", entryData);
 
       const response = await entryService.createEntry(entryData);
-      console.log("Post created successfully:", response);
 
       // Mock success
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -84,7 +81,6 @@ export const CreatePostPage: React.FC = () => {
       // Navigate to the new post or home
       navigate("/home");
     } catch (err: any) {
-      console.error("Error creating post:", err);
       setError("Something went wrong.");
     } finally {
       setIsLoading(false);

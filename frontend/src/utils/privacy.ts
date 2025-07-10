@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export type Visibility = "public" | "friends" | "unlisted";
+export type Visibility = "PUBLIC" | "FRIENDS" | "UNLISTED";
 
 interface PrivacySettings {
   defaultVisibility: Visibility;
@@ -19,13 +19,13 @@ export const getDefaultVisibility = (): Visibility => {
     const savedPrivacy = localStorage.getItem("privacySettings");
     if (savedPrivacy) {
       const settings: PrivacySettings = JSON.parse(savedPrivacy);
-      return settings.defaultVisibility || "public";
+      return settings.defaultVisibility || "PUBLIC";
     }
   } catch (error) {
     console.error("Error reading privacy settings:", error);
   }
   
-  return "public"; // Default fallback
+  return "PUBLIC"; // Default fallback
 };
 
 /**
@@ -43,7 +43,7 @@ export const getPrivacySettings = (): PrivacySettings => {
   
   // Default settings
   return {
-    defaultVisibility: "public",
+    defaultVisibility: "PUBLIC",
     requireApprovalToFollow: false,
     hideFollowerCount: false,
     hideFollowingCount: false,

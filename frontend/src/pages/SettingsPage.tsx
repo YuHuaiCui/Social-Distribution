@@ -76,6 +76,11 @@ export const SettingsPage: React.FC = () => {
     null
   );
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [isValidatingGithub, setIsValidatingGithub] = useState(false);
+  const [githubValidation, setGithubValidation] = useState<{
+    valid: boolean;
+    message: string;
+  } | null>(null);
 
   // Account settings
   const [email, setEmail] = useState(user?.email || "");
@@ -165,6 +170,51 @@ export const SettingsPage: React.FC = () => {
       reader.readAsDataURL(file);
     }
   };
+
+  const validateGitHubUsername = async (username: string) => {
+    if (!username) {
+      setGithubValidation(null);
+      return;
+    }
+
+    setIsValidatingGithub(true);
+    try {
+      const response = await fetch(`/api/github/validate/${username}/`);
+      const data = await response.json();
+
+      if (data.valid) {
+        setGithubValidation({
+          valid: true,
+          message: `Valid GitHub user: ${data.name || data.username}`,
+        });
+      } else {
+        setGithubValidation({
+          valid: false,
+          message: "GitHub username not found",
+        });
+      }
+    } catch (error) {
+      setGithubValidation({
+        valid: false,
+        message: "Error validating GitHub username",
+      });
+    } finally {
+      setIsValidatingGithub(false);
+    }
+  };
+
+  // Debounce GitHub validation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (githubUsername) {
+        validateGitHubUsername(githubUsername);
+      } else {
+        setGithubValidation(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [githubUsername]);
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
@@ -586,12 +636,35 @@ export const SettingsPage: React.FC = () => {
                   <label className="block text-sm font-medium text-text-2 mb-2">
                     GitHub Username
                   </label>
-                  <Input
-                    type="text"
-                    value={githubUsername}
-                    onChange={(e) => setGithubUsername(e.target.value)}
-                    placeholder="Your GitHub username"
-                  />
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      value={githubUsername}
+                      onChange={(e) => setGithubUsername(e.target.value)}
+                      placeholder="Your GitHub username"
+                      className={`${
+                        githubValidation
+                          ? githubValidation.valid
+                            ? "border-green-500 focus:ring-green-500"
+                            : "border-red-500 focus:ring-red-500"
+                          : ""
+                      }`}
+                    />
+                    {isValidatingGithub && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="w-4 h-4 border-2 border-[var(--primary-violet)] border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  {githubValidation && (
+                    <p
+                      className={`mt-1 text-sm ${
+                        githubValidation.valid ? "text-green-500" : "text-red-500"
+                      }`}
+                    >
+                      {githubValidation.message}
+                    </p>
+                  )}
                 </div>
 
                 <AnimatedButton

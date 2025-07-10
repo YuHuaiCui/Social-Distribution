@@ -103,11 +103,6 @@ SOCIALACCOUNT_PROVIDERS = {
         "SCOPE": [
             "user:email",
         ],
-        "APP": {
-            "client_id": os.getenv("GITHUB_CLIENT_ID"),
-            "secret": os.getenv("GITHUB_CLIENT_SECRET"),
-            "key": "",
-        },
     }
 }
 
@@ -238,4 +233,7 @@ SITE_URL = "http://localhost:8000"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+# Auto-approve local users on signup (set to False to require admin approval)
+AUTO_APPROVE_NEW_USERS = os.getenv("AUTO_APPROVE_NEW_USERS", "False") == "True"
+
 os.makedirs(MEDIA_ROOT, exist_ok=True)

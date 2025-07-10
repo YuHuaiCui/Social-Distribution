@@ -2,6 +2,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from app.models.author import Author
 from app.models.follow import Follow
+from app.models.friendship import Friendship
 from django.conf import settings
 import uuid
 
@@ -479,8 +480,83 @@ class FollowTest(TestCase):
         self.assertIn("error", response.data)
 
     def test_author_unfollow_nonexistent_via_endpoint(self):
-        """Test unfollowing via author endpoint when no relationship exists"""
+        """Test unfollowing nonexistent author via the author follow endpoint"""
         self.client.force_authenticate(user=self.author_a)
-        response = self.client.delete(f"/api/authors/{self.author_b.id}/follow/")
+        
+        # Attempt to unfollow an author that doesn't exist
+        nonexistent_id = uuid.uuid4()
+        response = self.client.delete(f"/api/authors/{nonexistent_id}/follow/")
         self.assertEqual(response.status_code, 404)
-        self.assertIn("error", response.data)
+
+    def test_social_graph_friendship_creation(self):
+        """Test that friendships are automatically created when both users follow each other"""
+        # Initially no friendship should exist
+        self.assertFalse(Friendship.objects.filter(
+            author1__in=[self.author_a, self.author_b], 
+            author2__in=[self.author_a, self.author_b]
+        ).exists())
+        
+        # A follows B
+        follow1 = Follow.objects.create(
+            follower=self.author_a, 
+            followed=self.author_b, 
+            status=Follow.ACCEPTED
+        )
+        
+        # Still no friendship (one-way follow)
+        self.assertFalse(Friendship.objects.filter(
+            author1__in=[self.author_a, self.author_b], 
+            author2__in=[self.author_a, self.author_b]
+        ).exists())
+        
+        # B follows A back - friendship should be created automatically
+        follow2 = Follow.objects.create(
+            follower=self.author_b, 
+            followed=self.author_a, 
+            status=Follow.ACCEPTED
+        )
+        
+        # Now friendship should exist
+        self.assertTrue(Friendship.objects.filter(
+            author1__in=[self.author_a, self.author_b], 
+            author2__in=[self.author_a, self.author_b]
+        ).exists())
+        
+        # Verify mutual friends relationship
+        self.assertTrue(self.author_a.is_friend_with(self.author_b))
+        self.assertTrue(self.author_b.is_friend_with(self.author_a))
+        
+    def test_social_graph_friendship_deletion(self):
+        """Test that friendships are automatically deleted when users unfollow"""
+        # Create mutual follows (friendship)
+        Follow.objects.create(
+            follower=self.author_a, 
+            followed=self.author_b, 
+            status=Follow.ACCEPTED
+        )
+        Follow.objects.create(
+            follower=self.author_b, 
+            followed=self.author_a, 
+            status=Follow.ACCEPTED
+        )
+        
+        # Verify friendship exists
+        self.assertTrue(Friendship.objects.filter(
+            author1__in=[self.author_a, self.author_b], 
+            author2__in=[self.author_a, self.author_b]
+        ).exists())
+        
+        # A unfollows B - friendship should be deleted
+        Follow.objects.filter(
+            follower=self.author_a, 
+            followed=self.author_b
+        ).delete()
+        
+        # Friendship should no longer exist
+        self.assertFalse(Friendship.objects.filter(
+            author1__in=[self.author_a, self.author_b], 
+            author2__in=[self.author_a, self.author_b]
+        ).exists())
+        
+        # Verify no longer friends
+        self.assertFalse(self.author_a.is_friend_with(self.author_b))

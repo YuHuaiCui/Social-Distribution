@@ -101,24 +101,30 @@ frontend/
 
 ### 2. Content Creation
 - Rich text editor with Markdown support
-- Image upload and embedding
+- Image upload with blob storage (stored directly in database)
 - Privacy controls (Public, Friends-only, Unlisted)
 - Category tagging
-- Draft saving
+- Real-time preview for Markdown content
+- Fullscreen editing mode
+- Caption support for image posts
 
 ### 3. Social Interactions
-- Follow/Unfollow users
-- Friend requests and management
-- Like posts
-- Comment on posts
-- Share posts to inbox
+- Follow/Unfollow users with pending request management
+- Friend relationships (mutual follows)
+- Like posts with real-time count updates
+- Comment on posts with Markdown support
+- Share posts via Web Share API or to user inbox
+- Bookmark/save posts for later viewing
 
 ### 4. Content Discovery
-- Home feed with posts from followed users
+- Home feed with multiple views:
+  - All Posts: Public posts from all users
+  - Friends Feed: All posts from friends (mutual follows)
+  - Liked Posts: Posts you've liked
 - Explore page for discovering new content
-- Search functionality for users and posts
-- Profile pages with user posts
-- Saved posts collection
+- Search functionality for users
+- Profile pages with user posts and activity
+- Saved posts collection with easy access
 
 ### 5. Inbox System
 - Notifications for likes, comments, and follows
@@ -471,6 +477,28 @@ dist/
 - Prettier for formatting
 - Import order conventions
 - Comments for complex logic
+
+## Recent Improvements
+
+### Bug Fixes and Enhancements (January 2025)
+- **Friends Feed**: Fixed to show all posts from friends (users who mutually follow each other)
+- **Image Storage**: Migrated from file-based storage to database blob storage for better reliability
+- **UI/UX Improvements**:
+  - Fixed tab flickering in navigation
+  - Improved empty state containers with proper flex layout
+  - Fixed input opacity issues in dark mode
+  - Added smooth hover animations without color changes
+  - Fixed button separators in PostCard component
+- **Share Functionality**: Implemented Web Share API with clipboard fallback
+- **Report System**: Limited report visibility to admin users only
+- **Performance**: Removed unnecessary console.log statements for production readiness
+- **TypeScript**: Fixed type safety issues with Visibility types
+
+### Code Quality
+- Cleaned up development console statements
+- Removed unhelpful comments
+- Improved error handling consistency
+- Enhanced TypeScript type definitions
 
 ## Future Improvements
 

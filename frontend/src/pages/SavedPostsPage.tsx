@@ -80,7 +80,7 @@ export const SavedPostsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
+    <div className="container mx-auto px-4 py-6 max-w-4xl flex flex-col flex-1">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -114,28 +114,31 @@ export const SavedPostsPage: React.FC = () => {
       </motion.div>
 
       {/* Posts List */}
+      <div className="flex-1 flex flex-col">
       {posts.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col"
         >
           <Card
             variant="main"
-            className="p-8 text-center bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl"
+            className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full"
           >
-            <motion.div
-              animate={{
-                rotate: [0, 10, -10, 0],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="inline-block mb-4"
-            >
-              <Bookmark size={48} className="text-text-2" />
-            </motion.div>
+            <div className="flex justify-center text-text-2 mb-4">
+              <motion.div
+                animate={{
+                  rotate: [0, 10, -10, 0],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <Bookmark size={48} />
+              </motion.div>
+            </div>
             <h2 className="text-xl font-semibold text-text-1 mb-2">
               No saved posts yet
             </h2>
@@ -146,13 +149,14 @@ export const SavedPostsPage: React.FC = () => {
             <AnimatedButton
               onClick={() => (window.location.href = "/home")}
               variant="primary"
+              className="max-w-xs mx-auto"
             >
               Explore Posts
             </AnimatedButton>
           </Card>
         </motion.div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 flex-1">
           {posts.map((post, index) => (
             <motion.div
               key={post.id}
@@ -207,6 +211,7 @@ export const SavedPostsPage: React.FC = () => {
           </motion.div>
         </div>
       )}
+      </div>
     </div>
   );
 };
