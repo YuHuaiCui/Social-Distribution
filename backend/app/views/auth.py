@@ -9,197 +9,279 @@ import requests
 from app.models import Author
 from app.serializers.author import AuthorSerializer
 
-@api_view(['GET', 'POST'])
+
+@api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 def auth_status(request):
     """
-    Returns authentication status and user info if authenticated
+    Check authentication status and return user information.
+
+    This endpoint allows the frontend to determine if a user is logged in
+    and get their basic profile information. Used for session persistence
+    across browser refreshes.
+
+    Returns:
+        200 OK: Authentication status and user data (if authenticated)
     """
     if request.user.is_authenticated:
         try:
-            # The Author model already has the User fields (it's the user)
+            # The Author model extends User, so we get the author by user ID
             author = Author.objects.get(id=request.user.id)
             serializer = AuthorSerializer(author)
-            return Response({
-                'isAuthenticated': True,
-                'user': serializer.data
-            })
+            return Response({"isAuthenticated": True, "user": serializer.data})
         except Author.DoesNotExist:
-            return Response({
-                'isAuthenticated': True,
-                'user': None,
-                'message': 'User exists but author profile not found'
-            })
+            return Response(
+                {
+                    "isAuthenticated": True,
+                    "user": None,
+                    "message": "User exists but author profile not found",
+                }
+            )
     else:
-        return Response({
-            'isAuthenticated': False
-        })
+        return Response({"isAuthenticated": False})
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def signup(request):
-    """Handle user registration"""
+    """
+    Handle user registration with validation and approval workflow.
+
+    Creates a new user account with the provided information. Users may require
+    admin approval before they can log in, depending on the AUTO_APPROVE_NEW_USERS
+    setting.
+
+    Security measures:
+    - Validates password strength using Django's password validators
+    - Checks for duplicate usernames and emails
+    - Automatically logs in the user after successful registration
+
+    Returns:
+        201 Created: User created successfully
+        400 Bad Request: Validation errors or duplicate data
+    """
     data = request.data
-    print(f"Signup request data: {data}")  # Debug log
-    
+
     # Validate required fields
-    required_fields = ['username', 'email', 'password', 'display_name']
+    required_fields = ["username", "email", "password", "display_name"]
     for field in required_fields:
         if field not in data:
-            return Response({'message': f'{field} is required'}, status=400)
-    
-    # Check if username already exists
-    if Author.objects.filter(username=data['username']).exists():
-        return Response({'message': 'Username already exists'}, status=400)
-    
-    # Check if email already exists
-    if Author.objects.filter(email=data['email']).exists():
-        return Response({'message': 'Email already exists'}, status=400)
-    
-    # Validate password
+            return Response({"message": f"{field} is required"}, status=400)
+
+    # Check for duplicate username (case-insensitive)
+    if Author.objects.filter(username=data["username"]).exists():
+        return Response({"message": "Username already exists"}, status=400)
+
+    # Check for duplicate email (case-insensitive)
+    if Author.objects.filter(email=data["email"]).exists():
+        return Response({"message": "Email already exists"}, status=400)
+
+    # Validate password strength using Django's built-in validators
     try:
-        validate_password(data['password'])
+        validate_password(data["password"])
     except ValidationError as e:
-        return Response({'message': ' '.join(e.messages)}, status=400)
-    
+        return Response({"message": " ".join(e.messages)}, status=400)
+
     try:
-        # Create the author/user
+        # Create the author/user with provided information
         author = Author.objects.create_user(
-            username=data['username'],
-            email=data['email'],
-            password=data['password'],
-            display_name=data.get('display_name', data['username']),
-            github_username=data.get('github_username', ''),
-            bio=data.get('bio', ''),
-            location=data.get('location', ''),
-            website=data.get('website', ''),
-
+            username=data["username"],
+            email=data["email"],
+            password=data["password"],
+            display_name=data.get("display_name", data["username"]),
+            github_username=data.get("github_username", ""),
+            bio=data.get("bio", ""),
+            location=data.get("location", ""),
+            website=data.get("website", ""),
+            # Check if new users should be auto-approved
             is_approved=getattr(settings, "AUTO_APPROVE_NEW_USERS", False),
-
-
-            is_active=True
+            is_active=True,
         )
-        
-        # Login the user with the default Django backend
-        login(request, author, backend='django.contrib.auth.backends.ModelBackend')
-        
+
+        # Automatically log in the user after successful registration
+        login(request, author, backend="django.contrib.auth.backends.ModelBackend")
+
         # Return the created author data
         serializer = AuthorSerializer(author)
-        return Response({
-            'success': True,
-            'user': serializer.data,
-            'message': 'Account created successfully'
-        }, status=201)
-        
-    except Exception as e:
-        return Response({'message': str(e)}, status=400)
+        return Response(
+            {
+                "success": True,
+                "user": serializer.data,
+                "message": "Account created successfully",
+            },
+            status=201,
+        )
 
-@api_view(['POST'])
+    except Exception as e:
+        return Response({"message": str(e)}, status=400)
+
+
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def login_view(request):
-    """Handle user login"""
-    username = request.data.get('username')
-    password = request.data.get('password')
-    remember_me = request.data.get('remember_me', False)
-    
+    """
+    Handle user login with authentication and approval checks.
+
+    Authenticates the user credentials and creates a session. Includes
+    security checks for account approval and session timeout configuration.
+
+    Security features:
+    - Validates credentials using Django's authentication backend
+    - Checks if user account has been approved by admin
+    - Sets session timeout based on "remember me" preference
+    - Staff users bypass approval requirements
+
+    Returns:
+        200 OK: Login successful with user data
+        400 Bad Request: Missing credentials
+        401 Unauthorized: Invalid credentials
+        403 Forbidden: Account awaiting approval
+    """
+    username = request.data.get("username")
+    password = request.data.get("password")
+    remember_me = request.data.get("remember_me", False)
+
     if not username or not password:
-        return Response({'message': 'Username and password are required'}, status=400)
-    
-    # Authenticate user
+        return Response({"message": "Username and password are required"}, status=400)
+
+    # Authenticate user credentials
     user = authenticate(request, username=username, password=password)
-    
+
     if user is not None:
-        # Login the user with the default Django backend
+        # Check if user account has been approved (staff users bypass this check)
         if not getattr(user, "is_approved", False) and not user.is_staff:
-            return Response({'message': 'Your account is awaiting admin approval.'}, status=403)
-    
-        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-        
-        # Set session timeout based on remember_me preference
+            return Response(
+                {"message": "Your account is awaiting admin approval."}, status=403
+            )
+
+        # Create session for authenticated user
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+
+        # Configure session timeout based on "remember me" preference
         if remember_me:
-            # Remember me: 2 weeks (current default)
+            # Extended session: 2 weeks
             request.session.set_expiry(1209600)  # 2 weeks in seconds
         else:
-            # Regular login: 24 hours
+            # Standard session: 24 hours
             request.session.set_expiry(86400)  # 24 hours in seconds
-        
-        # Get the author data
+
+        # Get the author data to return
         try:
             author = Author.objects.get(id=user.id)
             serializer = AuthorSerializer(author)
-            return Response({
-                'success': True,
-                'user': serializer.data,
-                'message': 'Login successful'
-            })
+            return Response(
+                {
+                    "success": True,
+                    "user": serializer.data,
+                    "message": "Login successful",
+                }
+            )
         except Author.DoesNotExist:
-            return Response({
-                'success': True,
-                'user': None,
-                'message': 'User exists but author profile not found'
-            })
+            return Response(
+                {
+                    "success": True,
+                    "user": None,
+                    "message": "User exists but author profile not found",
+                }
+            )
     else:
-        return Response({'message': 'Invalid username or password'}, status=401)
+        return Response({"message": "Invalid username or password"}, status=401)
 
-@api_view(['POST'])
+
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def github_callback(request):
-    """Handle GitHub OAuth callback"""
-    code = request.data.get('code')
-    
+    """
+    Handle GitHub OAuth callback after authentication.
+
+    This endpoint is called after a user successfully authenticates with GitHub
+    via django-allauth. It checks the authentication status and returns user data.
+
+    Note: The actual OAuth flow is handled by django-allauth middleware.
+    This endpoint just confirms the authentication result.
+
+    Returns:
+        200 OK: Authentication status and user data
+    """
+    code = request.data.get("code")
+
     if not code:
-        return Response({'message': 'No authorization code provided'}, status=400)
-    
-    # The user should already be authenticated by django-allauth at this point
+        return Response({"message": "No authorization code provided"}, status=400)
+
+    # Check if user is authenticated after OAuth flow
     if request.user.is_authenticated:
         try:
             author = Author.objects.get(id=request.user.id)
             serializer = AuthorSerializer(author)
-            return Response({
-                'success': True,
-                'user': serializer.data
-            })
+            return Response({"success": True, "user": serializer.data})
         except Author.DoesNotExist:
-            return Response({
-                'success': True,
-                'user': None,
-                'message': 'User exists but author profile not found'
-            })
+            return Response(
+                {
+                    "success": True,
+                    "user": None,
+                    "message": "User exists but author profile not found",
+                }
+            )
     else:
-        # If they're not authenticated yet, we need to check auth status
-        return Response({
-            'message': 'Authentication status pending, check /api/auth/status/',
-            'pendingAuth': True
-        })
+        # OAuth flow may still be in progress
+        return Response(
+            {
+                "message": "Authentication status pending, check /api/auth/status/",
+                "pendingAuth": True,
+            }
+        )
 
-@api_view(['GET', 'PATCH'])
+
+@api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def author_me(request):
-    """Get or update the current authenticated author's info"""
+    """
+    Get or update the current authenticated author's profile information.
+
+    This endpoint provides a convenient way for users to view and update
+    their own profile data without needing to know their author ID.
+
+    GET: Returns current user's profile data
+    PATCH: Updates current user's profile with provided fields
+
+    Returns:
+        200 OK: Current user's profile data
+        400 Bad Request: Validation errors on update
+        404 Not Found: Author profile not found
+    """
     try:
         # Get the current user's author profile
         author = Author.objects.get(id=request.user.id)
-        
-        if request.method == 'GET':
+
+        if request.method == "GET":
             serializer = AuthorSerializer(author)
             return Response(serializer.data)
-        
-        elif request.method == 'PATCH':
-            # Update the author profile
+
+        elif request.method == "PATCH":
+            # Update the author profile with provided data
             serializer = AuthorSerializer(author, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
             else:
                 return Response(serializer.errors, status=400)
-        
+
     except Author.DoesNotExist:
-        return Response({'message': 'Author profile not found'}, status=404)
+        return Response({"message": "Author profile not found"}, status=404)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    """Logout the current user"""
+    """
+    Log out the current user and destroy their session.
+
+    Clears the user's session data and authentication state.
+    This ensures the user is completely logged out and their session
+    cannot be reused.
+
+    Returns:
+        200 OK: Logout successful
+    """
     logout(request)
-    return Response({'success': True})
+    return Response({"success": True})
