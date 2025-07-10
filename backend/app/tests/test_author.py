@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.urls import reverse
-from app.models import Entry
+from app.models import Entry, Follow
 import base64
 from django.core.files.uploadedfile import SimpleUploadedFile
 
@@ -290,6 +290,33 @@ class AuthorAPITest(BaseAPITestCase):
         response = self.user_client.patch(url, data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('profile_image', response.data)
+
+    def test_public_author_profile_pages(self):
+        """Test add public author profile pages"""
+        # Test viewing another user's profile page
+        url = reverse('social-distribution:author-detail', args=[self.another_user.id])
+        
+        # Authenticated user can view other users' profiles
+        response = self.user_client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['username'], 'anotheruser')
+        self.assertEqual(response.data['display_name'], 'Another User')
+        self.assertIn('created_at', response.data)
+        self.assertIn('bio', response.data)
+        
+        # Profile should include all necessary public information
+        expected_fields = [
+            'id', 'url', 'username', 'display_name', 'github',
+            'profile_image', 'bio', 'is_approved', 'is_active', 'created_at'
+        ]
+        for field in expected_fields:
+            self.assertIn(field, response.data)
+        
+        # Test viewing own profile
+        own_profile_url = reverse('social-distribution:author-detail', args=[self.regular_user.id])
+        response = self.user_client.get(own_profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['username'], 'testuser')
 
 class AuthorModelTest(TestCase):
     """Test the Author model directly"""
