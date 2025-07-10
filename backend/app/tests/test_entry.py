@@ -48,7 +48,7 @@ class EntryAPITest(BaseAPITestCase):
         """Test retrieving a single entry"""
         url = reverse("social-distribution:entry-detail", args=[self.public_entry.id])
 
-        # Test unauthenticated access
+        # Test unauthenticated access/public entry access
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
