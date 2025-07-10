@@ -2,6 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from .test_author import BaseAPITestCase
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 
 Author = get_user_model()
 
@@ -95,6 +96,58 @@ class AuthAPITest(BaseAPITestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(response.data["message"], "Invalid username or password")
+
+    @override_settings(AUTO_APPROVE_NEW_USERS=False)
+    def test_user_approval_workflow(self):
+        """Test complete user approval"""
+        # Create user account
+        signup_url = reverse("signup")
+        signup_data = {
+            "username": "pendinguser",
+            "email": "pending@example.com",
+            "password": "pendingpass123",
+            "display_name": "Pending User",
+        }
+        
+        response = self.client.post(signup_url, signup_data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["user"]["username"], "pendinguser")
+        
+        # Verify user was created but not approved
+        pending_user = Author.objects.get(username="pendinguser")
+        self.assertFalse(pending_user.is_approved)
+        self.assertTrue(pending_user.is_active)
+        
+        # Attempt login - should fail because not approved
+        login_url = reverse("login")
+        login_data = {"username": "pendinguser", "password": "pendingpass123"}
+        
+        response = self.client.post(login_url, login_data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["message"], "Your account is awaiting admin approval.")
+        
+        # Admin approves the user
+        approve_url = reverse('social-distribution:author-approve', args=[pending_user.id])
+        response = self.admin_client.post(approve_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['author']['is_approved'])
+        
+        # Verify user is now approved in database
+        pending_user.refresh_from_db()
+        self.assertTrue(pending_user.is_approved)
+        
+        # User can now login successfully
+        response = self.client.post(login_url, login_data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["user"]["username"], "pendinguser")
+        
+        # Test with remember_me option as well
+        login_data["remember_me"] = True
+        response = self.client.post(login_url, login_data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
 
     def test_github_callback(self):
         """Test GitHub callback endpoint"""
