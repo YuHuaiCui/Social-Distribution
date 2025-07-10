@@ -38,9 +38,12 @@ class ApiService {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    const defaultHeaders: HeadersInit = {
-      "Content-Type": "application/json",
-    };
+    const defaultHeaders: HeadersInit = {};
+
+    // Only set Content-Type if not FormData
+    if (!(options.body instanceof FormData)) {
+      defaultHeaders["Content-Type"] = "application/json";
+    }
 
     // Get CSRF token from cookie if it exists
     const csrfToken = document.cookie
