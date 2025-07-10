@@ -17,6 +17,7 @@
    - [Follow Endpoints](#follow-endpoints)
    - [Inbox Endpoints](#inbox-endpoints)
    - [Image Upload Endpoints](#image-upload-endpoints)
+   - [GitHub Integration Endpoints](#github-integration-endpoints)
 9. [CORS Configuration](#cors-configuration)
 10. [Database Schema](#database-schema)
 11. [API Versioning](#api-versioning)
@@ -37,6 +38,7 @@ The Social Distribution Backend API is a RESTful API built with Django and Djang
 - CORS support for frontend integration
 - Image upload capabilities
 - Real-time notifications via inbox system
+- GitHub integration for profile validation and activity tracking
 
 ## Tech Stack
 
@@ -244,6 +246,7 @@ Authenticates a user and creates a session.
 
 **Error Responses:**
 - `401 Unauthorized`: Invalid credentials
+- `403 Forbidden`: Account awaiting admin approval
 
 #### 3. Authentication Status
 **GET** `/api/auth/status/`
@@ -289,8 +292,35 @@ Gets or updates the current authenticated user's profile.
 }
 ```
 
+**For profile image uploads use multipart/form-data:**
+- `profile_image_file`: The image file to upload
+
 **Response (200 OK):**
 Returns the updated user object.
+
+#### 6. GitHub OAuth Callback
+**POST** `/api/auth/github/callback/`
+
+Handles GitHub OAuth callback after successful authentication.
+
+**Request Body:**
+```json
+{
+  "code": "github_auth_code"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "username": "johndoe",
+    "display_name": "John Doe"
+  }
+}
+```
 
 ### Author Endpoints
 
@@ -303,7 +333,7 @@ Lists all authors with pagination and filtering.
 - `is_approved`: Filter by approval status (true/false)
 - `is_active`: Filter by active status (true/false)
 - `type`: Filter by author type (local/remote)
-- `search`: Search by username, display_name, or email
+- `search`: Search by username, display_name, github_username, or email
 - `page`: Page number for pagination
 
 **Response (200 OK):**
@@ -351,7 +381,51 @@ Updates an author's profile (admin only).
 }
 ```
 
-#### 4. Get Author's Followers
+#### 4. Create Author (Admin Only)
+**POST** `/api/authors/`
+
+Creates a new author (admin only).
+
+#### 5. Author Management Actions (Admin Only)
+
+##### Approve Author
+**POST** `/api/authors/{id}/approve/`
+
+Approves an author (admin only).
+
+##### Activate/Deactivate Author
+**POST** `/api/authors/{id}/activate/`
+**POST** `/api/authors/{id}/deactivate/`
+
+Activates or deactivates an author (admin only).
+
+##### Promote to Admin
+**POST** `/api/authors/{id}/promote_to_admin/`
+
+Promotes an author to admin status (admin only).
+
+#### 6. Author Statistics
+**GET** `/api/authors/stats/`
+
+Gets author statistics.
+
+**Response (200 OK):**
+```json
+{
+  "total_authors": 100,
+  "approved_authors": 85,
+  "active_authors": 90,
+  "local_authors": 80,
+  "remote_authors": 20
+}
+```
+
+#### 7. Pending Authors (Admin Only)
+**GET** `/api/authors/pending/`
+
+Gets authors awaiting approval (admin only).
+
+#### 8. Get Author's Followers
 **GET** `/api/authors/{id}/followers/`
 
 Gets all followers of an author.
@@ -368,17 +442,17 @@ Gets all followers of an author.
 ]
 ```
 
-#### 5. Get Author's Following
+#### 9. Get Author's Following
 **GET** `/api/authors/{id}/following/`
 
 Gets all authors that this author is following.
 
-#### 6. Get Author's Friends
+#### 10. Get Author's Friends
 **GET** `/api/authors/{id}/friends/`
 
 Gets all friends (mutual follows) of an author.
 
-#### 7. Follow/Unfollow Author
+#### 11. Follow/Unfollow Author
 **POST/DELETE** `/api/authors/{id}/follow/`
 
 Follow or unfollow an author.
@@ -386,12 +460,35 @@ Follow or unfollow an author.
 **POST Response (201 Created):**
 ```json
 {
-  "id": "follow-request-uuid",
-  "follower": "http://localhost:8000/api/authors/follower-uuid",
-  "followed": "http://localhost:8000/api/authors/followed-uuid",
-  "status": "pending"
+  "success": true,
+  "follow": {
+    "id": "follow-request-uuid",
+    "follower": "http://localhost:8000/api/authors/follower-uuid",
+    "followed": "http://localhost:8000/api/authors/followed-uuid",
+    "status": "pending"
+  }
 }
 ```
+
+#### 12. Get Author's Entries
+**GET** `/api/authors/{id}/entries/`
+
+Gets entries by a specific author.
+
+#### 13. Create Entry for Author
+**POST** `/api/authors/{id}/entries/`
+
+Creates a new entry for the author (author must be current user).
+
+#### 14. Post to Author's Inbox
+**POST** `/api/authors/{id}/inbox/`
+
+Posts an item to an author's inbox.
+
+#### 15. Get/Update Current User Profile
+**GET/PATCH** `/api/authors/me/`
+
+Alternative endpoint for current user profile management.
 
 ### Entry (Post) Endpoints
 
@@ -465,10 +562,10 @@ Creates a new entry/post. For image posts, use multipart/form-data to upload ima
 - `content_type`: One of: text/plain, text/markdown, image/png, image/jpeg
 - `visibility`: One of: public, unlisted, friends
 
-**Note:** Images are stored as binary data (blobs) in the database. The API returns base64-encoded data URLs for images in the `image` field.
+**Note:** Images are stored as binary data (blobs) in the database. The API returns base64-encoded data URLs for images in the `image_data` field.
 
 **Response (201 Created):**
-Returns the created entry object with the `image` field containing a data URL for image posts.
+Returns the created entry object with the `image_data` field containing a data URL for image posts.
 
 #### 3. Get Specific Entry
 **GET** `/api/entries/{id}/`
@@ -520,6 +617,20 @@ Gets the current user's saved/bookmarked entries.
 
 Save or unsave an entry.
 
+**POST Response (201 Created):**
+```json
+{
+  "detail": "Entry saved successfully"
+}
+```
+
+**DELETE Response (204 No Content):**
+```json
+{
+  "detail": "Entry unsaved successfully"
+}
+```
+
 ### Comment Endpoints
 
 #### 1. List Comments
@@ -565,19 +676,26 @@ Creates a new comment on an entry.
 **Response (201 Created):**
 Returns the created comment object.
 
-#### 3. Update Comment
+#### 3. Get Specific Comment
+**GET** `/api/entries/{entry_id}/comments/{comment_id}/`
+
+Gets a specific comment.
+
+#### 4. Update Comment
 **PATCH** `/api/entries/{entry_id}/comments/{comment_id}/`
 
 Updates a comment (author only).
 
-#### 4. Delete Comment
+#### 5. Delete Comment
 **DELETE** `/api/entries/{entry_id}/comments/{comment_id}/`
 
 Deletes a comment (author only).
 
 ### Like Endpoints
 
-#### 1. Get Like Status
+#### Entry Likes
+
+#### 1. Get Entry Like Status
 **GET** `/api/entries/{entry_id}/likes/`
 
 Gets like count and current user's like status.
@@ -609,6 +727,48 @@ Likes an entry.
 **DELETE** `/api/entries/{entry_id}/likes/`
 
 Unlikes an entry.
+
+**Response (200 OK):**
+```json
+{
+  "detail": "Unliked."
+}
+```
+
+#### Comment Likes
+
+#### 4. Get Comment Like Status
+**GET** `/api/comments/{comment_id}/likes/`
+
+Gets like count and current user's like status for a comment.
+
+**Response (200 OK):**
+```json
+{
+  "like_count": 5,
+  "liked_by_current_user": false
+}
+```
+
+#### 5. Like Comment
+**POST** `/api/comments/{comment_id}/likes/`
+
+Likes a comment.
+
+**Response (201 Created):**
+```json
+{
+  "id": "like-uuid",
+  "author": "http://localhost:8000/api/authors/author-uuid",
+  "comment": "http://localhost:8000/api/comments/comment-uuid",
+  "created_at": "2025-01-15T14:00:00Z"
+}
+```
+
+#### 6. Unlike Comment
+**DELETE** `/api/comments/{comment_id}/likes/`
+
+Unlikes a comment.
 
 **Response (200 OK):**
 ```json
@@ -663,7 +823,28 @@ Lists incoming follow requests for the authenticated user.
 ]
 ```
 
-#### 3. Accept Follow Request
+#### 3. Get Follow Requests (Paginated)
+**GET** `/api/follows/requests/`
+
+Gets pending follow requests for the current user with pagination.
+
+**Query Parameters:**
+- `page`: Page number
+- `page_size`: Items per page
+
+**Response (200 OK):**
+```json
+{
+  "results": [...],
+  "count": 25,
+  "page": 1,
+  "page_size": 20,
+  "has_next": true,
+  "has_previous": false
+}
+```
+
+#### 4. Accept Follow Request
 **POST** `/api/follows/{id}/accept/`
 
 Accepts a follow request.
@@ -675,7 +856,7 @@ Accepts a follow request.
 }
 ```
 
-#### 4. Reject Follow Request
+#### 5. Reject Follow Request
 **POST** `/api/follows/{id}/reject/`
 
 Rejects a follow request.
@@ -687,12 +868,12 @@ Rejects a follow request.
 }
 ```
 
-#### 5. Unfollow
+#### 6. Unfollow
 **DELETE** `/api/follows/{id}/`
 
 Unfollows an author (deletes the follow relationship).
 
-#### 6. Check Follow Status
+#### 7. Check Follow Status
 **GET** `/api/follows/status/`
 
 Checks follow status between two authors.
@@ -721,6 +902,7 @@ Lists inbox items for the authenticated user.
 **Query Parameters:**
 - `content_type`: Filter by type (follow, like, comment, entry)
 - `read`: Filter by read status (true/false)
+- `processed`: Filter by processed status (true/false)
 - `page`: Page number
 - `page_size`: Items per page (max 100)
 
@@ -752,7 +934,12 @@ Lists inbox items for the authenticated user.
 }
 ```
 
-#### 2. Mark Items as Read
+#### 2. Get Specific Inbox Item
+**GET** `/api/inbox/{id}/`
+
+Gets a specific inbox item.
+
+#### 3. Mark Items as Read
 **POST** `/api/inbox/mark-read/`
 
 Marks multiple inbox items as read.
@@ -772,12 +959,17 @@ Marks multiple inbox items as read.
 }
 ```
 
-#### 3. Mark Single Item as Read
+#### 4. Mark Single Item as Read
 **POST** `/api/inbox/{id}/read/`
 
 Marks a single inbox item as read.
 
-#### 4. Get Inbox Stats
+#### 5. Mark Items as Processed
+**POST** `/api/inbox/mark-processed/`
+
+Marks multiple inbox items as processed (ActivityPub compatibility).
+
+#### 6. Get Inbox Stats
 **GET** `/api/inbox/stats/`
 
 Gets inbox statistics.
@@ -791,7 +983,7 @@ Gets inbox statistics.
 }
 ```
 
-#### 5. Get Unread Count
+#### 7. Get Unread Count
 **GET** `/api/inbox/unread-count/`
 
 Gets count of unread notifications.
@@ -803,17 +995,33 @@ Gets count of unread notifications.
 }
 ```
 
-#### 6. Accept Follow from Inbox
+#### 8. Accept Follow from Inbox
 **POST** `/api/inbox/{id}/accept-follow/`
 
 Accepts a follow request directly from inbox.
 
-#### 7. Reject Follow from Inbox
+**Response (200 OK):**
+```json
+{
+  "status": "accepted",
+  "message": "Follow request accepted"
+}
+```
+
+#### 9. Reject Follow from Inbox
 **POST** `/api/inbox/{id}/reject-follow/`
 
 Rejects a follow request directly from inbox.
 
-#### 8. Clear Inbox
+**Response (200 OK):**
+```json
+{
+  "status": "rejected",
+  "message": "Follow request rejected"
+}
+```
+
+#### 10. Clear Inbox
 **POST** `/api/inbox/clear/`
 
 Clears all inbox items for the user.
@@ -856,6 +1064,82 @@ formData.append('image', file);
 **Error Responses:**
 - `400 Bad Request`: Invalid file type or size
 
+### GitHub Integration Endpoints
+
+#### 1. Validate GitHub Username
+**GET** `/api/github/validate/{username}/`
+
+Validates if a GitHub username exists and fetches basic user information.
+
+**Parameters:**
+- `username`: GitHub username to validate
+
+**Response (200 OK):**
+```json
+{
+  "valid": true,
+  "username": "johndoe",
+  "name": "John Doe",
+  "avatar_url": "https://avatars.githubusercontent.com/u/123456?v=4",
+  "bio": "Software Developer",
+  "public_repos": 25,
+  "followers": 100,
+  "following": 50,
+  "created_at": "2020-01-15T10:00:00Z",
+  "html_url": "https://github.com/johndoe"
+}
+```
+
+**Response (404 Not Found):**
+```json
+{
+  "valid": false,
+  "error": "User not found"
+}
+```
+
+#### 2. Get GitHub Activity
+**GET** `/api/github/activity/{username}/`
+
+Fetches GitHub activity data for a user including recent commits, pull requests, and issues.
+
+**Parameters:**
+- `username`: GitHub username
+
+**Response (200 OK):**
+```json
+{
+  "username": "johndoe",
+  "activities": [
+    {
+      "id": "abc1234",
+      "type": "commit",
+      "title": "Fix bug in authentication",
+      "repo": "johndoe/awesome-project",
+      "date": "2025-01-15T10:00:00Z",
+      "url": "https://github.com/johndoe/awesome-project/commit/abc1234"
+    },
+    {
+      "id": "pr456",
+      "type": "pull_request",
+      "title": "Add new feature",
+      "repo": "johndoe/another-project",
+      "date": "2025-01-14T15:30:00Z",
+      "url": "https://github.com/johndoe/another-project/pull/456"
+    }
+  ],
+  "contributions": {
+    "total": 15,
+    "message": "Detailed contribution graph requires GitHub GraphQL API"
+  }
+}
+```
+
+**Notes:**
+- These endpoints are cached to reduce GitHub API calls
+- Rate limiting is handled automatically
+- Authentication is optional (public endpoint)
+
 ## CORS Configuration
 
 The API is configured to accept requests from specific origins:
@@ -891,7 +1175,7 @@ CORS_ALLOWED_HEADERS = [
 - Relationships: entries, comments, likes, followers, following
 
 #### Entry (Post)
-- Fields: id (UUID), url, title, content, content_type, visibility, created_at, updated_at
+- Fields: id (UUID), url, title, content, content_type, visibility, image_data, created_at, updated_at
 - Relationships: author, comments, likes
 
 #### Comment
@@ -900,7 +1184,7 @@ CORS_ALLOWED_HEADERS = [
 
 #### Like
 - Fields: id (UUID), created_at
-- Relationships: author, entry
+- Relationships: author, entry, comment
 
 #### Follow
 - Fields: id (UUID), status (pending/accepted/rejected), created_at
@@ -914,6 +1198,10 @@ CORS_ALLOWED_HEADERS = [
 - Represents mutual follow relationships
 - Fields: id, created_at
 - Relationships: author1, author2
+
+#### UploadedImage
+- Fields: id (UUID), image, uploaded_at
+- Relationships: owner (Author)
 
 ## API Versioning
 
@@ -995,6 +1283,8 @@ Set these in production:
 - `ALLOWED_HOSTS`: Your domain names
 - `DATABASE_URL`: PostgreSQL connection string
 - `SITE_URL`: Your production URL
+- `GITHUB_API_TOKEN`: GitHub API token for higher rate limits (optional)
+- `AUTO_APPROVE_NEW_USERS`: Whether to auto-approve new user registrations
 
 ### Static and Media Files
 - Configure cloud storage (AWS S3, Google Cloud Storage)
