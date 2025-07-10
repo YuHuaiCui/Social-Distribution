@@ -4,9 +4,7 @@ import { Navigate } from "react-router-dom";
 export default function Auth() {
   const { isAuthenticated } = useAuth();
   function handleLogin() {
-    window.location.href = `${
-      import.meta.env.VITE_API_URL
-    }/accounts/github/login/`;
+    window.location.href = `${import.meta.env.VITE_API_URL}/accounts/github/login/`;
   }
 
   if (isAuthenticated) {

@@ -166,6 +166,51 @@ class AuthorViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def promote_to_admin(self, request, pk=None):
+        """Promote an author to admin (admin only)"""
+        # Check if current user is admin
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response(
+                {"error": "Only admins can promote other users"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        author = self.get_object()
+        
+        # Don't allow self-promotion
+        if author.id == request.user.id:
+            return Response(
+                {"error": "Cannot promote yourself"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if already admin
+        if author.is_staff:
+            return Response(
+                {"error": "User is already an admin"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Promote to admin
+        author.is_staff = True
+        author.is_approved = True  # Also approve them
+        author.is_active = True    # Also activate them
+        author.save()
+        
+        return Response(
+            {
+                "message": f"Author {author.username} has been promoted to admin",
+                "author": AuthorListSerializer(
+                    author, context={"request": request}
+                ).data,
+            }
+        )
+
     @action(detail=False, methods=["get"])
     def stats(self, request):
         """Get author statistics"""

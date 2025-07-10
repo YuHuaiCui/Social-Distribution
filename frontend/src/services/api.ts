@@ -346,6 +346,12 @@ class ApiService {
     return this.request(`/api/authors/${authorId}/`, { method: "DELETE" });
   }
 
+  async promoteToAdmin(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/promote_to_admin/`, {
+      method: "POST",
+    });
+  }
+
   // Inbox endpoints (when implemented in backend)
   async getInbox(): Promise<Inbox[]> {
     // This endpoint needs to be implemented in backend

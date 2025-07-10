@@ -11,6 +11,8 @@ import { useToast } from "../components/context/ToastContext";
 import AnimatedButton from "../components/ui/AnimatedButton";
 import { Shield, Trash2, UserX, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { GitHubActivity } from "../components/GitHubActivity";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 const AuthorProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,17 @@ const AuthorProfilePage: React.FC = () => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminActionLoading, setAdminActionLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: 'delete' | 'promote' | null;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    action: null,
+    title: '',
+    message: '',
+  });
   
   // Check if current user is admin
   const isAdmin = user?.is_staff || user?.is_superuser;
@@ -69,9 +82,58 @@ const AuthorProfilePage: React.FC = () => {
     );
   }
   
+  // Handle dialog actions
+  const handleShowConfirmDialog = (action: 'delete' | 'promote') => {
+    if (!author) return;
+    
+    if (action === 'delete') {
+      setConfirmDialog({
+        isOpen: true,
+        action,
+        title: 'Delete User',
+        message: `Are you sure you want to delete ${author.display_name}? This action cannot be undone.`,
+      });
+    } else if (action === 'promote') {
+      setConfirmDialog({
+        isOpen: true,
+        action,
+        title: 'Promote to Admin',
+        message: `Are you sure you want to promote ${author.display_name} to admin? This will give them full administrative privileges.`,
+      });
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog.action || !author) return;
+    
+    setAdminActionLoading(true);
+    try {
+      if (confirmDialog.action === 'delete') {
+        await api.deleteAuthor(author.id);
+        showSuccess(`${author.display_name} has been deleted`);
+        navigate('/authors');
+      } else if (confirmDialog.action === 'promote') {
+        await api.promoteToAdmin(author.id);
+        showSuccess(`${author.display_name} has been promoted to admin`);
+        setAuthor({ ...author, is_staff: true, is_approved: true, is_active: true });
+      }
+    } catch (error) {
+      showError(`Failed to ${confirmDialog.action} user`);
+    } finally {
+      setAdminActionLoading(false);
+      setConfirmDialog({ isOpen: false, action: null, title: '', message: '' });
+    }
+  };
+
   // Admin actions
-  const handleAdminAction = async (action: 'approve' | 'deactivate' | 'activate' | 'delete') => {
+  const handleAdminAction = async (action: 'approve' | 'deactivate' | 'activate' | 'delete' | 'promote') => {
     if (!isAdmin || !author) return;
+    
+    // For delete and promote, show confirmation dialog
+    if (action === 'delete' || action === 'promote') {
+      handleShowConfirmDialog(action);
+      return;
+    }
     
     setAdminActionLoading(true);
     try {
@@ -90,13 +152,6 @@ const AuthorProfilePage: React.FC = () => {
           await api.activateAuthor(author.id);
           showSuccess(`${author.display_name} has been activated`);
           setAuthor({ ...author, is_active: true });
-          break;
-        case 'delete':
-          if (window.confirm(`Are you sure you want to delete ${author.display_name}? This action cannot be undone.`)) {
-            await api.deleteAuthor(author.id);
-            showSuccess(`${author.display_name} has been deleted`);
-            navigate('/authors');
-          }
           break;
       }
     } catch (error) {
@@ -172,6 +227,19 @@ const AuthorProfilePage: React.FC = () => {
               >
                 Delete User
               </AnimatedButton>
+              
+              {!author.is_staff && (
+                <AnimatedButton
+                  size="sm"
+                  variant="primary"
+                  icon={<Shield size={16} />}
+                  onClick={() => handleAdminAction('promote')}
+                  loading={adminActionLoading}
+                  className="bg-purple-500 hover:bg-purple-600"
+                >
+                  Promote to Admin
+                </AnimatedButton>
+              )}
             </div>
           </div>
           
@@ -200,6 +268,18 @@ const AuthorProfilePage: React.FC = () => {
         showActions
       />
       
+      {/* GitHub Activity Section - Only show if user has GitHub username */}
+      {author.github && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h2 className="text-lg font-semibold text-text-1 mb-4">GitHub Activity</h2>
+          <GitHubActivity username={author.github.split('/').pop() || ''} />
+        </motion.div>
+      )}
+      
       {/* Posts Section */}
       <div className="space-y-4">
         {isAdmin && entries.length > 0 && (
@@ -226,6 +306,18 @@ const AuthorProfilePage: React.FC = () => {
           <p className="text-text-2">This author hasn't posted anything yet.</p>
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, action: null, title: '', message: '' })}
+        onConfirm={handleConfirmAction}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.action === 'delete' ? 'Delete' : 'Promote'}
+        variant={confirmDialog.action === 'delete' ? 'danger' : 'warning'}
+        loading={adminActionLoading}
+      />
     </div>
   );
 };

@@ -2,10 +2,11 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from app.views import AuthorViewSet
 from app.views.entry import EntryViewSet  
-from app.views.like import EntryLikeView
+from app.views.like import EntryLikeView, CommentLikeView
 from app.views.auth import auth_status, github_callback, author_me, logout_view
 from app.views.image import ImageUploadView
-from app.views.comment import CommentListCreateView, CommentDetailView  
+from app.views.comment import CommentListCreateView, CommentDetailView
+from app.views.github import GitHubValidationView, GitHubActivityView  
 
 # namespacing app
 app_name = "social-distribution"
@@ -57,6 +58,9 @@ urlpatterns = [    # Router-based endpoints
     # Comment endpoints
     path("entries/<uuid:entry_id>/comments/", CommentListCreateView.as_view(), name="entry-comments"),
     path("entries/<uuid:entry_id>/comments/<uuid:pk>/", CommentDetailView.as_view(), name="entry-comment-detail"),
+    
+    # Comment like endpoint
+    path("comments/<uuid:comment_id>/likes/", CommentLikeView.as_view(), name="comment-likes"),
 
     # Image upload
     path('upload-image/', ImageUploadView.as_view(), name='upload-image'),
@@ -66,4 +70,8 @@ urlpatterns = [    # Router-based endpoints
     path('api/auth/github/callback/', github_callback, name='github-callback'),
     path('authors/me/', author_me, name='author-me'),
     path('api/auth/logout/', logout_view, name='logout'),
+    
+    # GitHub endpoints
+    path('github/validate/<str:username>/', GitHubValidationView.as_view(), name='github-validate'),
+    path('github/activity/<str:username>/', GitHubActivityView.as_view(), name='github-activity'),
 ]
