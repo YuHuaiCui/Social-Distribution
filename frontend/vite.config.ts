@@ -11,25 +11,47 @@ export default defineConfig({
     }),
     tailwindcss(),
   ],
+  build: {
+    // Optimize for production
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        // Manual chunks for better caching
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          motion: ["framer-motion"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
+    // Optimize chunk size
+    chunkSizeWarningLimit: 1000,
+  },
   server: {
     hmr: {
       overlay: false,
     },
     proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
+      "/api": {
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
-      '/accounts': {
-        target: 'http://localhost:8000',
+      "/accounts": {
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
-      '/admin': {
-        target: 'http://localhost:8000',
+      "/admin": {
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
-      '/static': {
-        target: 'http://localhost:8000',
+      "/static": {
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
     },
