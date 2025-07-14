@@ -135,6 +135,8 @@ export const HomePage: React.FC = () => {
             >
               <PostCard
                 post={post}
+                isLiked={post.is_liked}
+                isSaved={post.is_saved}
                 onDelete={(deletedId) => {
                   setPosts((prev) => prev.filter((p) => p.id !== deletedId));
                 }}

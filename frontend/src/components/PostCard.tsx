@@ -84,7 +84,9 @@ const PostCardComponent: React.FC<PostCardProps> = ({
 
   // Consolidated useEffect for initialization and updates
   useEffect(() => {
-    // Initialize state
+    // Initialize state from props and post data
+    setLiked(isLiked || post.is_liked || false);
+    setSaved(isSaved || post.is_saved || false);
     setCommentCount(post.comments_count || 0);
     
     // Fetch like data if we have a valid post ID
@@ -93,7 +95,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     } else {
       // Use fallback data if no valid ID
       setLikeCount(post.likes_count || 0);
-      setLiked(post.is_liked || false);
+      setLiked(isLiked || post.is_liked || false);
     }
 
     // Listen for post updates from other components
@@ -111,7 +113,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     return () => {
       window.removeEventListener('post-update', handlePostUpdate);
     };
-  }, [post.id, post.comments_count, post.likes_count, post.is_liked, debouncedFetchLikeData]);
+  }, [post.id, post.comments_count, post.likes_count, post.is_liked, post.is_saved, isLiked, isSaved, debouncedFetchLikeData]);
 
   // Memoize author info extraction
   const author = useMemo(() => 
@@ -149,7 +151,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       );
       showError("Failed to update like status");
     }
-  }, [liked, extractUUID, post.id, showSuccess, showInfo, showError, onLike]);
+  }, [liked, post.id, showSuccess, showInfo, showError, onLike]);
 
   const handleSave = useCallback(async () => {
     const extractedId = extractUUID(post.id);
@@ -170,7 +172,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       setSaved(!newSavedState);
       showError("Failed to update saved status");
     }
-  }, [saved, extractUUID, post.id, showSuccess, showInfo, showError, onSave]);
+  }, [saved, post.id, showSuccess, showInfo, showError, onSave]);
 
   const handleShare = useCallback(() => {
     // For public posts, show the share modal with social media options
