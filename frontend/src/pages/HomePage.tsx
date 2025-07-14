@@ -21,7 +21,7 @@ export const HomePage: React.FC = () => {
   );
   const [posts, setPosts] = useState<Entry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useEffect(() => {
     fetchPosts();
   }, [feed, refreshTrigger]); // Add refreshTrigger as dependency
@@ -30,7 +30,7 @@ export const HomePage: React.FC = () => {
     setIsLoading(true);
     try {
       let response = null;
-      
+
       switch (feed) {
         case "all":
           response = await entryService.getEntries({
@@ -38,7 +38,7 @@ export const HomePage: React.FC = () => {
             page_size: 20,
           });
           break;
-          
+
         case "friends":
           if (user) {
             response = await entryService.getHomeFeed({
@@ -49,14 +49,14 @@ export const HomePage: React.FC = () => {
             response = { results: [] };
           }
           break;
-          
+
         case "liked":
           response = await api.getLikedEntries({
             page: 1,
             page_size: 20,
           });
           break;
-          
+
         default:
           response = await entryService.getEntries({
             page: 1,
@@ -94,7 +94,10 @@ export const HomePage: React.FC = () => {
 
     if (posts.length === 0) {
       return (
-        <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center">
+        <Card
+          variant="main"
+          className="text-center py-16 px-0 flex-1 flex flex-col justify-center"
+        >
           <div className="flex justify-center mb-4">
             <Globe size={48} className="text-text-2" />
           </div>
@@ -268,9 +271,7 @@ export const HomePage: React.FC = () => {
       )}
 
       {/* Posts */}
-      <div className="flex-1 flex flex-col">
-        {renderContent()}
-      </div>
+      <div className="flex-1 flex flex-col">{renderContent()}</div>
     </div>
   );
 };
