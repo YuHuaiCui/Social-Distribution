@@ -278,20 +278,26 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         Get the current user's saved entries.
 
-        Note: Currently uses the Like model to track saved status.
-        This could be separated into a dedicated SavedEntry model in the future.
+        Returns a paginated list of entries that the authenticated user
+        has saved/bookmarked, ordered by most recent save first.
         """
-        from app.models import Like
+        from app.models import SavedEntry
 
         user = request.user
 
         try:
-            # Get entries that this user has saved (currently tracked via likes)
-            liked_entry_ids = Like.objects.filter(
-                author=user,  # User is already an Author object
+            # Get the current user's author instance
+            if hasattr(user, "author"):
+                user_author = user.author
+            else:
+                user_author = user
+
+            # Get entries that this user has saved
+            saved_entry_ids = SavedEntry.objects.filter(
+                author=user_author,
             ).values_list("entry__id", flat=True)
 
-            entries = Entry.objects.filter(id__in=liked_entry_ids).order_by(
+            entries = Entry.objects.filter(id__in=saved_entry_ids).order_by(
                 "-created_at"
             )
 
@@ -376,20 +382,24 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         Save or unsave a post.
 
-        Note: This currently uses the Like model with an is_save flag.
-        This functionality could be refactored to use a dedicated SavedEntry model.
+        Uses the SavedEntry model to track which entries users have saved.
         """
-        from app.models import Like
+        from app.models import SavedEntry
 
         entry = self.get_object()
         user = request.user
 
         try:
-            # Check if entry is already saved (assuming is_save field exists on Like model)
-            existing_save = Like.objects.filter(
-                author=user.author if hasattr(user, "author") else user,
+            # Get the current user's author instance
+            if hasattr(user, "author"):
+                user_author = user.author
+            else:
+                user_author = user
+
+            # Check if entry is already saved
+            existing_save = SavedEntry.objects.filter(
+                author=user_author,
                 entry=entry,
-                is_save=True,  # This field would need to be added to the Like model
             ).first()
 
             if request.method == "POST":
@@ -400,10 +410,9 @@ class EntryViewSet(viewsets.ModelViewSet):
                     )
 
                 # Create a new saved entry record
-                Like.objects.create(
-                    author=user.author if hasattr(user, "author") else user,
+                SavedEntry.objects.create(
+                    author=user_author,
                     entry=entry,
-                    is_save=True,
                 )
                 return Response(
                     {"detail": "Entry saved successfully"},
