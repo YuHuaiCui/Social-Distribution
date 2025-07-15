@@ -68,6 +68,24 @@ jobs:
           echo "DISABLE_COLLECTSTATIC=1" > .env
           echo "✅ .env file created"
 
+      - name: Create custom package.json for Heroku
+        run: |
+          echo "📝 Creating custom package.json for Heroku deployment..."
+          cat > package.json << 'EOF'
+          {
+            "name": "s25-project-black",
+            "version": "1.0.0",
+            "description": "Django + React app",
+            "scripts": {
+              "heroku-postbuild": "cd frontend && npm install && npx vite build && cd .. && cp -r frontend/dist backend/staticfiles"
+            },
+            "engines": {
+              "node": "20.x"
+            }
+          }
+          EOF
+          echo "✅ Custom package.json created for Heroku"
+
       - name: Set Heroku Config Vars
         run: |
           echo "🔧 Setting Heroku production configuration..."
