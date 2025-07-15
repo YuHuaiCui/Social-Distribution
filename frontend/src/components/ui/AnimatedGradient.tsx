@@ -1,5 +1,4 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React from "react";
 
 interface AnimatedGradientProps {
   children: React.ReactNode;
@@ -8,57 +7,48 @@ interface AnimatedGradientProps {
   duration?: number;
   textClassName?: string;
   onClick?: () => void;
-  as?: 'div' | 'button';
-  type?: 'button' | 'submit' | 'reset';
+  as?: "div" | "button";
+  type?: "button" | "submit" | "reset";
   disabled?: boolean;
 }
 
 export const AnimatedGradient: React.FC<AnimatedGradientProps> = ({
   children,
-  className = '',
+  className = "",
   gradientColors,
   duration = 20,
-  textClassName = '',
+  textClassName = "",
   onClick,
-  as = 'div',
-  type = 'button',
+  as = "div",
+  type = "button",
   disabled = false,
 }) => {
   // Create a smooth gradient that transitions between all colors
-  const gradientStops = gradientColors.join(', ');
-  
-  const Component = as === 'button' ? motion.button : motion.div;
+  const gradientStops = gradientColors.join(", ");
+
+  const Component = as === "button" ? "button" : "div";
 
   return (
     <Component
-      className={`relative overflow-hidden block ${className}`}
+      className={`relative overflow-hidden block animated-gradient-container ${className} ${
+        disabled ? "disabled" : ""
+      }`}
       onClick={onClick}
-      whileHover={disabled ? {} : { scale: 1.05, y: -2 }}
-      whileTap={disabled ? {} : { scale: 0.95 }}
-      type={as === 'button' ? type : undefined}
-      disabled={as === 'button' ? disabled : undefined}
+      type={as === "button" ? type : undefined}
+      disabled={as === "button" ? disabled : undefined}
     >
-      {/* Smooth animated gradient background */}
-      <motion.div
-        className="absolute inset-0 rounded-lg"
+      {/* Optimized CSS animated gradient background */}
+      <div
+        className="absolute inset-0 rounded-lg animated-gradient"
         style={{
           background: `linear-gradient(135deg, ${gradientStops})`,
-          backgroundSize: '400% 400%',
-        }}
-        animate={{
-          backgroundPosition: ['0% 0%', '100% 100%', '0% 0%'],
-        }}
-        transition={{
-          duration: duration,
-          repeat: Infinity,
-          ease: 'linear',
+          backgroundSize: "400% 400%",
+          animationDuration: `${duration}s`,
         }}
       />
-      
+
       {/* Content with contrast shadow */}
-      <span className={`relative z-10 ${textClassName}`}>
-        {children}
-      </span>
+      <span className={`relative z-10 ${textClassName}`}>{children}</span>
     </Component>
   );
 };
