@@ -12,8 +12,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { FloatingDropdown } from "./ui/FloatingDropdown";
-
-type Visibility = "public" | "friends" | "unlisted";
+import type { Visibility } from "../types/common";
 
 interface PrivacyOption {
   value: Visibility;
@@ -33,21 +32,21 @@ interface PrivacySelectorProps {
 
 const privacyOptions: PrivacyOption[] = [
   {
-    value: "public",
+    value: "PUBLIC",
     label: "Public",
     icon: Globe,
     description: "Anyone can see this post",
     color: "text-green-500",
   },
   {
-    value: "friends",
+    value: "FRIENDS",
     label: "Friends Only",
     icon: Users,
     description: "Only your friends can see this post",
     color: "text-blue-500",
   },
   {
-    value: "unlisted",
+    value: "UNLISTED",
     label: "Unlisted",
     icon: Link,
     description: "Visible to followers and friends, not shown in public feeds",
@@ -138,124 +137,116 @@ export const PrivacySelector: React.FC<PrivacySelectorProps> = ({
       <FloatingDropdown
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        triggerRef={triggerRef}
+        triggerRef={triggerRef as React.RefObject<HTMLElement>}
         className="glass-card-prominent rounded-lg shadow-xl max-h-[300px] overflow-y-auto"
       >
-              {/* Info Header */}
-              <div className="flex items-center justify-between p-3 border-b border-border-1">
-                <span className="text-sm font-medium text-text-2">
-                  Post Visibility
-                </span>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowInfo(!showInfo);
-                  }}
-                  className="p-1 rounded hover:bg-glass-low transition-colors"
-                >
-                  <Info size={16} className="text-text-2" />
-                </motion.button>
+        {/* Info Header */}
+        <div className="flex items-center justify-between p-3 border-b border-border-1">
+          <span className="text-sm font-medium text-text-2">
+            Post Visibility
+          </span>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowInfo(!showInfo);
+            }}
+            className="p-1 rounded hover:bg-glass-low transition-colors"
+          >
+            <Info size={16} className="text-text-2" />
+          </motion.button>
+        </div>
+
+        {/* Info Panel */}
+        <AnimatePresence>
+          {showInfo && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="p-4 bg-[var(--primary-violet)]/10 border-b border-border-1">
+                <p className="text-sm text-text-1 mb-2">
+                  Choose who can see your post:
+                </p>
+                <ul className="space-y-1 text-xs text-text-2">
+                  <li className="flex items-start space-x-2">
+                    <Eye size={14} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong>Public:</strong> Visible to everyone on the
+                      internet
+                    </span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <Users size={14} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong>Friends:</strong> Only your approved friends can
+                      view
+                    </span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <Link size={14} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong>Unlisted:</strong> Visible to followers and
+                      friends, not shown in public feeds
+                    </span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <Lock size={14} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong>Private:</strong> Draft mode, only you can see it
+                    </span>
+                  </li>
+                </ul>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-              {/* Info Panel */}
-              <AnimatePresence>
-                {showInfo && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-4 bg-[var(--primary-violet)]/10 border-b border-border-1">
-                      <p className="text-sm text-text-1 mb-2">
-                        Choose who can see your post:
-                      </p>
-                      <ul className="space-y-1 text-xs text-text-2">
-                        <li className="flex items-start space-x-2">
-                          <Eye size={14} className="mt-0.5 flex-shrink-0" />
-                          <span>
-                            <strong>Public:</strong> Visible to everyone on the
-                            internet
-                          </span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <Users size={14} className="mt-0.5 flex-shrink-0" />
-                          <span>
-                            <strong>Friends:</strong> Only your approved friends
-                            can view
-                          </span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <Link size={14} className="mt-0.5 flex-shrink-0" />
-                          <span>
-                            <strong>Unlisted:</strong> Visible to followers and friends,
-                            not shown in public feeds
-                          </span>
-                        </li>
-                        <li className="flex items-start space-x-2">
-                          <Lock size={14} className="mt-0.5 flex-shrink-0" />
-                          <span>
-                            <strong>Private:</strong> Draft mode, only you can
-                            see it
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+        {/* Options */}
+        <div className="py-2">
+          {privacyOptions.map((option) => {
+            const OptionIcon = option.icon;
+            const isSelected = value === option.value;
 
-              {/* Options */}
-              <div className="py-2">
-                {privacyOptions.map((option) => {
-                  const OptionIcon = option.icon;
-                  const isSelected = value === option.value;
-
-                  return (
-                    <motion.button
-                      key={option.value}
-                      whileHover={{ x: 4 }}
-                      onClick={(e) => handleOptionSelect(e, option.value)}
-                      className={`
+            return (
+              <motion.button
+                key={option.value}
+                whileHover={{ x: 4 }}
+                onClick={(e) => handleOptionSelect(e, option.value)}
+                className={`
                         w-full flex items-center justify-between px-4 py-3
                         transition-all hover:bg-glass-low
                         ${isSelected ? "bg-[var(--primary-violet)]/10" : ""}
                       `}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <OptionIcon size={20} className={option.color} />
-                        <div className="text-left">
-                          <p className="font-medium text-text-1">
-                            {option.label}
-                          </p>
-                          <p className="text-xs text-text-2">
-                            {option.description}
-                          </p>
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 25,
-                          }}
-                        >
-                          <Check
-                            size={18}
-                            className="text-[var(--primary-violet)]"
-                          />
-                        </motion.div>
-                      )}
-                    </motion.button>
-                  );
-                })}
-              </div>
+              >
+                <div className="flex items-center space-x-3">
+                  <OptionIcon size={20} className={option.color} />
+                  <div className="text-left">
+                    <p className="font-medium text-text-1">{option.label}</p>
+                    <p className="text-xs text-text-2">{option.description}</p>
+                  </div>
+                </div>
+                {isSelected && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 25,
+                    }}
+                  >
+                    <Check size={18} className="text-[var(--primary-violet)]" />
+                  </motion.div>
+                )}
+              </motion.button>
+            );
+          })}
+        </div>
       </FloatingDropdown>
     </div>
   );

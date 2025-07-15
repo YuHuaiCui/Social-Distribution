@@ -34,7 +34,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   // Check if user is authenticated on mount and when lastChecked changes
   useEffect(() => {
     const checkAuthStatus = async () => {
-      console.log("🔍 AuthContext: Starting auth check...");
       try {
         setLoading(true);
 
@@ -44,19 +43,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         const hasSession = document.cookie.includes("sessionid");
         // Session authentication is handled by Django cookies
 
-        console.log(
-          "🔍 AuthContext: Session state -",
-          "\n  hasRememberMe:", hasRememberMe,
-          "\n  sessionData:", !!sessionData,
-          "\n  hasSession cookie:", hasSession,
-          "\n  lastChecked:", lastChecked,
-          "\n  cookies:", document.cookie
-        );
 
         // If we have a Django session cookie, we should check with the backend
         // This is important for GitHub OAuth where Django sets the session
         if (hasSession) {
-          console.log("🔍 AuthContext: Django session found, will check with backend");
         }
 
         // Check if we have a valid session (either remember me or 24-hour session)
@@ -67,19 +57,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
             const now = Date.now();
             const sessionExpiry = parsed.expiry || 0;
 
-            console.log("🔍 AuthContext: Session data parsed:", parsed);
-            console.log("🔍 AuthContext: Session expiry check:", now < sessionExpiry);
 
             if (hasRememberMe || now < sessionExpiry) {
               hasValidSession = true;
             } else {
               // Session expired, clear it
-              console.log("🔍 AuthContext: Session expired, clearing...");
               localStorage.removeItem("sessionData");
             }
           } catch {
             // Invalid session data, clear it
-            console.log("🔍 AuthContext: Invalid session data, clearing...");
             localStorage.removeItem("sessionData");
           }
         }
@@ -99,27 +85,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           !mightBeFromGitHub &&
           lastChecked === 0
         ) {
-          console.log("🔍 AuthContext: No auth indicators found, skipping backend check");
           setIsAuthenticated(false);
           setUser(null);
           setLoading(false);
           return;
         }
 
-        console.log("🔍 AuthContext: Checking auth status with backend...");
         // Check auth status with backend
         const response = await api.getAuthStatus();
-        console.log("🔍 AuthContext: Backend response:", response);
 
         setIsAuthenticated(response.isAuthenticated);
         setUser(response.user || null);
         
-        console.log("🔍 AuthContext: Auth state updated -",
-          "\n  isAuthenticated:", response.isAuthenticated,
-          "\n  user:", response.user?.username || "null"
-        );
       } catch (error) {
-        console.error("🔍 AuthContext: Auth check failed:", error);
         // If we get a 401/403, the interceptor will handle redirect
         // For other errors, just set as not authenticated
         setIsAuthenticated(false);
@@ -132,7 +110,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         localStorage.removeItem("rememberMe");
       } finally {
         setLoading(false);
-        console.log("🔍 AuthContext: Auth check complete");
       }
     };
 
@@ -153,12 +130,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
           if (now >= sessionExpiry) {
             // Session expired, log out user
-            console.log("Session expired, logging out user");
             logout();
           }
         } catch {
           // Invalid session data, log out user
-          console.log("Invalid session data, logging out user");
           logout();
         }
       }
@@ -174,13 +149,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   }, [isAuthenticated]);
 
   const login = async (rememberMe: boolean = false, userData?: Author) => {
-    console.log(
-      "🔐 AuthContext: Login called - rememberMe:",
-      rememberMe,
-      "userData:",
-      !!userData,
-      userData?.username
-    );
 
     setIsAuthenticated(true);
 
@@ -190,15 +158,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     } else {
       // If no user data provided, fetch it from the backend
       try {
-        console.log("🔐 AuthContext: No user data provided, fetching from backend...");
         const response = await api.getAuthStatus();
-        console.log("🔐 AuthContext: Auth status response:", response);
         if (response.isAuthenticated && response.user) {
           setUser(response.user);
           userData = response.user;
         }
       } catch (error) {
-        console.error("🔐 AuthContext: Failed to fetch user data after login:", error);
       }
     }
 
@@ -212,20 +177,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       userId: userData?.id,
     };
 
-    console.log("🔐 AuthContext: Creating session data:", sessionData);
     localStorage.setItem("sessionData", JSON.stringify(sessionData)); // Store auth persistence preference
     if (rememberMe) {
       localStorage.setItem("rememberMe", "true");
-      console.log("🔐 AuthContext: Remember me enabled");
     } else {
       localStorage.removeItem("rememberMe");
-      console.log("🔐 AuthContext: Remember me disabled - 24 hour session created");
     }
 
     // Update auth state immediately for better performance
     setLastChecked(Date.now());
-    
-    console.log("🔐 AuthContext: Login complete, auth state updated");
   };
 
   const logout = async () => {

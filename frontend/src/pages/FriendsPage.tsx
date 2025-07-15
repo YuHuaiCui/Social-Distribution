@@ -10,12 +10,22 @@ import AuthorCard from "../components/AuthorCard";
 import Input from "../components/ui/Input";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
 import Card from "../components/ui/Card";
+import { useParams } from "react-router-dom";
+import { i } from "framer-motion/client";
+
 
 type FilterType = "friends" | "following" | "followers";
 
-export const FriendsPage: React.FC = () => {
+type FriendsPageProps = {
+  defaultFilter?: FilterType;
+};
+
+export const FriendsPage: React.FC<FriendsPageProps> = ({ defaultFilter = "friends" }) => {
   const { user: currentUser } = useAuth();
-  const [filter, setFilter] = useState<FilterType>("friends");
+  //const [filter, setFilter] = useState<FilterType>("friends");
+  const { id: authorId } = useParams()
+  const [filter, setFilter] = useState<FilterType>(defaultFilter);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [authors, setAuthors] = useState<Author[]>([]);
@@ -36,9 +46,9 @@ export const FriendsPage: React.FC = () => {
     
     try {
       const [friends, following, followers, pendingRequests] = await Promise.all([
-        api.getFriends(currentUser.id),
-        api.getFollowing(currentUser.id),
-        api.getFollowers(currentUser.id),
+        api.getFriends(authorId ?? currentUser.id),
+        api.getFollowing(authorId ?? currentUser.id),
+        api.getFollowers(authorId ?? currentUser.id),
         socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
       ]);
       
@@ -60,13 +70,13 @@ export const FriendsPage: React.FC = () => {
 
       switch (filter) {
         case "friends":
-          fetchedAuthors = await api.getFriends(currentUser.id);
+          fetchedAuthors = await api.getFriends(authorId ?? currentUser.id);
           break;
         case "following":
-          fetchedAuthors = await api.getFollowing(currentUser.id);
+          fetchedAuthors = await api.getFollowing(authorId ?? currentUser.id);
           break;
         case "followers":
-          fetchedAuthors = await api.getFollowers(currentUser.id);
+          fetchedAuthors = await api.getFollowers(authorId ?? currentUser.id);
           break;
       }
 
@@ -117,7 +127,7 @@ export const FriendsPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-6xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-6xl mx-auto flex flex-col flex-1">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-1 mb-2">Connections</h1>
@@ -126,7 +136,7 @@ export const FriendsPage: React.FC = () => {
 
       {/* Filter Tabs */}
       <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-hide">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
           {filter === "friends" ? (
             <AnimatedGradient
               gradientColors={[
@@ -141,27 +151,27 @@ export const FriendsPage: React.FC = () => {
             >
               <Users size={18} />
               <span className="font-medium">Friends</span>
-              {!isLoading && (
-                <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                  {friendsCount}
-                </span>
-              )}
+              <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                {friendsCount}
+              </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("friends")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <Users size={18} />
-              <span className="font-medium">Friends</span>
-              {!isLoading && (
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Users size={18} />
+                <span className="font-medium">Friends</span>
                 <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
                   {friendsCount}
                 </span>
-              )}
-            </motion.div>
+              </motion.div>
+            </div>
           )}
 
           {filter === "following" ? (
@@ -183,18 +193,22 @@ export const FriendsPage: React.FC = () => {
               </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("following")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <UserPlus size={18} />
-              <span className="font-medium">Following</span>
-              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followingCount}
-              </span>
-            </motion.div>
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <UserPlus size={18} />
+                <span className="font-medium">Following</span>
+                <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                  {followingCount}
+                </span>
+              </motion.div>
+            </div>
           )}
 
           {filter === "followers" ? (
@@ -216,18 +230,22 @@ export const FriendsPage: React.FC = () => {
               </span>
             </AnimatedGradient>
           ) : (
-            <motion.div
-              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all flex items-center space-x-2 cursor-pointer flex-shrink-0"
+            <div
+              className="px-4 py-2 rounded-lg text-text-2 hover:text-text-1 hover:bg-glass-low transition-all cursor-pointer flex-shrink-0"
               onClick={() => setFilter("followers")}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
-              <UserCheck size={18} />
-              <span className="font-medium">Followers</span>
-              <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
-                {followersCount}
-              </span>
-            </motion.div>
+              <motion.div
+                className="flex items-center space-x-2"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <UserCheck size={18} />
+                <span className="font-medium">Followers</span>
+                <span className="ml-1 px-2 py-0.5 bg-glass-low rounded-full text-xs">
+                  {followersCount}
+                </span>
+              </motion.div>
+            </div>
           )}
         </div>
 
@@ -244,48 +262,52 @@ export const FriendsPage: React.FC = () => {
       </div>
 
       {/* Follow Requests Notification */}
-      {pendingRequestsCount > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <Link to="/follow-requests">
-            <Card
-              variant="prominent"
-              className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
-                         border border-[var(--primary-violet)]/20 hover:border-[var(--primary-violet)]/40 
-                         transition-all cursor-pointer group"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
-                    <Bell size={20} className="text-[var(--primary-violet)]" />
+      {(() => {
+        const isSelf = authorId === undefined || authorId === currentUser?.id;
+        return isSelf && pendingRequestsCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Link to="/follow-requests">
+              <Card
+                variant="prominent"
+                className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
+                           border border-[var(--primary-violet)]/20 hover:border-[var(--primary-violet)]/40 
+                           transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
+                      <Bell size={20} className="text-[var(--primary-violet)]" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-text-1">
+                        {pendingRequestsCount} pending follow {pendingRequestsCount === 1 ? 'request' : 'requests'}
+                      </h3>
+                      <p className="text-sm text-text-2">
+                        Review and manage who can follow you
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-text-1">
-                      {pendingRequestsCount} pending follow {pendingRequestsCount === 1 ? 'request' : 'requests'}
-                    </h3>
-                    <p className="text-sm text-text-2">
-                      Review and manage who can follow you
-                    </p>
-                  </div>
+                  <motion.div
+                    animate={{ x: [0, 5, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    <ArrowRight size={20} className="text-[var(--primary-violet)]" />
+                  </motion.div>
                 </div>
-                <motion.div
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                  <ArrowRight size={20} className="text-[var(--primary-violet)]" />
-                </motion.div>
-              </div>
-            </Card>
-          </Link>
-        </motion.div>
-      )}
+              </Card>
+            </Link>
+          </motion.div>
+        );
+      })()}
 
       {/* Content */}
+      <div className="flex-1 flex flex-col">
       {isLoading ? (
-        <div className="flex justify-center items-center py-16">
+        <div className="flex-1 flex justify-center items-center py-16">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -295,42 +317,52 @@ export const FriendsPage: React.FC = () => {
           </motion.div>
         </div>
       ) : filteredAuthors.length === 0 ? (
-        <Card variant="main" className="text-center py-16">
-          <div className="text-text-2 mb-4">{getIcon()}</div>
-          <h3 className="font-medium text-lg mb-2 text-text-1">
-            {searchQuery ? "No results found" : `No ${filter} yet`}
-          </h3>
-          <p className="text-text-2 max-w-md mx-auto">
-            {searchQuery
-              ? `Try searching with a different term.`
-              : getEmptyMessage()}
-          </p>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col"
+        >
+          <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full">
+            <div className="flex justify-center text-text-2 mb-4">{getIcon()}</div>
+            <h3 className="font-medium text-lg mb-2 text-text-1">
+              {searchQuery ? "No results found" : `No ${filter} yet`}
+            </h3>
+            <p className="text-text-2 max-w-md mx-auto">
+              {searchQuery
+                ? `Try searching with a different term.`
+                : getEmptyMessage()}
+            </p>
+          </Card>
+        </motion.div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 flex-1">
           <AnimatePresence mode="popLayout">
-            {filteredAuthors.map((author, index) => (
-              <motion.div
-                key={author.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                layout
-              >
-                <AuthorCard
-                  author={author}
-                  variant="default"
-                  showStats={true}
-                  showBio={true}
-                  showActions={true}
-                  onFollow={handleFollowToggle}
-                />
-              </motion.div>
-            ))}
+            {filteredAuthors.map((author, index) => {
+              const isSelf = !authorId || authorId === currentUser?.id;
+              return (
+                <motion.div
+                  key={author.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  layout
+                >
+                  <AuthorCard
+                    author={author}
+                    variant="default"
+                    showStats={true}
+                    showBio={true}
+                    showActions={isSelf}
+                    onFollow={handleFollowToggle}
+                  />
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
+      </div>
     </div>
   );
 };

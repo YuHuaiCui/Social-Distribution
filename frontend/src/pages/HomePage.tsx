@@ -10,6 +10,7 @@ import AnimatedButton from "../components/ui/AnimatedButton";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
 import Card from "../components/ui/Card";
 import { entryService } from "../services/entry";
+import { api } from "../services/api";
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
@@ -20,7 +21,7 @@ export const HomePage: React.FC = () => {
   );
   const [posts, setPosts] = useState<Entry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   useEffect(() => {
     fetchPosts();
   }, [feed, refreshTrigger]); // Add refreshTrigger as dependency
@@ -28,53 +29,49 @@ export const HomePage: React.FC = () => {
   const fetchPosts = async () => {
     setIsLoading(true);
     try {
-      // For now, we'll use mock data since entry endpoints aren't implemented
-      // Once backend is ready, use: const response = await api.getEntries({ visibility: feed });
-      // Try to fetch real data first, fall back to mock data if needed
-      try {
-        const response = await entryService.getEntries({
-          page: 1,
-          page_size: 20,
-        });
-        if (response.results && response.results.length > 0) {
-          setPosts(response.results);
-          return;
-        }
-      } catch (error) {
-        console.error("Failed to fetch real entries, using mock data:", error);
+      let response = null;
+
+      switch (feed) {
+        case "all":
+          response = await entryService.getEntries({
+            page: 1,
+            page_size: 20,
+          });
+          break;
+
+        case "friends":
+          if (user) {
+            response = await entryService.getHomeFeed({
+              page: 1,
+              page_size: 20,
+            });
+          } else {
+            response = { results: [] };
+          }
+          break;
+
+        case "liked":
+          response = await api.getLikedEntries({
+            page: 1,
+            page_size: 20,
+          });
+          break;
+
+        default:
+          response = await entryService.getEntries({
+            page: 1,
+            page_size: 20,
+          });
       }
 
-      // Mock data for demonstration - using proper UUID format
-      const mockPosts: Entry[] = [
-        {
-          id: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-          url: "http://localhost:8000/api/entries/f47ac10b-58cc-4372-a567-0e02b2c3d479/",
-          author: user || {
-            id: "f47ac10b-58cc-4372-a567-0e02b2c3d480",
-            url: "http://localhost:8000/api/authors/f47ac10b-58cc-4372-a567-0e02b2c3d480/",
-            username: "demo",
-            email: "demo@example.com",
-            display_name: "Demo User",
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          title: "Welcome to Social Distribution",
-          content:
-            "This is a **demo post** showing the markdown capabilities of our platform.",
-          content_type: "text/markdown" as const,
-          visibility: "public" as const,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          likes_count: 5,
-          comments_count: 2,
-        },
-      ];
-
-      setPosts(mockPosts);
+      if (response && response.results) {
+        setPosts(response.results);
+      } else {
+        setPosts([]);
+      }
     } catch (error) {
       console.error("Error fetching posts:", error);
+      setPosts([]);
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +80,7 @@ export const HomePage: React.FC = () => {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex justify-center items-center py-12">
+        <div className="flex-1 flex justify-center items-center py-16">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -97,8 +94,13 @@ export const HomePage: React.FC = () => {
 
     if (posts.length === 0) {
       return (
-        <Card variant="main" className="text-center py-12">
-          <Globe size={48} className="mx-auto mb-4 text-text-2" />
+        <Card
+          variant="main"
+          className="text-center py-16 px-0 flex-1 flex flex-col justify-center"
+        >
+          <div className="flex justify-center mb-4">
+            <Globe size={48} className="text-text-2" />
+          </div>
           <h3 className="font-medium text-lg mb-2">No posts found</h3>
           <p className="text-text-2 mb-4">
             {feed === "friends"
@@ -113,6 +115,7 @@ export const HomePage: React.FC = () => {
             <AnimatedButton
               onClick={() => openCreatePost()}
               icon={<Plus size={18} />}
+              className="max-w-xs mx-auto"
             >
               Create Post
             </AnimatedButton>
@@ -122,7 +125,7 @@ export const HomePage: React.FC = () => {
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 flex-1">
         <AnimatePresence mode="popLayout">
           {posts.map((post) => (
             <motion.div
@@ -135,6 +138,8 @@ export const HomePage: React.FC = () => {
             >
               <PostCard
                 post={post}
+                isLiked={post.is_liked}
+                isSaved={post.is_saved}
                 onDelete={(deletedId) => {
                   setPosts((prev) => prev.filter((p) => p.id !== deletedId));
                 }}
@@ -152,7 +157,7 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-4xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-4xl mx-auto flex flex-col flex-1">
       {/* Feed Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-text-1">
@@ -266,7 +271,7 @@ export const HomePage: React.FC = () => {
       )}
 
       {/* Posts */}
-      {renderContent()}
+      <div className="flex-1 flex flex-col">{renderContent()}</div>
     </div>
   );
 };

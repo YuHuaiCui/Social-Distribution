@@ -193,10 +193,6 @@ export class EntryService extends BaseApiService {
       ...data,
       content_type: data.content_type || "text/plain",
     };
-    
-    // Log the request for debugging
-    console.log("Creating comment with data:", commentData);
-    console.log("Request URL:", `/api/entries/${entryId}/comments/`);
 
     return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
       method: "POST",

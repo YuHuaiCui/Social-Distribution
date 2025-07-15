@@ -37,9 +37,6 @@ export default function AuthCallback() {
           navigate("/home", { replace: true });
         } else {
           // Not authenticated - we need to manually exchange the code
-          console.log(
-            "Not authenticated yet, trying to exchange code manually"
-          );
 
           // This is a fallback approach
           const response = await fetch(

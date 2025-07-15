@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../components/context/AuthContext";
 import { useToast } from "../components/context/ToastContext";
+import { useCreatePost } from "../components/context/CreatePostContext";
 import { triggerNotificationUpdate } from "../components/context/NotificationContext";
 import type { Entry, Comment, Author } from "../types/models";
 import AnimatedButton from "../components/ui/AnimatedButton";
@@ -31,23 +32,29 @@ import { extractUUID } from "../utils/extractId";
 
 interface CommentWithReplies extends Comment {
   replies?: Comment[];
+  likes_count?: number;
+  is_liked?: boolean;
 }
 
 export const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
+  const { openCreatePost } = useCreatePost();
   const [post, setPost] = useState<Entry | null>(null);
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [commentContentType, setCommentContentType] = useState<"text/plain" | "text/markdown">("text/plain");
+  const [commentContentType, setCommentContentType] = useState<
+    "text/plain" | "text/markdown"
+  >("text/plain");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
   // Type guard to check if author is an Author object
   const isAuthorObject = (author: unknown): author is Author => {
     return (
@@ -63,25 +70,25 @@ export const PostDetailPage: React.FC = () => {
 
     // Extract UUID if postId is a full URL
     let extractedId = postId;
-    if (postId.includes('/')) {
+    if (postId.includes("/")) {
       // Extract the UUID from the URL (last segment)
-      const segments = postId.split('/');
-      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+      const segments = postId.split("/");
+      extractedId =
+        segments[segments.length - 1] || segments[segments.length - 2];
     }
 
     // Validate UUID format
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(extractedId)) {
-      console.warn(`Invalid UUID format for postId: ${extractedId} (original: ${postId})`);
       setPost(null);
       setIsLoading(false);
       return;
     }
-    
+
     // Use the extracted UUID for all API calls
     const validPostId = extractedId;
-    
+
     // Fetch the post details
     let fetchedPost;
     try {
@@ -95,7 +102,6 @@ export const PostDetailPage: React.FC = () => {
       // if the direct entry endpoint returns a 404
       if (user?.id) {
         try {
-          console.log("Trying to fetch post using author endpoint");
           // Try fetching through author's endpoint which might have different permissions
           const response = await entryService.getEntriesByAuthor(user.id);
           const authorPost = response.results.find(
@@ -103,16 +109,12 @@ export const PostDetailPage: React.FC = () => {
           );
 
           if (authorPost) {
-            console.log("Found post via author endpoint");
             setPost(authorPost);
             setIsLoading(false);
             return;
           }
         } catch (authorError) {
-          console.error(
-            "Also failed to fetch via author endpoint:",
-            authorError
-          );
+          console.error("Error fetching from author entries:", authorError);
         }
       }
 
@@ -156,38 +158,59 @@ export const PostDetailPage: React.FC = () => {
         }
       });
 
-      setComments(parentComments);
+      // Fetch like status for each comment
+      const commentsWithLikes = await Promise.all(
+        parentComments.map(async (comment) => {
+          try {
+            const likeStatus = await socialService.getCommentLikeStatus(comment.id);
+            return {
+              ...comment,
+              likes_count: likeStatus.like_count,
+              is_liked: likeStatus.liked_by_current_user,
+            };
+          } catch (error) {
+            console.error(`Error fetching like status for comment ${comment.id}:`, error);
+            return comment;
+          }
+        })
+      );
+
+      setComments(commentsWithLikes);
     } catch (error) {
       console.error("Error fetching comments:", error);
       // Continue with other operations even if comments fail
     }
 
     // Get like status using the API
-    try {
-      const response = await fetch(`/api/entries/${validPostId}/likes/`);
-      if (response.ok) {
-        const likeData = await response.json();
-        setIsLiked(likeData.liked_by_current_user);
-      } else {
-        // If the API call fails, use the is_liked property from the post
+    if (user?.id) {
+      try {
+        const response = await fetch(`/api/entries/${validPostId}/likes/`);
+        if (response.ok) {
+          const likeData = await response.json();
+          setIsLiked(likeData.liked_by_current_user);
+        } else {
+          // If the API call fails, use the is_liked property from the post
+          setIsLiked(fetchedPost.is_liked || false);
+        }
+      } catch (error) {
+        console.error("Error fetching like status:", error);
+        // Fallback to post data
         setIsLiked(fetchedPost.is_liked || false);
       }
-    } catch (error) {
-      console.error("Error fetching like status:", error);
-      // Fallback to post data
-      setIsLiked(fetchedPost.is_liked || false);
     }
 
     // Get bookmarked/saved status
-    try {
-      const savedPostsResponse = await socialService.getSavedPosts();
-      const isSaved = savedPostsResponse.results.some(
-        (savedPost) => savedPost.id === validPostId
-      );
-      setIsBookmarked(isSaved);
-    } catch (error) {
-      console.error("Error checking saved status:", error);
-      setIsBookmarked(false);
+    if (user?.id) {
+      try {
+        const savedPostsResponse = await socialService.getSavedPosts();
+        const isSaved = savedPostsResponse.results.some(
+          (savedPost) => savedPost.id === validPostId
+        );
+        setIsBookmarked(isSaved);
+      } catch (error) {
+        console.error("Error checking saved status:", error);
+        setIsBookmarked(false);
+      }
     }
 
     // Always set loading to false at the end
@@ -197,6 +220,25 @@ export const PostDetailPage: React.FC = () => {
   useEffect(() => {
     fetchPostDetails();
   }, [fetchPostDetails]);
+
+  // Handle click outside to close actions menu
+  useEffect(() => {
+    if (!showActions) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        actionsRef.current &&
+        !actionsRef.current.contains(event.target as Node)
+      ) {
+        setShowActions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showActions]);
 
   const handleLike = async () => {
     if (!postId || !post) return;
@@ -257,20 +299,47 @@ export const PostDetailPage: React.FC = () => {
       setIsBookmarked(!newBookmarkState);
     }
   };
+
+  const handleShare = async () => {
+    if (!post) return;
+
+    const shareUrl = `${window.location.origin}/posts/${extractUUID(post.id)}`;
+    const shareText = `Check out this post: ${post.title}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post.title,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("Error sharing:", err);
+        }
+      }
+    } else {
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        // You might want to show a toast notification here
+        alert("Link copied to clipboard!");
+      } catch (err) {
+        console.error("Failed to copy link:", err);
+      }
+    }
+  };
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim() || !postId) return;
 
     // Extract UUID from postId if it's a URL
     let extractedId = postId;
-    if (postId.includes('/')) {
-      const segments = postId.split('/');
-      extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+    if (postId.includes("/")) {
+      const segments = postId.split("/");
+      extractedId =
+        segments[segments.length - 1] || segments[segments.length - 2];
     }
-
-    console.log("Submitting comment for post ID:", extractedId, "(original:", postId, ")");
-    console.log("Current user:", user);
-    console.log("Session cookie:", document.cookie);
 
     setIsSubmitting(true);
     try {
@@ -319,36 +388,109 @@ export const PostDetailPage: React.FC = () => {
       if (post) {
         const newCommentCount = (post.comments_count || 0) + 1;
         setPost({ ...post, comments_count: newCommentCount });
-        
+
         // Dispatch custom event to update comment count in other components
-        window.dispatchEvent(new CustomEvent('post-update', {
-          detail: { postId: post.id, updates: { comments_count: newCommentCount } }
-        }));
-        
+        window.dispatchEvent(
+          new CustomEvent("post-update", {
+            detail: {
+              postId: post.id,
+              updates: { comments_count: newCommentCount },
+            },
+          })
+        );
+
         // Trigger notification update in case the post author receives a notification
         triggerNotificationUpdate();
       }
     } catch (err) {
       console.error("Error submitting comment:", err);
-
-      // Provide detailed error logging to help troubleshooting
-      if (err instanceof Error) {
-        console.error("Error message:", err.message);
-      }
-
-      // Log request data for debugging
-      console.log("Comment request data:", {
-        postId,
-        commentData: {
-          content: commentText,
-          content_type: commentContentType,
-        },
-      });
-
       // Show user-friendly error message
       showError("Failed to submit comment. Please try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setShowActions(false);
+    // Open edit modal instead of navigating
+    if (post) {
+      openCreatePost(post);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!post || !postId) return;
+
+    setShowActions(false);
+    if (
+      window.confirm(
+        "Are you sure you want to delete this post? This action cannot be undone."
+      )
+    ) {
+      try {
+        const extractedId = extractUUID(postId);
+        await entryService.deleteEntry(extractedId);
+        showSuccess("Post deleted successfully");
+        navigate("/"); // Navigate back to home page
+      } catch (error) {
+        console.error("Error deleting post:", error);
+        showError("Failed to delete post");
+      }
+    }
+  };
+
+  const handleCommentLike = async (commentId: string) => {
+    if (!user?.id) {
+      showError("Please sign in to like comments");
+      return;
+    }
+
+    try {
+      // Find the comment
+      const commentIndex = comments.findIndex((c) => c.id === commentId);
+      if (commentIndex === -1) return;
+
+      const comment = comments[commentIndex];
+      const wasLiked = comment.is_liked;
+
+      // Optimistic update
+      const updatedComments = [...comments];
+      updatedComments[commentIndex] = {
+        ...comment,
+        is_liked: !wasLiked,
+        likes_count: wasLiked
+          ? (comment.likes_count || 1) - 1
+          : (comment.likes_count || 0) + 1,
+      };
+      setComments(updatedComments);
+
+      // API call
+      if (wasLiked) {
+        await socialService.unlikeComment(commentId);
+      } else {
+        await socialService.likeComment(commentId);
+      }
+    } catch (error) {
+      console.error("Error liking comment:", error);
+      showError("Failed to like comment");
+      // Revert on error
+      const comment = comments.find((c) => c.id === commentId);
+      if (comment) {
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === commentId
+              ? {
+                  ...c,
+                  is_liked: !c.is_liked,
+                  likes_count: c.is_liked
+                    ? (c.likes_count || 1) - 1
+                    : (c.likes_count || 0) + 1,
+                }
+              : c
+          )
+        );
+      }
     }
   };
 
@@ -381,6 +523,26 @@ export const PostDetailPage: React.FC = () => {
           className="prose prose-lg max-w-none text-text-1"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
         />
+      );
+    }
+
+    // For image posts, display the image and caption
+    if (contentType === "image/png" || contentType === "image/jpeg") {
+      return (
+        <div className="space-y-4">
+          {post?.image && (
+            <div className="rounded-lg overflow-hidden">
+              <img
+                src={post.image}
+                alt={post?.title}
+                className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
+              />
+            </div>
+          )}
+          {content && content !== "Image post" && (
+            <p className="text-text-1 text-center italic">{content}</p>
+          )}
+        </div>
       );
     }
 
@@ -432,7 +594,7 @@ export const PostDetailPage: React.FC = () => {
         </button>
 
         {isAuthorObject(post.author) && post.author.id === user?.id && (
-          <div className="relative">
+          <div className="relative" ref={actionsRef}>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -448,13 +610,19 @@ export const PostDetailPage: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden"
+                  className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden z-10"
                 >
-                  <button className="w-full px-4 py-2 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2">
+                  <button
+                    onClick={handleEdit}
+                    className="w-full px-4 py-2 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2"
+                  >
                     <Edit size={16} />
                     <span>Edit Post</span>
                   </button>
-                  <button className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2">
+                  <button
+                    onClick={handleDelete}
+                    className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2"
+                  >
                     <Trash2 size={16} />
                     <span>Delete Post</span>
                   </button>
@@ -546,26 +714,35 @@ export const PostDetailPage: React.FC = () => {
           {/* Actions */}
           <div className="flex items-center justify-between pt-6 border-t border-border-1">
             <div className="flex items-center space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleLike}
-                className={`flex items-center space-x-2 ${
-                  isLiked
-                    ? "text-[var(--primary-pink)]"
-                    : "text-text-2 hover:text-text-1"
-                } transition-colors`}
-              >
-                <motion.div
-                  animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
-                  transition={{ duration: 0.3 }}
+              {user?.id ? (
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleLike}
+                  className={`flex items-center space-x-2 ${
+                    isLiked
+                      ? "text-[var(--primary-pink)]"
+                      : "text-text-2 hover:text-text-1"
+                  } transition-colors`}
                 >
-                  <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-                </motion.div>
-                <span className="text-sm font-medium">
-                  {post.likes_count || 0}
-                </span>
-              </motion.button>
+                  <motion.div
+                    animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+                  </motion.div>
+                  <span className="text-sm font-medium">
+                    {post.likes_count || 0}
+                  </span>
+                </motion.button>
+              ) : (
+                <div className="flex items-center space-x-2 text-text-2">
+                  <Heart size={20} />
+                  <span className="text-sm font-medium">
+                    {post.likes_count || 0}
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center space-x-2 text-text-2">
                 <MessageCircle size={20} />
@@ -577,6 +754,7 @@ export const PostDetailPage: React.FC = () => {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
+                onClick={handleShare}
                 className="text-text-2 hover:text-text-1 transition-colors"
               >
                 <Share2 size={20} />
@@ -611,89 +789,95 @@ export const PostDetailPage: React.FC = () => {
           </h2>
 
           {/* Comment Form */}
-          <form onSubmit={handleSubmitComment} className="mb-6">
-            {replyingTo && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="mb-2 text-sm text-text-2"
-              >
-                Replying to comment...
-                <button
-                  type="button"
-                  onClick={() => setReplyingTo(null)}
-                  className="ml-2 text-[var(--primary-violet)] hover:underline"
+          {user?.id && (
+            <form onSubmit={handleSubmitComment} className="mb-6">
+              {replyingTo && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mb-2 text-sm text-text-2"
                 >
-                  Cancel
-                </button>
-              </motion.div>
-            )}
+                  Replying to comment...
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="ml-2 text-[var(--primary-violet)] hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </motion.div>
+              )}
 
-            <div className="flex space-x-3">
-              <Avatar
-                imgSrc={user?.profile_image}
-                alt={user?.display_name || "User"}
-                size="md"
-              />
-              <div className="flex-1">
-                {/* Content Type Toggle */}
-                <div className="flex items-center space-x-2 mb-2">
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setCommentContentType("text/plain")}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
-                      commentContentType === "text/plain"
-                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
-                        : "text-text-2 hover:text-text-1 border border-transparent"
-                    }`}
-                  >
-                    <AlignLeft size={14} />
-                    <span>Plain</span>
-                  </motion.button>
-                  <motion.button
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setCommentContentType("text/markdown")}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
-                      commentContentType === "text/markdown"
-                        ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
-                        : "text-text-2 hover:text-text-1 border border-transparent"
-                    }`}
-                  >
-                    <FileText size={14} />
-                    <span>Markdown</span>
-                  </motion.button>
-                </div>
-                <textarea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder={commentContentType === "text/markdown" ? "Write a comment in Markdown..." : "Write a comment..."}
-                  className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none font-mono"
-                  rows={3}
+              <div className="flex space-x-3">
+                <Avatar
+                  imgSrc={user?.profile_image}
+                  alt={user?.display_name || "User"}
+                  size="md"
                 />
-                {commentContentType === "text/markdown" && (
-                  <p className="text-xs text-text-2 mt-1">
-                    Supports **bold**, *italic*, [links](url), and more
-                  </p>
-                )}
-                <div className="flex justify-end mt-2">
-                  <AnimatedButton
-                    type="submit"
-                    size="sm"
-                    variant="primary"
-                    loading={isSubmitting}
-                    disabled={!commentText.trim()}
-                    icon={<Send size={16} />}
-                  >
-                    Post Comment
-                  </AnimatedButton>
+                <div className="flex-1">
+                  {/* Content Type Toggle */}
+                  <div className="flex items-center space-x-2 mb-2">
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setCommentContentType("text/plain")}
+                      className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                        commentContentType === "text/plain"
+                          ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                          : "text-text-2 hover:text-text-1 border border-transparent"
+                      }`}
+                    >
+                      <AlignLeft size={14} />
+                      <span>Plain</span>
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setCommentContentType("text/markdown")}
+                      className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm transition-all ${
+                        commentContentType === "text/markdown"
+                          ? "bg-[var(--primary-violet)]/20 text-[var(--primary-violet)] border border-[var(--primary-violet)]"
+                          : "text-text-2 hover:text-text-1 border border-transparent"
+                      }`}
+                    >
+                      <FileText size={14} />
+                      <span>Markdown</span>
+                    </motion.button>
+                  </div>
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder={
+                      commentContentType === "text/markdown"
+                        ? "Write a comment in Markdown..."
+                        : "Write a comment..."
+                    }
+                    className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none font-mono"
+                    rows={3}
+                  />
+                  {commentContentType === "text/markdown" && (
+                    <p className="text-xs text-text-2 mt-1">
+                      Supports **bold**, *italic*, [links](url), and more
+                    </p>
+                  )}
+                  <div className="flex justify-end mt-2">
+                    <AnimatedButton
+                      type="submit"
+                      size="sm"
+                      variant="primary"
+                      loading={isSubmitting}
+                      disabled={!commentText.trim()}
+                      icon={<Send size={16} />}
+                    >
+                      Post Comment
+                    </AnimatedButton>
+                  </div>
                 </div>
               </div>
-            </div>
-          </form>
+            </form>
+          )}
 
           {/* Comments List */}
           <AnimatePresence>
@@ -742,11 +926,54 @@ export const PostDetailPage: React.FC = () => {
                       {comment.content_type === "text/markdown" ? (
                         <div
                           className="prose prose-sm max-w-none text-text-1"
-                          dangerouslySetInnerHTML={{ __html: renderMarkdown(comment.content) }}
+                          dangerouslySetInnerHTML={{
+                            __html: renderMarkdown(comment.content),
+                          }}
                         />
                       ) : (
                         <p className="text-text-1">{comment.content}</p>
                       )}
+                      
+                      {/* Comment Actions */}
+                      <div className="flex items-center space-x-4 mt-3">
+                        <button
+                          onClick={() => handleCommentLike(comment.id)}
+                          className="relative overflow-hidden rounded-full px-3 py-1 group transition-all"
+                        >
+                          {/* Gradient background on hover or when liked */}
+                          <motion.div
+                            className={`absolute inset-0 transition-opacity ${
+                              comment.is_liked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            }`}
+                            style={{
+                              background:
+                                "linear-gradient(135deg, var(--primary-pink) 0%, var(--primary-purple) 100%)",
+                            }}
+                          />
+                          <motion.div
+                            className={`relative z-10 flex items-center gap-1.5 ${
+                              comment.is_liked ? "text-white" : "text-text-2 group-hover:text-white"
+                            } transition-colors`}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            animate={
+                              comment.is_liked
+                                ? {
+                                    rotate: [0, -20, 20, -10, 10, 0],
+                                    scale: [1, 1.2, 1.1, 1.15, 1.05, 1],
+                                  }
+                                : {}
+                            }
+                            transition={{ duration: 0.5 }}
+                          >
+                            <Heart
+                              size={16}
+                              fill={comment.is_liked ? "currentColor" : "none"}
+                            />
+                            <span className="text-sm font-medium">{comment.likes_count || 0}</span>
+                          </motion.div>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Replies */}
@@ -786,7 +1013,9 @@ export const PostDetailPage: React.FC = () => {
                               {reply.content_type === "text/markdown" ? (
                                 <div
                                   className="prose prose-sm max-w-none text-text-1 text-sm"
-                                  dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.content) }}
+                                  dangerouslySetInnerHTML={{
+                                    __html: renderMarkdown(reply.content),
+                                  }}
                                 />
                               ) : (
                                 <p className="text-sm text-text-1">

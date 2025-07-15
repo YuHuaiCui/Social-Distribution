@@ -67,6 +67,16 @@ export class SocialService extends BaseApiService {
     );
   }
 
+  /**
+   * Get like status for a comment
+   */
+  async getCommentLikeStatus(commentId: string): Promise<{
+    like_count: number;
+    liked_by_current_user: boolean;
+  }> {
+    return this.request(`/api/comments/${commentId}/likes/`);
+  }
+
   // Follow-related methods
 
   /**

@@ -5,14 +5,18 @@
 import type { Node, TimestampedModel } from '../common';
 
 export interface Author extends TimestampedModel {
-  id: string;
+  type: "author"; // Object type for federation
+  id: string; // Full URL as per spec
   url: string;
+  host: string; // API host URL for this author's node
+  web: string; // Frontend URL where profile can be viewed
   username: string;
   email: string;
   first_name?: string;
   last_name?: string;
   display_name: string;
-  github_username?: string;
+  github?: string; // Full GitHub URL (not just username)
+  github_username?: string; // Kept for backwards compatibility
   profile_image?: string;
   bio?: string;
   location?: string;

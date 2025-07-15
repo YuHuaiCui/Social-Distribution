@@ -91,13 +91,51 @@ export const GitHubActivity: React.FC<GitHubActivityProps> = ({
 
   useEffect(() => {
     const loadData = async () => {
-      setIsLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!username) return;
       
-      setActivities(generateMockActivities());
-      setContributions(generateMockContributions());
-      setIsLoading(false);
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/github/activity/${username}/`);
+        console.log('GitHub API response status:', response.status);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('GitHub activity data:', data);
+          
+          // Check if activities exist and is an array
+          if (data.activities && Array.isArray(data.activities) && data.activities.length > 0) {
+            // Transform the data to match our interface
+            const transformedActivities: ActivityItem[] = data.activities.map((activity: any) => ({
+              id: activity.id,
+              type: activity.type,
+              title: activity.title,
+              repo: activity.repo,
+              date: new Date(activity.date),
+              url: activity.url
+            }));
+            
+            setActivities(transformedActivities);
+          } else {
+            console.log('No activities returned from API, using mock data');
+            setActivities(generateMockActivities());
+          }
+          
+          // Still use mock contributions until we implement GraphQL
+          setContributions(generateMockContributions());
+        } else {
+          console.error('GitHub API returned non-OK status:', response.status);
+          // Fallback to mock data if API fails
+          setActivities(generateMockActivities());
+          setContributions(generateMockContributions());
+        }
+      } catch (error) {
+        console.error('Error fetching GitHub activity:', error);
+        // Fallback to mock data
+        setActivities(generateMockActivities());
+        setContributions(generateMockContributions());
+      } finally {
+        setIsLoading(false);
+      }
     };
     
     loadData();
@@ -237,30 +275,40 @@ export const GitHubActivity: React.FC<GitHubActivityProps> = ({
             exit={{ opacity: 0, y: -20 }}
             className="space-y-3"
           >
-            {activities.map((activity, index) => (
-              <motion.div
-                key={activity.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="flex items-start space-x-3 p-3 rounded-lg hover:bg-glass-low transition-colors group"
-              >
-                <div className="mt-1">{getActivityIcon(activity.type)}</div>
-                <div className="flex-1">
-                  <a
-                    href={activity.url}
-                    className="text-text-1 hover:text-[var(--primary-violet)] transition-colors font-medium text-sm"
-                  >
-                    {activity.title}
-                  </a>
-                  <div className="flex items-center space-x-2 text-xs text-text-2 mt-1">
-                    <span>{activity.repo}</span>
-                    <span>•</span>
-                    <span>{formatDate(activity.date)}</span>
+            {activities.length > 0 ? (
+              activities.map((activity, index) => (
+                <motion.div
+                  key={activity.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="flex items-start space-x-3 p-3 rounded-lg hover:bg-glass-low transition-colors group"
+                >
+                  <div className="mt-1">{getActivityIcon(activity.type)}</div>
+                  <div className="flex-1">
+                    <a
+                      href={activity.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-text-1 hover:text-[var(--primary-violet)] transition-colors font-medium text-sm"
+                    >
+                      {activity.title}
+                    </a>
+                    <div className="flex items-center space-x-2 text-xs text-text-2 mt-1">
+                      <span>{activity.repo}</span>
+                      <span>•</span>
+                      <span>{formatDate(activity.date)}</span>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <GitBranch size={48} className="mx-auto text-text-2 opacity-30 mb-4" />
+                <p className="text-text-2 text-sm">No recent GitHub activity</p>
+                <p className="text-text-2 text-xs mt-1">Push some code to see your contributions here!</p>
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div
@@ -268,7 +316,11 @@ export const GitHubActivity: React.FC<GitHubActivityProps> = ({
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="overflow-x-auto"
+            className="overflow-x-auto scrollbar-custom"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'var(--text-2) transparent',
+            }}
           >
             <div className="min-w-[800px]">
               {/* Month labels */}

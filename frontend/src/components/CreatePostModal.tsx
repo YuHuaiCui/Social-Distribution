@@ -49,41 +49,44 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
-  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
+  const [replacingImage, setReplacingImage] = useState(false);
+  const [currentImage, setCurrentImage] = useState<string | null>(null);
+
   const [expandedSection, setExpandedSection] = useState<
     "content" | "tags" | "privacy" | null
   >("content");
   // Pre-fill form when editing
   React.useEffect(() => {
-    if (editingPost) {
-      setTitle(editingPost.title);
-      setContent(editingPost.content);
-      setContentType(editingPost.content_type || "text/markdown");
-      // Ensure visibility is one of our valid types ('public', 'friends', 'unlisted')
-      const validVisibilities: Visibility[] = ["public", "friends", "unlisted"];
-      setVisibility(
-        validVisibilities.includes(editingPost.visibility as Visibility)
-          ? (editingPost.visibility as Visibility)
-          : "public"
-      );
-      setCategories(editingPost.categories || []);
-    } else {
-      // Reset form when creating new post
-      setTitle("");
-      setContent("");
-      setContentType("text/markdown");
-      setVisibility(defaultVisibility);
-      setCategories([]);
-      setImages([]);
-    }
-  }, [editingPost, defaultVisibility]);
+  if (editingPost) {
+    setTitle(editingPost.title|| "");
+    setContent(editingPost.content|| "");
+    setContentType(editingPost.content_type || "text/markdown");
 
-  // Update visibility when default changes for new posts
-  React.useEffect(() => {
-    if (!editingPost) {
-      setVisibility(defaultVisibility);
-    }
-  }, [defaultVisibility, editingPost]);
+    const validVisibilities: Visibility[] = ["PUBLIC", "FRIENDS", "UNLISTED"];
+    setVisibility(
+      validVisibilities.includes(editingPost.visibility as Visibility)
+        ? (editingPost.visibility as Visibility)
+        : defaultVisibility
+    );
+
+    setCategories(editingPost.categories || []);
+    setReplacingImage(false);
+    // DO NOT reset images[] here
+    setImages([]);
+    setCurrentImage(editingPost.image || null);
+  } else {
+    setTitle("");
+    setContent("");
+    setContentType("text/markdown");
+    setVisibility(defaultVisibility);
+    setCategories([]);
+    setImages([]);
+    setReplacingImage(false);
+    setCurrentImage(null);
+  }
+}, [editingPost?.id, defaultVisibility]); // 🛠 use editingPost?.id to ensure clean re-run
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,7 +109,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     if (
       contentType &&
       contentType.startsWith("image/") &&
-      images.length === 0
+      images.length === 0 &&
+      (!editingPost || !editingPost.image)
     ) {
       setError("Please upload at least one image");
       return;
@@ -118,25 +122,22 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     try {
       const entryData: CreateEntryData = {
         title,
-        content: contentType.startsWith("image/") && uploadedImageUrls.length > 0 
-          ? uploadedImageUrls[0]  // Use the uploaded image URL as content
+        content: contentType.startsWith("image/") 
+          ? (content || "Image post")  // Use caption for image posts
           : content,
         content_type: contentType,
         visibility,
         categories,
-        // Don't include image file if we're using uploaded URLs
-        ...(images.length > 0 && uploadedImageUrls.length === 0 && { image: images[0] }),
+        // Include image file for image posts
+        ...(images.length > 0 && { image: images[0] }),
       };
       if (editingPost) {
         // Update existing post
-        console.log("editingPost:", editingPost);
         if (!editingPost.id) {
-          console.error("Editing post is missing an ID");
           setError("Cannot update: missing post ID");
           return;
         }
         const id = editingPost.id.includes("/") ? editingPost.id.split("/").pop() : editingPost.id;
-        console.log("[PATCH] Entry ID used for update:", id);
         if (!id) {
           setError("Cannot update: invalid post ID");
           setIsLoading(false);
@@ -149,8 +150,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
         onSuccess?.(updatedPost);
         triggerRefresh(); // Trigger posts refresh
-        handleClose();
-        console.log("Post updated successfully, refreshing feed...");
+        setReplacingImage(false);
+        setImages([]); // clear images
+        setContent(updatedPost.content);
+        setContentType(updatedPost.content_type as ContentType);
+        setTitle(updatedPost.title);
+        setCategories(updatedPost.categories || []);
+        setVisibility(updatedPost.visibility as Visibility);
       } else {
         // Create new post
         const newPost = await entryService.createEntry(entryData);
@@ -159,7 +165,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         triggerRefresh(); // Trigger posts refresh
         // Dispatch event for other components to update
         window.dispatchEvent(new Event('post-created'));
-        console.log("Post created successfully, refreshing feed...");
         handleClose();
       }
     } catch (err: unknown) {
@@ -182,7 +187,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
-      setUploadedImageUrls([]);
       setError("");
       setExpandedSection("content");
       setIsFullscreen(false);
@@ -356,21 +360,35 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         >
                           {contentType && contentType.startsWith("image/") ? (
                             <div>
+
+                              {replacingImage || images.length > 0 || !editingPost?.image  ? (
                               <ImageUploader
-                                onImagesChange={setImages}
-                                onImagesUploaded={(uploadedImages) => {
-                                  // Store the URLs of uploaded images
-                                  const urls = uploadedImages.map(img => img.url);
-                                  setUploadedImageUrls(urls);
-                                  // If we have uploaded images, use the first URL as content
-                                  if (urls.length > 0 && !content) {
-                                    setContent(urls[0]);
-                                  }
+                                onImagesChange={(newImages) => {
+                                  setImages(newImages);
+                                  setReplacingImage(true); // hide uploader after user picks a file
+                                  setCurrentImage(null); // clear preview
                                 }}
-                                maxImages={4}
+                                maxImages={1}
                                 className="mt-3"
-                                uploadToServer={true}
+                                uploadToServer={false}
                               />
+                            ) : (
+                              <div className="mt-3 space-y-2">
+                                <img
+                                  key={editingPost.updated_at || Date.now()} // force rerender
+                                  src={editingPost.image}
+                                  alt="Current uploaded"
+                                  className="rounded-lg max-h-64 object-contain border border-border-1"
+                                />
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => setReplacingImage(true)} // triggers file upload
+                                  className="text-sm text-primary hover:underline"
+                                >
+                                </button>
+                              </div>
+                            )}
                               {images.length > 0 && (
                                 <div className="mt-3">
                                   <textarea

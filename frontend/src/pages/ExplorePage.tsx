@@ -19,6 +19,8 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
+import { useAuth } from "../components/context/AuthContext";
+import { api } from "../services/api";
 
 type ViewMode = "grid" | "list";
 type ExploreTab = "trending" | "authors" | "categories" | "recent";
@@ -46,6 +48,8 @@ export const ExplorePage: React.FC = () => {
   const [followingAuthors, setFollowingAuthors] = useState<Set<string>>(
     new Set()
   );
+  const { user } = useAuth();
+  const isAdmin = user?.is_staff || user?.is_superuser;
   useEffect(() => {
     fetchExploreData();
   }, [activeTab, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -124,53 +128,21 @@ export const ExplorePage: React.FC = () => {
         ];
         setPosts(mockPosts);
       } else if (activeTab === "authors") {
-        const mockAuthors: TrendingAuthor[] = [
-          {
-            id: "c3d4e5f6-7g8h-9i0j-1k2l-m3n4o5p6q7r8",
-            url: "http://localhost:8000/api/authors/c3d4e5f6-7g8h-9i0j-1k2l-m3n4o5p6q7r8/",
-            username: "techexplorer",
-            email: "tech@example.com",
-            display_name: "Tech Explorer",
-            profile_image: "https://i.pravatar.cc/150?u=tech",
-            bio: "Exploring the latest in technology and sharing insights",
-            follower_count: 1234,
-            post_count: 45,
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "d4e5f6g7-8h9i-0j1k-2l3m-n4o5p6q7r8s9",
-            url: "http://localhost:8000/api/authors/d4e5f6g7-8h9i-0j1k-2l3m-n4o5p6q7r8s9/",
-            username: "designpro",
-            email: "design@example.com",
-            display_name: "Design Pro",
-            profile_image: "https://i.pravatar.cc/150?u=design",
-            bio: "UI/UX designer passionate about creating beautiful experiences",
-            follower_count: 892,
-            post_count: 32,
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "e5f6g7h8-9i0j-1k2l-3m4n-o5p6q7r8s9t0",
-            url: "http://localhost:8000/api/authors/e5f6g7h8-9i0j-1k2l-3m4n-o5p6q7r8s9t0/",
-            username: "codemaster",
-            email: "code@example.com",
-            display_name: "Code Master",
-            bio: "Full-stack developer sharing coding tips and tricks",
-            follower_count: 567,
-            post_count: 28,
-            is_approved: true,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ];
-        setAuthors(mockAuthors);
+         const authorResponse = await api.getAuthors({
+        is_active: true,
+        ...(isAdmin ? {} : { is_approved: true }),
+        });
+      const fetchedAuthors = authorResponse.results || authorResponse || [];
+      // Map authors to TrendingAuthor type with default follower_count and post_count if missing
+      setAuthors(
+        fetchedAuthors.map((author: Author) => ({
+          ...author,
+          follower_count: (author as any).follower_count ?? 0,
+          post_count: (author as any).post_count ?? 0,
+        }))
+      );
+        
+      
       } else if (activeTab === "categories") {
         const mockCategories: Category[] = [
           { name: "Technology", count: 156, color: "var(--primary-blue)" },
@@ -251,7 +223,7 @@ export const ExplorePage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full px-4 lg:px-6 py-6 max-w-7xl mx-auto">
+    <div className="w-full px-4 lg:px-6 py-6 max-w-7xl mx-auto flex flex-col flex-1">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -382,12 +354,13 @@ export const ExplorePage: React.FC = () => {
       </motion.div>
 
       {/* Content */}
+      <div className="flex-1 flex flex-col">
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex-1 flex justify-center items-center">
           <Loader size="lg" message="Discovering content..." />
         </div>
       ) : (
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" className="flex-1 flex flex-col">
           {/* Trending Posts */}
           {activeTab === "trending" && (
             <motion.div
@@ -397,8 +370,8 @@ export const ExplorePage: React.FC = () => {
               exit={{ opacity: 0, y: -20 }}
               className={
                 viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 gap-6"
-                  : "space-y-4"
+                  ? "grid grid-cols-1 md:grid-cols-2 gap-6 flex-1"
+                  : "space-y-4 flex-1"
               }
             >
               {posts.map((post, index) => (
@@ -421,7 +394,7 @@ export const ExplorePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1"
             >
               {authors.map((author, index) => (
                 <motion.div
@@ -495,7 +468,7 @@ export const ExplorePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-1"
             >
               {categories.map((category, index) => (
                 <motion.div
@@ -537,6 +510,7 @@ export const ExplorePage: React.FC = () => {
           )}
         </AnimatePresence>
       )}
+      </div>
     </div>
   );
 };

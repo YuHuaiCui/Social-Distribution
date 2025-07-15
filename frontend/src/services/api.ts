@@ -38,9 +38,12 @@ class ApiService {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
-    const defaultHeaders: HeadersInit = {
-      "Content-Type": "application/json",
-    };
+    const defaultHeaders: HeadersInit = {};
+
+    // Only set Content-Type if not FormData
+    if (!(options.body instanceof FormData)) {
+      defaultHeaders["Content-Type"] = "application/json";
+    }
 
     // Get CSRF token from cookie if it exists
     const csrfToken = document.cookie
@@ -70,6 +73,12 @@ class ApiService {
           error.detail ||
           `HTTP error! status: ${response.status}`
       );
+    }
+
+    // Handle empty responses (like 204 No Content for DELETE operations)
+    const contentType = response.headers.get("content-type");
+    if (response.status === 204 || !contentType?.includes("application/json")) {
+      return {} as T;
     }
 
     return response.json();
@@ -127,12 +136,15 @@ class ApiService {
     );
   }
 
-  async searchAuthors(query: string, params?: {
-    is_approved?: boolean;
-    is_active?: boolean;
-    type?: "local" | "remote";
-    page?: number;
-  }): Promise<PaginatedResponse<Author>> {
+  async searchAuthors(
+    query: string,
+    params?: {
+      is_approved?: boolean;
+      is_active?: boolean;
+      type?: "local" | "remote";
+      page?: number;
+    }
+  ): Promise<PaginatedResponse<Author>> {
     return this.getAuthors({ ...params, search: query });
   }
 
@@ -316,19 +328,31 @@ class ApiService {
 
   // Admin endpoints
   async approveAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/approve/`, { method: 'POST' });
+    return this.request(`/api/authors/${authorId}/approve/`, {
+      method: "POST",
+    });
   }
 
   async deactivateAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/deactivate/`, { method: 'POST' });
+    return this.request(`/api/authors/${authorId}/deactivate/`, {
+      method: "POST",
+    });
   }
 
   async activateAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/activate/`, { method: 'POST' });
+    return this.request(`/api/authors/${authorId}/activate/`, {
+      method: "POST",
+    });
   }
 
   async deleteAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/`, { method: 'DELETE' });
+    return this.request(`/api/authors/${authorId}/`, { method: "DELETE" });
+  }
+
+  async promoteToAdmin(authorId: string): Promise<void> {
+    return this.request(`/api/authors/${authorId}/promote_to_admin/`, {
+      method: "POST",
+    });
   }
 
   // Inbox endpoints (when implemented in backend)

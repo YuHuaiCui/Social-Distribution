@@ -40,10 +40,27 @@ class Comment(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        """
+        Save the comment and auto-generate URL if not provided.
+        
+        For comments by local authors, automatically generates the API URL
+        based on the site URL, author ID, entry ID, and comment ID. This
+        follows the hierarchical URL structure of the social distribution API.
+        
+        Args:
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments
+        """
         if not self.url:
             if self.author.is_local:
                 self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/entries/{self.entry.id}/comments/{self.id}"
         super().save(*args, **kwargs)
 
     def __str__(self):
+        """
+        String representation of the comment.
+        
+        Returns:
+            str: A human-readable string showing who commented on which entry
+        """
         return f"Comment by {self.author} on {self.entry.title}"

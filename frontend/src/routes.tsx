@@ -19,6 +19,7 @@ import AuthorProfilePage from "./pages/AuthorProfilePage";
 import SavedPostsPage from "./pages/SavedPostsPage";
 import LikedPostsPage from "./pages/LikedPostsPage";
 import FollowRequestsPage from "./pages/FollowRequestsPage";
+import DocsPage from "./pages/DocsPage";
 
 
 
@@ -98,9 +99,7 @@ export const routes: RouteObject[] = [
       {
         path: "/posts/:postId",
         element: (
-          <Protected>
             <PostDetailPage />
-          </Protected>
         ),
       },
       {
@@ -118,7 +117,24 @@ export const routes: RouteObject[] = [
         <AuthorProfilePage />
       </Protected>
     ),
+  },
+{
+  path: "/authors/:id/followers",
+  element: (
+    <Protected>
+      <FriendsPage defaultFilter="followers" />
+    </Protected>
+  ),
 },
+{
+  path: "/authors/:id/following",
+  element: (
+    <Protected>
+      <FriendsPage defaultFilter="following" />
+    </Protected>
+  ),
+},
+
     {
       path: "/saved",
       element: (
@@ -142,6 +158,10 @@ export const routes: RouteObject[] = [
           <FollowRequestsPage />
         </Protected>
       ),
+    },
+    {
+      path: "/docs",
+      element: <DocsPage />,
     },
     ],
   },
