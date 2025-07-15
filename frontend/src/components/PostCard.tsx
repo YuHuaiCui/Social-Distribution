@@ -535,8 +535,8 @@ const PostCardComponent: React.FC<PostCardProps> = ({
               aria-label={liked ? "Unlike this post" : "Like this post"}
             >
               {/* Gradient background on hover or when liked */}
-              <motion.div
-                className={`absolute inset-0 transition-opacity ${
+              <div
+                className={`absolute inset-0 transition-opacity duration-300 ${
                   liked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
                 style={{
@@ -544,25 +544,14 @@ const PostCardComponent: React.FC<PostCardProps> = ({
                     "linear-gradient(135deg, var(--primary-pink) 0%, var(--primary-purple) 100%)",
                 }}
               />
-              <motion.div
+              <div
                 className={`relative z-10 flex items-center gap-2 ${
                   liked ? "text-white" : "text-text-2 group-hover:text-white"
-                } transition-colors`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                animate={
-                  liked
-                    ? {
-                        rotate: [0, -20, 20, -10, 10, 0],
-                        scale: [1, 1.2, 1.1, 1.15, 1.05, 1],
-                      }
-                    : {}
-                }
-                transition={{ duration: 0.5 }}
+                } transition-colors like-button ${liked ? "liked" : ""}`}
               >
                 <Heart size={18} fill={liked ? "currentColor" : "none"} />
                 <span className="text-sm font-medium">{likeCount}</span>
-              </motion.div>
+              </div>
             </button>
 
             {/* Comment Button */}
@@ -572,21 +561,17 @@ const PostCardComponent: React.FC<PostCardProps> = ({
               aria-label="View comments"
             >
               {/* Gradient background on hover */}
-              <motion.div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 style={{
                   background:
                     "linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)",
                 }}
               />
-              <motion.div
-                className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
+              <div className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors comment-button">
                 <MessageCircle size={18} />
                 <span className="text-sm font-medium">{commentCount}</span>
-              </motion.div>
+              </div>
             </button>
 
             {/* Share Button */}
@@ -596,21 +581,17 @@ const PostCardComponent: React.FC<PostCardProps> = ({
               aria-label="Share this post"
             >
               {/* Gradient background on hover */}
-              <motion.div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 style={{
                   background:
                     "linear-gradient(135deg, var(--primary-yellow) 0%, var(--primary-coral) 100%)",
                 }}
               />
-              <motion.div
-                className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
+              <div className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-all duration-200 share-button">
                 <Share2 size={18} />
                 <span className="text-sm font-medium">Share</span>
-              </motion.div>
+              </div>
             </button>
 
             {/* Save Button */}
@@ -620,8 +601,8 @@ const PostCardComponent: React.FC<PostCardProps> = ({
               aria-label={saved ? "Unsave this post" : "Save this post"}
             >
               {/* Gradient background on hover or when saved */}
-              <motion.div
-                className={`absolute inset-0 transition-opacity ${
+              <div
+                className={`absolute inset-0 transition-opacity duration-300 ${
                   saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
                 style={{
@@ -629,25 +610,14 @@ const PostCardComponent: React.FC<PostCardProps> = ({
                     "linear-gradient(135deg, var(--primary-violet) 0%, var(--primary-purple) 100%)",
                 }}
               />
-              <motion.div
+              <div
                 className={`relative z-10 flex items-center gap-2 ${
                   saved ? "text-white" : "text-text-2 group-hover:text-white"
-                } transition-colors`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                animate={
-                  saved
-                    ? {
-                        scale: [1, 1.2, 1],
-                        rotate: [0, 10, -10, 0],
-                      }
-                    : {}
-                }
-                transition={{ duration: 0.3 }}
+                } transition-colors save-button ${saved ? "saved" : ""}`}
               >
                 <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
                 <span className="text-sm font-medium">Save</span>
-              </motion.div>
+              </div>
             </button>
           </div>
         </div>

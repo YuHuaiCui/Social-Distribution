@@ -20,14 +20,14 @@ import Input from "../components/ui/Input";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
 import { useAuth } from "../components/context/AuthContext";
-import { api } from "../services/api";
+import { entryService, authorService, socialService } from "../services";
 
 type ViewMode = "grid" | "list";
 type ExploreTab = "trending" | "authors" | "categories" | "recent";
 
 interface TrendingAuthor extends Author {
-  follower_count: number;
-  post_count: number;
+  follower_count?: number;
+  post_count?: number;
   is_following?: boolean;
 }
 
@@ -71,102 +71,64 @@ export const ExplorePage: React.FC = () => {
   const fetchExploreData = async () => {
     setIsLoading(true);
     try {
-      // Mock data - replace with API calls
       if (activeTab === "trending") {
-        const mockPosts: Entry[] = [
-          {
-            id: "e1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
-            url: "http://localhost:8000/api/entries/e1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6/",
-            author: {
-              id: "a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
-              url: "http://localhost:8000/api/authors/a1b2c3d4-5e6f-7g8h-9i0j-k1l2m3n4o5p6/",
-              username: "techexplorer",
-              email: "tech@example.com",
-              display_name: "Tech Explorer",
-              profile_image: "https://i.pravatar.cc/150?u=tech",
-              is_approved: true,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            title: "The Future of Web Development in 2024",
-            content:
-              "An in-depth look at emerging technologies shaping the web...",
-            content_type: "text/markdown" as const,
-            visibility: "public" as const,
-            categories: ["technology", "web-development"],
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-            updated_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-            likes_count: 156,
-            comments_count: 42,
-          },
-          {
-            id: "f2g3h4i5-6j7k-8l9m-0n1o-p2q3r4s5t6u7",
-            url: "http://localhost:8000/api/entries/f2g3h4i5-6j7k-8l9m-0n1o-p2q3r4s5t6u7/",
-            author: {
-              id: "b2c3d4e5-6f7g-8h9i-0j1k-l2m3n4o5p6q7",
-              url: "http://localhost:8000/api/authors/b2c3d4e5-6f7g-8h9i-0j1k-l2m3n4o5p6q7/",
-              username: "designpro",
-              email: "design@example.com",
-              display_name: "Design Pro",
-              profile_image: "https://i.pravatar.cc/150?u=design",
-              is_approved: true,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            title: "Creating Beautiful Gradients with CSS",
-            content: "Learn how to create stunning gradient effects...",
-            content_type: "text/markdown" as const,
-            visibility: "public" as const,
-            categories: ["design", "css"],
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-            updated_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-            likes_count: 89,
-            comments_count: 23,
-          },
-        ];
-        setPosts(mockPosts);
-      } else if (activeTab === "authors") {
-         const authorResponse = await api.getAuthors({
-        is_active: true,
-        ...(isAdmin ? {} : { is_approved: true }),
+        // Fetch trending posts
+        const response = await entryService.getTrendingEntries({
+          page: 1,
+          page_size: 20,
+          ...(searchQuery && { search: searchQuery }),
         });
-      const fetchedAuthors = authorResponse.results || authorResponse || [];
-      // Map authors to TrendingAuthor type with default follower_count and post_count if missing
-      setAuthors(
-        fetchedAuthors.map((author: Author) => ({
-          ...author,
-          follower_count: (author as any).follower_count ?? 0,
-          post_count: (author as any).post_count ?? 0,
-        }))
-      );
-        
-      
+        setPosts(response.results || []);
+      } else if (activeTab === "authors") {
+        // Fetch authors with optional search
+        const response = await authorService.getAuthors({
+          is_active: true,
+          ...(isAdmin ? {} : { is_approved: true }),
+          page: 1,
+          page_size: 20,
+          ...(searchQuery && { search: searchQuery }),
+        });
+        const fetchedAuthors = response.results || [];
+
+        // Map authors to TrendingAuthor type with default values
+        setAuthors(
+          fetchedAuthors.map(
+            (author: Author): TrendingAuthor => ({
+              ...author,
+              follower_count: (author as TrendingAuthor).follower_count ?? 0,
+              post_count: (author as TrendingAuthor).post_count ?? 0,
+            })
+          )
+        );
       } else if (activeTab === "categories") {
-        const mockCategories: Category[] = [
-          { name: "Technology", count: 156, color: "var(--primary-blue)" },
-          { name: "Design", count: 123, color: "var(--primary-purple)" },
-          { name: "Programming", count: 98, color: "var(--primary-teal)" },
-          { name: "AI/ML", count: 76, color: "var(--primary-pink)" },
-          { name: "Web Development", count: 65, color: "var(--primary-coral)" },
-          { name: "Mobile Dev", count: 54, color: "var(--primary-violet)" },
-          { name: "Data Science", count: 45, color: "var(--primary-yellow)" },
-        ];
-        // Ensure all categories have colors
-        const categoriesWithColors = mockCategories.map((cat, index) => ({
+        // Fetch categories from the API
+        const categoriesResponse = await entryService.getCategories();
+
+        // Transform the response and add colors
+        const categoriesWithColors = categoriesResponse.map((cat, index) => ({
           ...cat,
-          color: cat.color || getCategoryColor(cat.name, index),
+          color: getCategoryColor(cat.name, index),
         }));
         setCategories(categoriesWithColors);
-      }
-
-      // Apply search filter
-      if (searchQuery) {
-        // Filter logic here
+      } else if (activeTab === "recent") {
+        // Fetch recent posts
+        const response = await entryService.getEntries({
+          page: 1,
+          page_size: 20,
+          ...(searchQuery && { search: searchQuery }),
+        });
+        setPosts(response.results || []);
       }
     } catch (error) {
       console.error("Error fetching explore data:", error);
+      // Set empty arrays on error to prevent showing stale data
+      if (activeTab === "trending" || activeTab === "recent") {
+        setPosts([]);
+      } else if (activeTab === "authors") {
+        setAuthors([]);
+      } else if (activeTab === "categories") {
+        setCategories([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -175,17 +137,47 @@ export const ExplorePage: React.FC = () => {
   const handleFollowAuthor = async (authorId: string) => {
     setFollowingAuthors((prev) => new Set(prev).add(authorId));
     try {
-      // API call would go here
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Get current follow status
+      const currentAuthor = authors.find((author) => author.id === authorId);
+      const isCurrentlyFollowing = currentAuthor?.is_following;
 
-      // Update UI to show following
-      setAuthors((prev) =>
-        prev.map((author) =>
-          author.id === authorId ? { ...author, is_following: true } : author
-        )
-      );
+      if (isCurrentlyFollowing) {
+        // Unfollow the author
+        await socialService.unfollowAuthor(authorId);
+
+        // Update UI to show not following
+        setAuthors((prev) =>
+          prev.map((author) =>
+            author.id === authorId
+              ? {
+                  ...author,
+                  is_following: false,
+                  follower_count: (author.follower_count || 1) - 1,
+                }
+              : author
+          )
+        );
+      } else {
+        // Follow the author
+        await socialService.followAuthor(authorId);
+
+        // Update UI to show following
+        setAuthors((prev) =>
+          prev.map((author) =>
+            author.id === authorId
+              ? {
+                  ...author,
+                  is_following: true,
+                  follower_count: (author.follower_count || 0) + 1,
+                }
+              : author
+          )
+        );
+      }
     } catch (error) {
-      console.error("Error following author:", error);
+      console.error("Error updating follow status:", error);
+      // Revert optimistic update on error
+      // Could show a toast notification here
     } finally {
       setFollowingAuthors((prev) => {
         const newSet = new Set(prev);
@@ -355,161 +347,244 @@ export const ExplorePage: React.FC = () => {
 
       {/* Content */}
       <div className="flex-1 flex flex-col">
-      {isLoading ? (
-        <div className="flex-1 flex justify-center items-center">
-          <Loader size="lg" message="Discovering content..." />
-        </div>
-      ) : (
-        <AnimatePresence mode="wait" className="flex-1 flex flex-col">
-          {/* Trending Posts */}
-          {activeTab === "trending" && (
-            <motion.div
-              key="trending"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 gap-6 flex-1"
-                  : "space-y-4 flex-1"
-              }
-            >
-              {posts.map((post, index) => (
+        {isLoading ? (
+          <div className="flex-1 flex justify-center items-center">
+            <Loader size="lg" message="Discovering content..." />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col">
+            <AnimatePresence mode="wait">
+              {/* Trending Posts */}
+              {activeTab === "trending" && (
                 <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.05 }}
+                  key="trending"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className={
+                    viewMode === "grid"
+                      ? "grid grid-cols-1 md:grid-cols-2 gap-6 flex-1"
+                      : "space-y-4 flex-1"
+                  }
                 >
-                  <PostCard post={post} />
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-
-          {/* Authors Grid */}
-          {activeTab === "authors" && (
-            <motion.div
-              key="authors"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1"
-            >
-              {authors.map((author, index) => (
-                <motion.div
-                  key={author.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <Card
-                    variant="main"
-                    hoverable
-                    className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl"
-                  >
-                    <div className="flex flex-col items-center text-center">
-                      <motion.div whileHover={{ scale: 1.05 }} className="mb-4">
-                        <Avatar
-                          imgSrc={author.profile_image}
-                          alt={author.display_name}
-                          size="xl"
-                        />
-                      </motion.div>
-
-                      <h3 className="font-semibold text-lg text-text-1 mb-1">
-                        {author.display_name}
+                  {posts.length === 0 ? (
+                    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                      <TrendingUp className="w-16 h-16 text-text-2 mb-4" />
+                      <h3 className="text-lg font-medium text-text-1 mb-2">
+                        No trending posts yet
                       </h3>
-                      <p className="text-sm text-text-2 mb-3">
-                        @{author.username}
+                      <p className="text-text-2">
+                        Check back later for trending content!
                       </p>
-
-                      {author.bio && (
-                        <p className="text-sm text-text-2 mb-4 line-clamp-2">
-                          {author.bio}
-                        </p>
-                      )}
-
-                      <div className="flex items-center space-x-4 mb-4 text-sm">
-                        <div>
-                          <span className="font-semibold text-text-1">
-                            {author.follower_count}
-                          </span>
-                          <span className="text-text-2 ml-1">followers</span>
-                        </div>
-                        <div>
-                          <span className="font-semibold text-text-1">
-                            {author.post_count}
-                          </span>
-                          <span className="text-text-2 ml-1">posts</span>
-                        </div>
-                      </div>
-
-                      <AnimatedButton
-                        size="sm"
-                        variant={author.is_following ? "secondary" : "primary"}
-                        onClick={() => handleFollowAuthor(author.id)}
-                        loading={followingAuthors.has(author.id)}
-                        className="w-full"
-                      >
-                        {author.is_following ? "Followed" : "Follow"}
-                      </AnimatedButton>
                     </div>
-                  </Card>
+                  ) : (
+                    posts.map((post, index) => (
+                      <motion.div
+                        key={post.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <PostCard post={post} />
+                      </motion.div>
+                    ))
+                  )}
                 </motion.div>
-              ))}
-            </motion.div>
-          )}
+              )}
 
-          {/* Categories */}
-          {activeTab === "categories" && (
-            <motion.div
-              key="categories"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-1"
-            >
-              {categories.map((category, index) => (
+              {/* Recent Posts */}
+              {activeTab === "recent" && (
                 <motion.div
-                  key={category.name}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  key="recent"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className={
+                    viewMode === "grid"
+                      ? "grid grid-cols-1 md:grid-cols-2 gap-6 flex-1"
+                      : "space-y-4 flex-1"
+                  }
                 >
-                  <Card
-                    variant="main"
-                    hoverable
-                    className="p-6 cursor-pointer text-center h-full flex flex-col justify-center min-h-[160px] border-l-4 transition-all bg-[rgba(var(--glass-rgb),0.35)] backdrop-blur-lg"
-                    style={{
-                      borderLeftColor: category.color,
-                    }}
-                  >
-                    <motion.div
-                      className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
-                      style={{
-                        backgroundColor: `${category.color}20`,
-                      }}
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Hash size={24} style={{ color: category.color }} />
-                    </motion.div>
-                    <h3 className="font-semibold text-text-1 mb-1">
-                      {category.name}
-                    </h3>
-                    <p className="text-sm text-text-2">
-                      {category.count} posts
-                    </p>
-                  </Card>
+                  {posts.length === 0 ? (
+                    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                      <Sparkles className="w-16 h-16 text-text-2 mb-4" />
+                      <h3 className="text-lg font-medium text-text-1 mb-2">
+                        No recent posts
+                      </h3>
+                      <p className="text-text-2">
+                        Be the first to share something!
+                      </p>
+                    </div>
+                  ) : (
+                    posts.map((post, index) => (
+                      <motion.div
+                        key={post.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <PostCard post={post} />
+                      </motion.div>
+                    ))
+                  )}
                 </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
+              )}
+
+              {/* Authors Grid */}
+              {activeTab === "authors" && (
+                <motion.div
+                  key="authors"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1"
+                >
+                  {authors.length === 0 ? (
+                    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                      <Users className="w-16 h-16 text-text-2 mb-4" />
+                      <h3 className="text-lg font-medium text-text-1 mb-2">
+                        No authors found
+                      </h3>
+                      <p className="text-text-2">
+                        Discover amazing creators as the community grows!
+                      </p>
+                    </div>
+                  ) : (
+                    authors.map((author, index) => (
+                      <motion.div
+                        key={author.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Card
+                          variant="main"
+                          hoverable
+                          className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl"
+                        >
+                          <div className="flex flex-col items-center text-center">
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              className="mb-4"
+                            >
+                              <Avatar
+                                imgSrc={author.profile_image}
+                                alt={author.display_name}
+                                size="xl"
+                              />
+                            </motion.div>
+
+                            <h3 className="font-semibold text-lg text-text-1 mb-1">
+                              {author.display_name}
+                            </h3>
+                            <p className="text-sm text-text-2 mb-3">
+                              @{author.username}
+                            </p>
+
+                            {author.bio && (
+                              <p className="text-sm text-text-2 mb-4 line-clamp-2">
+                                {author.bio}
+                              </p>
+                            )}
+
+                            <div className="flex items-center space-x-4 mb-4 text-sm">
+                              <div>
+                                <span className="font-semibold text-text-1">
+                                  {author.follower_count || 0}
+                                </span>
+                                <span className="text-text-2 ml-1">
+                                  followers
+                                </span>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-text-1">
+                                  {author.post_count || 0}
+                                </span>
+                                <span className="text-text-2 ml-1">posts</span>
+                              </div>
+                            </div>
+
+                            <AnimatedButton
+                              size="sm"
+                              variant={
+                                author.is_following ? "secondary" : "primary"
+                              }
+                              onClick={() => handleFollowAuthor(author.id)}
+                              loading={followingAuthors.has(author.id)}
+                              className="w-full"
+                            >
+                              {author.is_following ? "Followed" : "Follow"}
+                            </AnimatedButton>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))
+                  )}
+                </motion.div>
+              )}
+
+              {/* Categories */}
+              {activeTab === "categories" && (
+                <motion.div
+                  key="categories"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 flex-1"
+                >
+                  {categories.length === 0 ? (
+                    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+                      <Hash className="w-16 h-16 text-text-2 mb-4" />
+                      <h3 className="text-lg font-medium text-text-1 mb-2">
+                        No categories yet
+                      </h3>
+                      <p className="text-text-2">
+                        Categories will appear as people start posting!
+                      </p>
+                    </div>
+                  ) : (
+                    categories.map((category, index) => (
+                      <motion.div
+                        key={category.name}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <Card
+                          variant="main"
+                          hoverable
+                          className="p-6 cursor-pointer text-center h-full flex flex-col justify-center min-h-[160px] border-l-4 transition-all bg-[rgba(var(--glass-rgb),0.35)] backdrop-blur-lg"
+                          style={{
+                            borderLeftColor: category.color,
+                          }}
+                        >
+                          <motion.div
+                            className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
+                            style={{
+                              backgroundColor: `${category.color}20`,
+                            }}
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <Hash size={24} style={{ color: category.color }} />
+                          </motion.div>
+                          <h3 className="font-semibold text-text-1 mb-1">
+                            {category.name}
+                          </h3>
+                          <p className="text-sm text-text-2">
+                            {category.count} posts
+                          </p>
+                        </Card>
+                      </motion.div>
+                    ))
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
     </div>
   );
