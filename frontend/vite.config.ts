@@ -13,13 +13,7 @@ export default defineConfig({
   ],
   build: {
     // Optimize for production
-    minify: "terser",
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
+    minify: "esbuild",
     rollupOptions: {
       output: {
         // Manual chunks for better caching
@@ -32,6 +26,10 @@ export default defineConfig({
     },
     // Optimize chunk size
     chunkSizeWarningLimit: 1000,
+  },
+  esbuild: {
+    // Drop console and debugger statements in production
+    drop: ["console", "debugger"],
   },
   server: {
     hmr: {
