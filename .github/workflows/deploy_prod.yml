@@ -38,17 +38,16 @@ jobs:
           echo "✅ Frontend dependencies installed"
 
           echo "📝 Running TypeScript type check..."
-          # Run TypeScript check but don't fail on errors (non-blocking)
+          # Run TypeScript check but don't fail on errors
           npx tsc --noEmit || {
-            echo "⚠️  TypeScript issues found (non-blocking for production)"
+            echo "⚠️  TypeScript issues found (non-blocking)"
             echo "Consider fixing these type issues for better code quality."
           }
-          echo "✅ TypeScript check completed"
 
           echo "🔨 Building React app for production..."
-          # Build for production without TypeScript checking (already done above)
+          # Build without TypeScript checking (already done above)
           # Set VITE_API_URL to empty string to use relative URLs
-          VITE_API_URL="" npx vite build --mode production || {
+          VITE_API_URL="" npx vite build || {
             echo "❌ Build failed!"
             echo "Check the error messages above."
             exit 1
