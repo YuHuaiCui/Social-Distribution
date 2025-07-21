@@ -131,7 +131,8 @@ class CommentLikeView(APIView):
     Attributes:
         permission_classes: Requires authentication for all operations
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
 
     def post(self, request, comment_id):
         """
