@@ -11,6 +11,8 @@ class EntrySerializer(serializers.ModelSerializer):
     comments_count = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_saved = serializers.SerializerMethodField()
 
     class Meta:
         model = Entry
@@ -33,6 +35,8 @@ class EntrySerializer(serializers.ModelSerializer):
             "comments_count",
             "likes_count",
             "image",
+            "is_liked",
+            "is_saved",
         ]
         read_only_fields = ["type", "id", "url", "web", "author", "source", "origin", "published", "created_at", "updated_at", "comments_count", "likes_count"]
 
@@ -62,6 +66,30 @@ class EntrySerializer(serializers.ModelSerializer):
             image_base64 = base64.b64encode(obj.image_data).decode('utf-8')
             return f"data:{obj.content_type};base64,{image_base64}#v={obj.updated_at.timestamp()}"
         return None
+
+    def get_is_liked(self, obj):
+        """Check if the current user has liked this entry"""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        
+        from app.models import Like
+        return Like.objects.filter(author=request.user, entry=obj).exists()
+
+    def get_is_saved(self, obj):
+        """Check if the current user has saved this entry"""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        
+        from app.models import SavedEntry
+        # Get the user's author instance
+        if hasattr(request.user, 'author'):
+            user_author = request.user.author
+        else:
+            user_author = request.user
+            
+        return SavedEntry.objects.filter(author=user_author, entry=obj).exists()
 
     def to_representation(self, instance):
         """

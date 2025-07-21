@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Heart,
@@ -64,36 +70,39 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   const [showActions, setShowActions] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
-  
+
   // Memoize the debounced fetch function
   const debouncedFetchLikeData = useMemo(
-    () => debounce(async (postId: string) => {
-      try {
-        const extractedId = extractUUID(postId);
-        const data = await api.getEntryLikeStatus(extractedId);
-        setLikeCount(data.like_count);
-        setLiked(data.liked_by_current_user);
-      } catch (error) {
-        // Use the data from the post itself as fallback
-        setLikeCount(post.likes_count || 0);
-        setLiked(post.is_liked || false);
-      }
-    }, 500),
+    () =>
+      debounce(async (postId: string) => {
+        try {
+          const extractedId = extractUUID(postId);
+          const data = await api.getEntryLikeStatus(extractedId);
+          setLikeCount(data.like_count);
+          setLiked(data.liked_by_current_user);
+        } catch (error) {
+          // Use the data from the post itself as fallback
+          setLikeCount(post.likes_count || 0);
+          setLiked(post.is_liked || false);
+        }
+      }, 500),
     [post.likes_count, post.is_liked]
   );
 
   // Consolidated useEffect for initialization and updates
   useEffect(() => {
-    // Initialize state
+    // Initialize state from props and post data
+    setLiked(isLiked || post.is_liked || false);
+    setSaved(isSaved || post.is_saved || false);
     setCommentCount(post.comments_count || 0);
-    
+
     // Fetch like data if we have a valid post ID
     if (post.id) {
       debouncedFetchLikeData(post.id);
     } else {
       // Use fallback data if no valid ID
       setLikeCount(post.likes_count || 0);
-      setLiked(post.is_liked || false);
+      setLiked(isLiked || post.is_liked || false);
     }
 
     // Listen for post updates from other components
@@ -105,19 +114,29 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       }
     };
 
-    window.addEventListener('post-update', handlePostUpdate, { passive: true });
-    
+    window.addEventListener("post-update", handlePostUpdate, { passive: true });
+
     // Cleanup function
     return () => {
-      window.removeEventListener('post-update', handlePostUpdate);
+      window.removeEventListener("post-update", handlePostUpdate);
     };
-  }, [post.id, post.comments_count, post.likes_count, post.is_liked, debouncedFetchLikeData]);
+  }, [
+    post.id,
+    post.comments_count,
+    post.likes_count,
+    post.is_liked,
+    post.is_saved,
+    isLiked,
+    isSaved,
+    debouncedFetchLikeData,
+  ]);
 
   // Memoize author info extraction
-  const author = useMemo(() => 
-    typeof post.author === "string"
-      ? ({ display_name: "Unknown", id: "" } as Author)
-      : post.author,
+  const author = useMemo(
+    () =>
+      typeof post.author === "string"
+        ? ({ display_name: "Unknown", id: "" } as Author)
+        : post.author,
     [post.author]
   );
 
@@ -149,7 +168,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       );
       showError("Failed to update like status");
     }
-  }, [liked, extractUUID, post.id, showSuccess, showInfo, showError, onLike]);
+  }, [liked, post.id, showSuccess, showInfo, showError, onLike]);
 
   const handleSave = useCallback(async () => {
     const extractedId = extractUUID(post.id);
@@ -170,7 +189,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       setSaved(!newSavedState);
       showError("Failed to update saved status");
     }
-  }, [saved, extractUUID, post.id, showSuccess, showInfo, showError, onSave]);
+  }, [saved, post.id, showSuccess, showInfo, showError, onSave]);
 
   const handleShare = useCallback(() => {
     // For public posts, show the share modal with social media options
@@ -231,8 +250,10 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside, { passive: true });
-    
+    document.addEventListener("mousedown", handleClickOutside, {
+      passive: true,
+    });
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -253,124 +274,112 @@ const PostCardComponent: React.FC<PostCardProps> = ({
 
   const getVisibilityBadge = () => {
     const badges = [];
-    
+
     switch (post.visibility) {
       case "FRIENDS":
         badges.push(
-          <span key="friends" className="text-xs bg-cat-mint px-2 py-0.5 rounded-full">
+          <span
+            key="friends"
+            className="text-xs bg-cat-mint px-2 py-0.5 rounded-full"
+          >
             Friends
           </span>
         );
         break;
       case "UNLISTED":
         badges.push(
-          <span key="unlisted" className="text-xs bg-cat-yellow px-2 py-0.5 rounded-full">
+          <span
+            key="unlisted"
+            className="text-xs bg-cat-yellow px-2 py-0.5 rounded-full"
+          >
             Unlisted
           </span>
         );
         break;
     }
-    
+
     // Show admin visibility indicator if viewing a post that wouldn't normally be visible
     if (isAdmin && !isOwnPost && post.visibility === "FRIENDS") {
       badges.push(
-        <span key="admin" className="text-xs bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+        <span
+          key="admin"
+          className="text-xs bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white px-2 py-0.5 rounded-full flex items-center gap-1"
+        >
           <Shield size={10} />
           Admin View
         </span>
       );
     }
-    
+
     return badges.length > 0 ? badges : null;
   };
 
   return (
     <>
       <Card variant="main" hoverable className="card-layout">
-      <div className="card-content">
-        {/* Author info */}
-        <div className="flex items-center mb-4">
-          <Link to={`/authors/${author.id}`} className="flex items-center">
-            <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
-              {author.profile_image ? (
-                <LoadingImage
-                  src={author.profile_image}
-                  alt={author.display_name}
-                  className="w-full h-full"
-                  loaderSize={14}
-                  aspectRatio="1/1"
-                  fallback={
-                    <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                      {author.display_name.charAt(0).toUpperCase()}
-                    </div>
-                  }
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                  {author.display_name.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div>
-              <h3 className="font-medium text-text-1">{author.display_name}</h3>
-              <div className="flex items-center text-xs text-text-2">
-                <span>{timeAgo}</span>
-                {getVisibilityBadge() && (
-                  <>
-                    <span className="mx-1">·</span>
-                    <div className="inline-flex items-center gap-1">
-                      {getVisibilityBadge()}
-                    </div>
-                  </>
+        <div className="card-content">
+          {/* Author info */}
+          <div className="flex items-center mb-4">
+            <Link to={`/authors/${author.id}`} className="flex items-center">
+              <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
+                {author.profile_image ? (
+                  <LoadingImage
+                    src={author.profile_image}
+                    alt={author.display_name}
+                    className="w-full h-full"
+                    loaderSize={14}
+                    aspectRatio="1/1"
+                    fallback={
+                      <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
+                        {author.display_name.charAt(0).toUpperCase()}
+                      </div>
+                    }
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
+                    {author.display_name.charAt(0).toUpperCase()}
+                  </div>
                 )}
               </div>
-            </div>
-          </Link>
+              <div>
+                <h3 className="font-medium text-text-1">
+                  {author.display_name}
+                </h3>
+                <div className="flex items-center text-xs text-text-2">
+                  <span>{timeAgo}</span>
+                  {getVisibilityBadge() && (
+                    <>
+                      <span className="mx-1">·</span>
+                      <div className="inline-flex items-center gap-1">
+                        {getVisibilityBadge()}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Link>
 
-          {(isOwnPost || isAdmin) && (
-            <div className="ml-auto relative" ref={actionsRef}>
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setShowActions(!showActions)}
-                className="p-2 rounded-lg hover:bg-glass-low transition-colors"
-                aria-label="Post options"
-              >
-                <MoreHorizontal size={18} className="text-text-2" />
-              </motion.button>
+            {(isOwnPost || isAdmin) && (
+              <div className="ml-auto relative" ref={actionsRef}>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowActions(!showActions)}
+                  className="p-2 rounded-lg hover:bg-glass-low transition-colors"
+                  aria-label="Post options"
+                >
+                  <MoreHorizontal size={18} className="text-text-2" />
+                </motion.button>
 
-              <AnimatePresence>
-                {showActions && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                    className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden z-dropdown"
-                  >
-                    {isOwnPost && (
-                      <motion.button
-                        whileHover={{ x: 4 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 400,
-                          damping: 30,
-                        }}
-                        onClick={handleEdit}
-                        className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
-                      >
-                        <Edit size={16} />
-                        <span>Edit Post</span>
-                      </motion.button>
-                    )}
-                    
-                    {/* Admin controls */}
-                    {isAdmin && !isOwnPost && (
-                      <>
-                        <div className="border-t border-border-1 my-1" />
-                        <div className="px-3 py-1.5 text-xs text-text-2 font-medium flex items-center space-x-1">
-                          <Shield size={12} />
-                          <span>Admin Actions</span>
-                        </div>
+                <AnimatePresence>
+                  {showActions && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                      className="absolute right-0 mt-2 w-48 glass-card-prominent rounded-lg shadow-lg overflow-hidden z-dropdown"
+                    >
+                      {isOwnPost && (
                         <motion.button
                           whileHover={{ x: 4 }}
                           transition={{
@@ -382,238 +391,240 @@ const PostCardComponent: React.FC<PostCardProps> = ({
                           className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
                         >
                           <Edit size={16} />
-                          <span>Modify Post</span>
+                          <span>Edit Post</span>
                         </motion.button>
-                      </>
-                    )}
-                    
-                    <motion.button
-                      whileHover={{ x: 4 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 30,
-                      }}
-                      onClick={handleDelete}
-                      className="w-full px-4 py-2.5 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Trash2 size={16} />
-                      <span>{isAdmin && !isOwnPost ? 'Remove Post' : 'Delete Post'}</span>
-                    </motion.button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-        </div>
+                      )}
 
-        {/* Post title */}
-        <Link to={`/posts/${extractUUID(post.id)}`}>
-          <h2 className="text-xl font-semibold mb-3 text-text-1 hover:text-brand-500 transition-colors">
-            {post.title}
-          </h2>
-        </Link>
+                      {/* Admin controls */}
+                      {isAdmin && !isOwnPost && (
+                        <>
+                          <div className="border-t border-border-1 my-1" />
+                          <div className="px-3 py-1.5 text-xs text-text-2 font-medium flex items-center space-x-1">
+                            <Shield size={12} />
+                            <span>Admin Actions</span>
+                          </div>
+                          <motion.button
+                            whileHover={{ x: 4 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 400,
+                              damping: 30,
+                            }}
+                            onClick={handleEdit}
+                            className="w-full px-4 py-2.5 text-left text-text-1 hover:bg-glass-low transition-colors flex items-center space-x-2 cursor-pointer"
+                          >
+                            <Edit size={16} />
+                            <span>Modify Post</span>
+                          </motion.button>
+                        </>
+                      )}
 
-        {/* Title/Content separator for markdown posts */}
-        {post.content_type === "text/markdown" && (
-          <div className="flex items-center mb-4">
-            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
-            <div className="mx-3 text-text-2">
-              <FileText size={14} className="opacity-50" />
-            </div>
-            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
+                      <motion.button
+                        whileHover={{ x: 4 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 30,
+                        }}
+                        onClick={handleDelete}
+                        className="w-full px-4 py-2.5 text-left text-red-500 hover:bg-red-500/10 transition-colors flex items-center space-x-2 cursor-pointer"
+                      >
+                        <Trash2 size={16} />
+                        <span>
+                          {isAdmin && !isOwnPost
+                            ? "Remove Post"
+                            : "Delete Post"}
+                        </span>
+                      </motion.button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Post content */}
-        <div className={`mb-4 ${post.content_type === "text/markdown" ? "prose-sm" : ""}`}>
-          {renderContent()}
-        </div>
+          {/* Post title */}
+          <Link to={`/posts/${extractUUID(post.id)}`}>
+            <h2 className="text-xl font-semibold mb-3 text-text-1 hover:text-brand-500 transition-colors">
+              {post.title}
+            </h2>
+          </Link>
 
-        {/* Post image if it's an image type */}
-        {(post.content_type === "image/png" ||
-          post.content_type === "image/jpeg") &&
-          post.image && (
-            <div className="mb-4 rounded-lg overflow-hidden">
-              <LoadingImage
-                src={`${post.image}?v=${post.updated_at}`}
-                alt="Post attachment"
-                className="w-full h-auto max-h-96 object-cover"
-                loaderSize={24}
-              />
+          {/* Title/Content separator for markdown posts */}
+          {post.content_type === "text/markdown" && (
+            <div className="flex items-center mb-4">
+              <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
+              <div className="mx-3 text-text-2">
+                <FileText size={14} className="opacity-50" />
+              </div>
+              <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
             </div>
           )}
 
-        {/* Categories */}
-        {post.categories && post.categories.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {post.categories.map((category, index) => {
-              const gradientSets = [
-                ["var(--primary-yellow)", "var(--primary-pink)"],
-                ["var(--primary-pink)", "var(--primary-purple)"],
-                ["var(--primary-purple)", "var(--primary-teal)"],
-                ["var(--primary-teal)", "var(--primary-coral)"],
-                ["var(--primary-coral)", "var(--primary-violet)"],
-              ];
+          {/* Post content */}
+          <div
+            className={`mb-4 ${
+              post.content_type === "text/markdown" ? "prose-sm" : ""
+            }`}
+          >
+            {renderContent()}
+          </div>
 
-              return (
-                <Link
-                  key={index}
-                  to={`/search?category=${encodeURIComponent(category)}`}
-                >
-                  <AnimatedGradient
-                    gradientColors={gradientSets[index % gradientSets.length]}
-                    className="px-3 py-1 rounded-full text-sm font-medium shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                    textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-                    duration={20 + index * 2}
+          {/* Post image if it's an image type */}
+          {(post.content_type === "image/png" ||
+            post.content_type === "image/jpeg") &&
+            post.image && (
+              <div className="mb-4 rounded-lg overflow-hidden">
+                <LoadingImage
+                  src={`${post.image}?v=${post.updated_at}`}
+                  alt="Post attachment"
+                  className="w-full h-auto max-h-96 object-cover"
+                  loaderSize={24}
+                />
+              </div>
+            )}
+
+          {/* Categories */}
+          {post.categories && post.categories.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {post.categories.map((category, index) => {
+                const gradientSets = [
+                  ["var(--primary-yellow)", "var(--primary-pink)"],
+                  ["var(--primary-pink)", "var(--primary-purple)"],
+                  ["var(--primary-purple)", "var(--primary-teal)"],
+                  ["var(--primary-teal)", "var(--primary-coral)"],
+                  ["var(--primary-coral)", "var(--primary-violet)"],
+                ];
+
+                return (
+                  <Link
+                    key={index}
+                    to={`/search?category=${encodeURIComponent(category)}`}
                   >
-                    #{category}
-                  </AnimatedGradient>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    <AnimatedGradient
+                      gradientColors={gradientSets[index % gradientSets.length]}
+                      className="px-3 py-1 rounded-full text-sm font-medium shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      textClassName="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                      duration={20 + index * 2}
+                    >
+                      #{category}
+                    </AnimatedGradient>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-      {/* Post stats and interaction buttons */}
-      <div className="card-footer border-t border-border-1 -mx-5 -mb-5 px-0 rounded-b-xl overflow-hidden">
-        <div className="flex items-stretch divide-x divide-border-1" style={{ borderColor: 'var(--border-1)' }}>
-          <style>{`
+        {/* Post stats and interaction buttons */}
+        <div className="card-footer border-t border-border-1 -mx-5 -mb-5 px-0 rounded-b-xl overflow-hidden">
+          <div
+            className="flex items-stretch divide-x divide-border-1"
+            style={{ borderColor: "var(--border-1)" }}
+          >
+            <style>{`
             .card-footer .divide-x > :not([hidden]) ~ :not([hidden]) {
               border-left-color: var(--border-1) !important;
               border-left-width: 1px !important;
             }
           `}</style>
-          {/* Like Button */}
-          <button
-            onClick={handleLike}
-            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-            aria-label={liked ? "Unlike this post" : "Like this post"}
-          >
-            {/* Gradient background on hover or when liked */}
-            <motion.div
-              className={`absolute inset-0 transition-opacity ${
-                liked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-              }`}
-              style={{
-                background:
-                  "linear-gradient(135deg, var(--primary-pink) 0%, var(--primary-purple) 100%)",
-              }}
-            />
-            <motion.div
-              className={`relative z-10 flex items-center gap-2 ${
-                liked ? "text-white" : "text-text-2 group-hover:text-white"
-              } transition-colors`}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              animate={
-                liked
-                  ? {
-                      rotate: [0, -20, 20, -10, 10, 0],
-                      scale: [1, 1.2, 1.1, 1.15, 1.05, 1],
-                    }
-                  : {}
-              }
-              transition={{ duration: 0.5 }}
+            {/* Like Button */}
+            <button
+              onClick={handleLike}
+              className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
+              aria-label={liked ? "Unlike this post" : "Like this post"}
             >
-              <Heart size={18} fill={liked ? "currentColor" : "none"} />
-              <span className="text-sm font-medium">{likeCount}</span>
-            </motion.div>
-          </button>
+              {/* Gradient background on hover or when liked */}
+              <div
+                className={`absolute inset-0 transition-opacity duration-300 ${
+                  liked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--primary-pink) 0%, var(--primary-purple) 100%)",
+                }}
+              />
+              <div
+                className={`relative z-10 flex items-center gap-2 ${
+                  liked ? "text-white" : "text-text-2 group-hover:text-white"
+                } transition-colors like-button ${liked ? "liked" : ""}`}
+              >
+                <Heart size={18} fill={liked ? "currentColor" : "none"} />
+                <span className="text-sm font-medium">{likeCount}</span>
+              </div>
+            </button>
 
-          {/* Comment Button */}
-          <button
-            onClick={() => navigate(`/posts/${extractUUID(post.id)}`)}
-            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-            aria-label="View comments"
-          >
-            {/* Gradient background on hover */}
-            <motion.div
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{
-                background:
-                  "linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)",
-              }}
-            />
-            <motion.div
-              className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            {/* Comment Button */}
+            <button
+              onClick={() => navigate(`/posts/${extractUUID(post.id)}`)}
+              className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
+              aria-label="View comments"
             >
-              <MessageCircle size={18} />
-              <span className="text-sm font-medium">
-                {commentCount}
-              </span>
-            </motion.div>
-          </button>
+              {/* Gradient background on hover */}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%)",
+                }}
+              />
+              <div className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors comment-button">
+                <MessageCircle size={18} />
+                <span className="text-sm font-medium">{commentCount}</span>
+              </div>
+            </button>
 
-          {/* Share Button */}
-          <button
-            onClick={handleShare}
-            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-            aria-label="Share this post"
-          >
-            {/* Gradient background on hover */}
-            <motion.div
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{
-                background:
-                  "linear-gradient(135deg, var(--primary-yellow) 0%, var(--primary-coral) 100%)",
-              }}
-            />
-            <motion.div
-              className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+            {/* Share Button */}
+            <button
+              onClick={handleShare}
+              className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
+              aria-label="Share this post"
             >
-              <Share2 size={18} />
-              <span className="text-sm font-medium">Share</span>
-            </motion.div>
-          </button>
+              {/* Gradient background on hover */}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--primary-yellow) 0%, var(--primary-coral) 100%)",
+                }}
+              />
+              <div className="relative z-10 flex items-center gap-2 text-text-2 group-hover:text-white transition-all duration-200 share-button">
+                <Share2 size={18} />
+                <span className="text-sm font-medium">Share</span>
+              </div>
+            </button>
 
-          {/* Save Button */}
-          <button
-            onClick={handleSave}
-            className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-            aria-label={saved ? "Unsave this post" : "Save this post"}
-          >
-            {/* Gradient background on hover or when saved */}
-            <motion.div
-              className={`absolute inset-0 transition-opacity ${
-                saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-              }`}
-              style={{
-                background:
-                  "linear-gradient(135deg, var(--primary-violet) 0%, var(--primary-purple) 100%)",
-              }}
-            />
-            <motion.div
-              className={`relative z-10 flex items-center gap-2 ${
-                saved ? "text-white" : "text-text-2 group-hover:text-white"
-              } transition-colors`}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              animate={
-                saved
-                  ? {
-                      scale: [1, 1.2, 1],
-                      rotate: [0, 10, -10, 0],
-                    }
-                  : {}
-              }
-              transition={{ duration: 0.3 }}
+            {/* Save Button */}
+            <button
+              onClick={handleSave}
+              className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
+              aria-label={saved ? "Unsave this post" : "Save this post"}
             >
-              <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
-              <span className="text-sm font-medium">Save</span>
-            </motion.div>
-          </button>
+              {/* Gradient background on hover or when saved */}
+              <div
+                className={`absolute inset-0 transition-opacity duration-300 ${
+                  saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--primary-violet) 0%, var(--primary-purple) 100%)",
+                }}
+              />
+              <div
+                className={`relative z-10 flex items-center gap-2 ${
+                  saved ? "text-white" : "text-text-2 group-hover:text-white"
+                } transition-colors save-button ${saved ? "saved" : ""}`}
+              >
+                <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
+                <span className="text-sm font-medium">Save</span>
+              </div>
+            </button>
+          </div>
         </div>
-      </div>
       </Card>
-      
+
       {/* Share Modal for public posts */}
-      <ShareModal 
+      <ShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         post={post}
@@ -645,16 +656,19 @@ function getTimeAgo(date: Date): string {
 }
 
 // Memoized PostCard component
-export const PostCard = React.memo(PostCardComponent, (prevProps, nextProps) => {
-  // Custom comparison function for memo
-  return (
-    prevProps.post.id === nextProps.post.id &&
-    prevProps.post.likes_count === nextProps.post.likes_count &&
-    prevProps.post.comments_count === nextProps.post.comments_count &&
-    prevProps.post.visibility === nextProps.post.visibility &&
-    prevProps.isLiked === nextProps.isLiked &&
-    prevProps.isSaved === nextProps.isSaved
-  );
-});
+export const PostCard = React.memo(
+  PostCardComponent,
+  (prevProps, nextProps) => {
+    // Custom comparison function for memo
+    return (
+      prevProps.post.id === nextProps.post.id &&
+      prevProps.post.likes_count === nextProps.post.likes_count &&
+      prevProps.post.comments_count === nextProps.post.comments_count &&
+      prevProps.post.visibility === nextProps.post.visibility &&
+      prevProps.isLiked === nextProps.isLiked &&
+      prevProps.isSaved === nextProps.isSaved
+    );
+  }
+);
 
 export default PostCard;

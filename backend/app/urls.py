@@ -41,6 +41,10 @@ entry_feed = EntryViewSet.as_view({
 entry_saved = EntryViewSet.as_view({
     'get': 'saved_entries',
 })
+entry_save_action = EntryViewSet.as_view({
+    'post': 'save_entry',
+    'delete': 'save_entry',
+})
 
 
 urlpatterns = [    # Router-based endpoints
@@ -51,6 +55,7 @@ urlpatterns = [    # Router-based endpoints
     path("entries/feed/", entry_feed, name="entry-feed"),
     path("entries/saved/", entry_saved, name="entry-saved"),
     path("entries/<uuid:id>/", entry_detail, name="entry-detail"),    
+    path("entries/<uuid:id>/save/", entry_save_action, name="entry-save"),    
     
     # Like endpoint
     path("entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
