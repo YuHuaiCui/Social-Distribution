@@ -375,26 +375,3 @@ class APIEndpointComplianceTest(APITestCase):
         response = self.client.post(url, comment_data, format='json')
         self.assertNotEqual(response.status_code, status.HTTP_404_NOT_FOUND,
                            f"Inbox comment endpoint should exist: {url}")
-
-    def print_missing_endpoints_summary(self):
-        """Print a summary of potentially missing endpoints for manual review"""
-        print("\n" + "="*80)
-        print("API ENDPOINT COMPLIANCE SUMMARY")
-        print("="*80)
-        print("This test suite checked for the existence of all API endpoints")
-        print("specified in the project requirements. Review the test results above")
-        print("to see which endpoints may need implementation.")
-        print("\nEndpoints checked:")
-        print("✓ Authors API (/api/authors/)")
-        print("✓ Single Author API (/api/authors/{id}/)")
-        print("✓ Followers API (/api/authors/{id}/followers/)")
-        print("✓ Entries API (/api/authors/{id}/entries/)")
-        print("✓ Image Entries (/api/authors/{id}/entries/{id}/image/)")
-        print("✓ Comments API (/api/authors/{id}/entries/{id}/comments/)")
-        print("✓ Commented API (/api/authors/{id}/commented/)")
-        print("✓ Likes API (/api/authors/{id}/entries/{id}/likes/)")
-        print("✓ Liked API (/api/authors/{id}/liked/)")
-        print("✓ Inbox API (/api/authors/{id}/inbox/)")
-        print("\nNote: 404 errors indicate missing endpoints that may need implementation.")
-        print("Authentication errors (401/403) indicate endpoints exist but need proper auth.")
-        print("="*80)
