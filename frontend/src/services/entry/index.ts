@@ -31,7 +31,9 @@ export class EntryService extends BaseApiService {
    * Get a specific entry by ID
    */
   async getEntry(id: string): Promise<Entry> {
-    return this.request<Entry>(`/api/entries/${id}/`);
+    // Extract ID from URL if full URL is passed
+    const entryId = id.includes("/") ? id.split("/").filter(Boolean).pop() : id;
+    return this.request<Entry>(`/api/entries/${entryId}/`);
   }
 
   /**
@@ -113,7 +115,11 @@ export class EntryService extends BaseApiService {
    */
   async deleteEntry(id: string): Promise<boolean> {
     try {
-      await this.request(`/api/entries/${id}/`, {
+      // Extract ID from URL if full URL is passed
+      const entryId = id.includes("/")
+        ? id.split("/").filter(Boolean).pop()
+        : id;
+      await this.request(`/api/entries/${entryId}/`, {
         method: "DELETE",
       });
       return true;
@@ -173,7 +179,7 @@ export class EntryService extends BaseApiService {
 
   /**
    * Get comments for an entry
-   */  async getComments(
+   */ async getComments(
     entryId: string,
     params?: { page?: number; page_size?: number }
   ): Promise<PaginatedResponse<Comment>> {
@@ -184,7 +190,7 @@ export class EntryService extends BaseApiService {
   }
   /**
    * Create a comment on an entry
-   */  async createComment(
+   */ async createComment(
     entryId: string,
     data: CreateCommentData
   ): Promise<Comment> {
@@ -221,7 +227,14 @@ export class EntryService extends BaseApiService {
    * Delete a comment
    */
   async deleteComment(entryId: string, commentId: string): Promise<void> {
-    await this.request(`/api/entries/${entryId}/comments/${commentId}/`, {
+    // Extract IDs from URLs if full URLs are passed
+    const eId = entryId.includes("/")
+      ? entryId.split("/").filter(Boolean).pop()
+      : entryId;
+    const cId = commentId.includes("/")
+      ? commentId.split("/").filter(Boolean).pop()
+      : commentId;
+    await this.request(`/api/entries/${eId}/comments/${cId}/`, {
       method: "PATCH",
       body: JSON.stringify({ visibility: "deleted" }),
     });

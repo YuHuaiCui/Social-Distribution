@@ -3,43 +3,59 @@
  * Handles author-related API calls
  */
 
-import { BaseApiService } from '../base';
-import type { 
-  Author, 
+import { BaseApiService } from "../base";
+import type {
+  Author,
   AuthorUpdateData,
   AuthorSearchParams,
-  PaginatedResponse 
-} from '../../types';
+  PaginatedResponse,
+} from "../../types";
 
 export class AuthorService extends BaseApiService {
   /**
    * Get paginated list of authors
    */
-  async getAuthors(params?: AuthorSearchParams): Promise<PaginatedResponse<Author>> {
+  async getAuthors(
+    params?: AuthorSearchParams
+  ): Promise<PaginatedResponse<Author>> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Author>>(`/api/authors/${queryString}`);
+    const response = await this.request<{ type: "authors"; authors: Author[] }>(
+      `/api/authors/${queryString}`
+    );
+
+    // Convert CMPUT 404 format to expected PaginatedResponse format
+    return {
+      count: response.authors.length,
+      next: null,
+      previous: null,
+      results: response.authors,
+    };
   }
 
   /**
    * Get a specific author by ID
    */
   async getAuthor(id: string): Promise<Author> {
-    return this.request<Author>(`/api/authors/${id}/`);
+    // Extract ID from URL if full URL is passed
+    const authorId = id.includes("/")
+      ? id.split("/").filter(Boolean).pop()
+      : id;
+    return this.request<Author>(`/api/authors/${authorId}/`);
   }
 
   /**
    * Get the current authenticated author
    */
   async getCurrentAuthor(): Promise<Author> {
-    return this.request<Author>('/api/authors/me/');
+    return this.request<Author>("/api/authors/me/");
   }
 
   /**
    * Update the current author's profile
    */
   async updateCurrentAuthor(data: AuthorUpdateData): Promise<Author> {
-    return this.request<Author>('/api/authors/me/', {
-      method: 'PATCH',
+    return this.request<Author>("/api/authors/me/", {
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }
@@ -49,10 +65,10 @@ export class AuthorService extends BaseApiService {
    */
   async uploadProfileImage(file: File): Promise<Author> {
     const formData = new FormData();
-    formData.append('profile_image_file', file);
+    formData.append("profile_image_file", file);
 
-    return this.requestFormData<Author>('/api/authors/me/', {
-      method: 'PATCH',
+    return this.requestFormData<Author>("/api/authors/me/", {
+      method: "PATCH",
       body: formData,
     });
   }
@@ -60,7 +76,10 @@ export class AuthorService extends BaseApiService {
   /**
    * Search authors by query
    */
-  async searchAuthors(query: string, params?: Omit<AuthorSearchParams, 'search'>): Promise<PaginatedResponse<Author>> {
+  async searchAuthors(
+    query: string,
+    params?: Omit<AuthorSearchParams, "search">
+  ): Promise<PaginatedResponse<Author>> {
     return this.getAuthors({ ...params, search: query });
   }
 
