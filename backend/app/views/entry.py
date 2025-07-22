@@ -257,12 +257,6 @@ class EntryViewSet(viewsets.ModelViewSet):
             # The user is already an Author instance since Author extends AbstractUser
             user_author = user
 
-            if not user_author:
-                return Response(
-                    {"error": "User has no author profile"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
             # Get entries that this user has liked
             liked_entry_ids = Like.objects.filter(
                 author=user_author,  # Use the correct author instance
@@ -309,12 +303,6 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             # The user is already an Author instance since Author extends AbstractUser
             user_author = user
-
-            if not user_author:
-                return Response(
-                    {"error": "User has no author profile"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
             # Get entries that this user has saved
             saved_entry_ids = SavedEntry.objects.filter(
@@ -363,12 +351,6 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             # The user is already an Author instance since Author extends AbstractUser
             current_author = user
-
-            if not current_author:
-                return Response(
-                    {"error": "User has no author profile"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
             # Get all users that the current user is following with ACCEPTED status
             following_ids = set(
