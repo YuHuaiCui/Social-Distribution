@@ -80,7 +80,7 @@ class AuthorAPITest(BaseAPITestCase):
     
     def test_author_list(self):
         """Test author list endpoint"""
-        url = reverse('social-distribution:author-list')
+        url = reverse('social-distribution:authors-list')
         
         # Test unauthenticated access
         response = self.client.get(url)
@@ -108,7 +108,7 @@ class AuthorAPITest(BaseAPITestCase):
     
     def test_author_list_filtering(self):
         """Test author list filtering"""
-        url = reverse('social-distribution:author-list')
+        url = reverse('social-distribution:authors-list')
         
         # Test filtering by approval status
         response = self.user_client.get(url, {'is_approved': 'true'})
@@ -132,7 +132,7 @@ class AuthorAPITest(BaseAPITestCase):
     
     def test_author_detail(self):
         """Test retrieving author details"""
-        url = reverse('social-distribution:author-detail', args=[self.regular_user.id])
+        url = reverse('social-distribution:authors-detail', args=[self.regular_user.id])
         
         # Test unauthenticated access
         response = self.client.get(url)
@@ -145,7 +145,7 @@ class AuthorAPITest(BaseAPITestCase):
     
     def test_author_create(self):
         """Test creating new authors"""
-        url = reverse('social-distribution:author-list')
+        url = reverse('social-distribution:authors-list')
         data = {
             'username': 'newauthor',
             'email': 'new@example.com',
@@ -186,7 +186,7 @@ class AuthorAPITest(BaseAPITestCase):
     
     def test_author_update(self):
         """Test updating author details"""
-        url = reverse('social-distribution:author-detail', args=[self.regular_user.id])
+        url = reverse('social-distribution:authors-detail', args=[self.regular_user.id])
         data = {'display_name': 'Updated Name'}
         
         # Test unauthorized update
@@ -213,7 +213,7 @@ class AuthorAPITest(BaseAPITestCase):
             is_approved=False
         )
         
-        url = reverse('social-distribution:author-approve', args=[unapproved_user.id])
+        url = reverse('social-distribution:authors-approve', args=[unapproved_user.id])
         
         # Test unauthorized approval
         response = self.user_client.post(url)
@@ -226,8 +226,8 @@ class AuthorAPITest(BaseAPITestCase):
     
     def test_author_activate_deactivate(self):
         """Test author activation/deactivation"""
-        url_activate = reverse('social-distribution:author-activate', args=[self.regular_user.id])
-        url_deactivate = reverse('social-distribution:author-deactivate', args=[self.regular_user.id])
+        url_activate = reverse('social-distribution:authors-activate', args=[self.regular_user.id])
+        url_deactivate = reverse('social-distribution:authors-deactivate', args=[self.regular_user.id])
         
         # Test unauthorized deactivation
         response = self.user_client.post(url_deactivate)
@@ -245,7 +245,7 @@ class AuthorAPITest(BaseAPITestCase):
     
     def test_author_stats(self):
         """Test author statistics endpoint"""
-        url = reverse('social-distribution:author-stats')
+        url = reverse('social-distribution:authors-stats')
         
         # Test unauthenticated access
         response = self.client.get(url)
@@ -294,7 +294,7 @@ class AuthorAPITest(BaseAPITestCase):
     def test_public_author_profile_pages(self):
         """Test add public author profile pages"""
         # Test viewing another user's profile page
-        url = reverse('social-distribution:author-detail', args=[self.another_user.id])
+        url = reverse('social-distribution:authors-detail', args=[self.another_user.id])
         
         # Authenticated user can view other users' profiles
         response = self.user_client.get(url)
@@ -313,7 +313,7 @@ class AuthorAPITest(BaseAPITestCase):
             self.assertIn(field, response.data)
         
         # Test viewing own profile
-        own_profile_url = reverse('social-distribution:author-detail', args=[self.regular_user.id])
+        own_profile_url = reverse('social-distribution:authors-detail', args=[self.regular_user.id])
         response = self.user_client.get(own_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['username'], 'testuser')

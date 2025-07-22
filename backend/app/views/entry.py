@@ -742,3 +742,79 @@ class EntryViewSet(viewsets.ModelViewSet):
                 {"error": "Could not update entry"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def retrieve_author_entry(self, request, author_id=None, entry_id=None):
+        """
+        GET: Retrieve a specific entry by author and entry ID
+        """
+        try:
+            entry = Entry.objects.get(id=entry_id, author__id=author_id)
+            
+            # Check visibility permissions
+            user_author = getattr(request.user, 'author', None) or request.user if request.user.is_authenticated else None
+            
+            if entry not in Entry.objects.visible_to_author(user_author):
+                return Response(
+                    {"detail": "Entry not found or you don't have permission to view it."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            serializer = self.get_serializer(entry)
+            return Response(serializer.data)
+            
+        except Entry.DoesNotExist:
+            return Response(
+                {"detail": "Entry not found."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def update_author_entry(self, request, author_id=None, entry_id=None):
+        """
+        PUT: Update a specific entry by author and entry ID
+        """
+        try:
+            entry = Entry.objects.get(id=entry_id, author__id=author_id)
+            
+            # Check if user can edit this entry
+            user_author = getattr(request.user, 'author', None) or request.user if request.user.is_authenticated else None
+            if user_author != entry.author and not request.user.is_staff:
+                return Response(
+                    {"detail": "You cannot edit this entry."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            serializer = self.get_serializer(entry, data=request.data, partial=False)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Entry.DoesNotExist:
+            return Response(
+                {"detail": "Entry not found."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def delete_author_entry(self, request, author_id=None, entry_id=None):
+        """
+        DELETE: Delete a specific entry by author and entry ID
+        """
+        try:
+            entry = Entry.objects.get(id=entry_id, author__id=author_id)
+            
+            # Check if user can delete this entry
+            user_author = getattr(request.user, 'author', None) or request.user if request.user.is_authenticated else None
+            if user_author != entry.author and not request.user.is_staff:
+                return Response(
+                    {"detail": "You cannot delete this entry."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            entry.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Entry.DoesNotExist:
+            return Response(
+                {"detail": "Entry not found."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )

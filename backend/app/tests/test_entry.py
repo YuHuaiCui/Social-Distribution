@@ -318,7 +318,12 @@ class EntryAPITest(BaseAPITestCase):
         comment_id = comment_response.data['id']
         
         # Regular user tries to like the comment using direct model creation
-        comment_obj = Comment.objects.get(id=comment_id)
+        # Extract UUID from comment_id if it's a full URL
+        if isinstance(comment_id, str) and comment_id.startswith('http'):
+            actual_comment_id = comment_id.split('/')[-1] if comment_id.split('/')[-1] else comment_id.split('/')[-2]
+        else:
+            actual_comment_id = comment_id
+        comment_obj = Comment.objects.get(id=actual_comment_id)
         like = Like.objects.create(
             author=self.regular_user,
             comment=comment_obj
@@ -472,7 +477,7 @@ class EntryAPITest(BaseAPITestCase):
             content_type=Entry.TEXT_MARKDOWN,
             visibility=Entry.PUBLIC
         )
-        self.assertIn("![---------------------------------------------------------------------------- 1]", entry.content)
+        self.assertIn("![Image 1]", entry.content)
         self.assertIn("![Image 2]", entry.content)
 
     

@@ -110,6 +110,12 @@ urlpatterns = [
     # Commented API: /api/authors/{AUTHOR_SERIAL}/commented
     path("authors/<uuid:author_id>/commented/", CommentListCreateView.as_view(), name="author-commented"),
     
+    # Commented API by FQID: /api/authors/{AUTHOR_FQID}/commented
+    path("authors/<path:author_fqid>/commented/", CommentListCreateView.as_view(), name="author-commented-by-fqid"),
+    
+    # Specific commented: /api/authors/{AUTHOR_SERIAL}/commented/{COMMENT_SERIAL}
+    path("authors/<uuid:author_id>/commented/<uuid:comment_id>/", CommentDetailView.as_view(), name="author-commented-detail"),
+    
     # Comment by FQID: /api/commented/{COMMENT_FQID}
     path("commented/<path:comment_fqid>/", CommentDetailView.as_view(), name="comment-by-fqid"),
     
@@ -121,6 +127,9 @@ urlpatterns = [
     
     # Liked API: /api/authors/{AUTHOR_SERIAL}/liked
     path("authors/<uuid:author_id>/liked/", EntryLikeView.as_view(), name="author-liked"),
+    
+    # Liked API by FQID: /api/authors/{AUTHOR_FQID}/liked
+    path("authors/<path:author_fqid>/liked/", EntryLikeView.as_view(), name="author-liked-by-fqid"),
     
     # Single Like: /api/authors/{AUTHOR_SERIAL}/liked/{LIKE_SERIAL}
     path("authors/<uuid:author_id>/liked/<uuid:like_id>/", EntryLikeView.as_view(), name="author-liked-detail"),
