@@ -377,6 +377,77 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["get"], url_path="trending")
+    def trending_entries(self, request):
+        """
+        Get trending entries based on like count and recent activity.
+        
+        Returns entries ordered by a combination of like count and recency,
+        giving preference to recent posts with high engagement.
+        """
+        from app.models import Like
+        from django.db.models import Count, F
+        from datetime import datetime, timedelta
+
+        try:
+            # Get entries from the last 30 days with like counts
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+            
+            entries = (
+                Entry.objects
+                .filter(visibility__in=[Entry.PUBLIC, Entry.FRIENDS_ONLY])
+                .exclude(visibility=Entry.DELETED)
+                .filter(created_at__gte=thirty_days_ago)
+                .annotate(like_count=Count('likes'))
+                .order_by('-like_count', '-created_at')
+            )
+
+            # Apply visibility filtering for the current user
+            if request.user.is_authenticated:
+                # Get user's friends
+                from app.models import Follow
+                
+                user_author = getattr(request.user, 'author', request.user)
+                
+                # Get users that the current user is following and who follow back (mutual)
+                following = Follow.objects.filter(
+                    follower=user_author, 
+                    status=Follow.ACCEPTED
+                ).values_list('followed_id', flat=True)
+                
+                followers = Follow.objects.filter(
+                    followed=user_author, 
+                    status=Follow.ACCEPTED
+                ).values_list('follower_id', flat=True)
+                
+                # Friends are users who appear in both lists
+                friends = list(set(following) & set(followers))
+                
+                # Include public posts and posts from friends
+                entries = entries.filter(
+                    Q(visibility=Entry.PUBLIC) |
+                    (Q(visibility=Entry.FRIENDS_ONLY) & Q(author_id__in=friends))
+                )
+            else:
+                # Non-authenticated users can only see public entries
+                entries = entries.filter(visibility=Entry.PUBLIC)
+
+            # Apply pagination
+            page = self.paginate_queryset(entries)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(entries, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(f"Error retrieving trending entries: {str(e)}")
+            return Response(
+                {"error": f"Could not retrieve trending entries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["post", "delete"], url_path="save")
     def save_entry(self, request, id=None):
         """
@@ -442,7 +513,178 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    def save_entry_by_fqid(self, request, entry_fqid=None):
+        """
+        Save or unsave a post by FQID.
+        
+        Uses the SavedEntry model to track which entries users have saved.
+        """
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Extract UUID from FQID
+            if '/' in entry_fqid:
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Validate UUID
+            import uuid
+            uuid.UUID(entry_id)
+            
+            # Use existing save logic
+            self.kwargs['id'] = entry_id
+            return self.save_entry(request, id=entry_id)
+            
+        except ValueError:
+            return Response(
+                {"error": "Invalid entry ID format"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error saving entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not save/unsave entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for entry updates with logging"""
         logger.debug(f"Updating entry - User: {request.user}, Data: {request.data}")
         return super().partial_update(request, *args, **kwargs)
+
+    def retrieve_by_fqid(self, request, entry_fqid=None):
+        """
+        Retrieve an entry by its fully qualified ID (FQID).
+        
+        This is for CMPUT 404 compliance where entries can be referenced
+        by their full URL/FQID instead of just UUID.
+        """
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # For now, treat FQID as a simple UUID extraction
+            # In a full implementation, this would parse the full URL
+            if '/' in entry_fqid:
+                # Extract UUID from the end of the path
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Try to parse as UUID
+            import uuid
+            try:
+                uuid.UUID(entry_id)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid entry ID format"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get the entry using the existing get_object logic
+            self.kwargs['id'] = entry_id
+            entry = self.get_object()
+            
+            serializer = self.get_serializer(entry)
+            return Response(serializer.data)
+            
+        except Entry.DoesNotExist:
+            return Response(
+                {"error": "Entry not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def partial_update_by_fqid(self, request, entry_fqid=None):
+        """PATCH an entry by FQID"""
+        return self._update_by_fqid(request, entry_fqid, partial=True)
+
+    def update_by_fqid(self, request, entry_fqid=None):
+        """PUT an entry by FQID"""
+        return self._update_by_fqid(request, entry_fqid, partial=False)
+
+    def destroy_by_fqid(self, request, entry_fqid=None):
+        """DELETE an entry by FQID"""
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Extract UUID from FQID
+            if '/' in entry_fqid:
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Validate UUID
+            import uuid
+            uuid.UUID(entry_id)
+            
+            # Use existing destroy logic
+            self.kwargs['id'] = entry_id
+            return self.destroy(request, id=entry_id)
+            
+        except ValueError:
+            return Response(
+                {"error": "Invalid entry ID format"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error deleting entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not delete entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _update_by_fqid(self, request, entry_fqid, partial=True):
+        """Helper method for update operations by FQID"""
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Extract UUID from FQID
+            if '/' in entry_fqid:
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Validate UUID
+            import uuid
+            uuid.UUID(entry_id)
+            
+            # Use existing update logic
+            self.kwargs['id'] = entry_id
+            if partial:
+                return self.partial_update(request, id=entry_id)
+            else:
+                return self.update(request, id=entry_id)
+            
+        except ValueError:
+            return Response(
+                {"error": "Invalid entry ID format"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error updating entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not update entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

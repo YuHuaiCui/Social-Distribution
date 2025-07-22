@@ -149,7 +149,11 @@ class ApiService {
   }
 
   async getAuthor(id: string): Promise<Author> {
-    return this.request<Author>(`/api/authors/${id}/`);
+    // Extract ID from URL if full URL is passed
+    const authorId = id.includes("/")
+      ? id.split("/").filter(Boolean).pop()
+      : id;
+    return this.request<Author>(`/api/authors/${authorId}/`);
   }
 
   async getCurrentAuthor(): Promise<Author> {
@@ -226,8 +230,10 @@ class ApiService {
   }
 
   async getEntry(id: string): Promise<Entry> {
+    // Extract ID from URL if full URL is passed
+    const entryId = id.includes("/") ? id.split("/").filter(Boolean).pop() : id;
     // This endpoint needs to be implemented in backend
-    return this.request<Entry>(`/api/entries/${id}/`);
+    return this.request<Entry>(`/api/entries/${entryId}/`);
   }
 
   async createEntry(data: {
@@ -245,23 +251,31 @@ class ApiService {
   }
 
   async updateEntry(id: string, data: Partial<Entry>): Promise<Entry> {
+    // Extract ID from URL if full URL is passed
+    const entryId = id.includes("/") ? id.split("/").filter(Boolean).pop() : id;
     // This endpoint needs to be implemented in backend
-    return this.request<Entry>(`/api/entries/${id}/`, {
+    return this.request<Entry>(`/api/entries/${entryId}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
   }
 
   async deleteEntry(id: string): Promise<void> {
+    // Extract ID from URL if full URL is passed
+    const entryId = id.includes("/") ? id.split("/").filter(Boolean).pop() : id;
     // This endpoint needs to be implemented in backend
-    await this.request(`/api/entries/${id}/`, {
+    await this.request(`/api/entries/${entryId}/`, {
       method: "DELETE",
     });
   }
 
   // Comment endpoints - backend completed
   async getComments(entryId: string): Promise<Comment[]> {
-    return this.request<Comment[]>(`/api/entries/${entryId}/comments/`);
+    // Extract ID from URL if full URL is passed
+    const id = entryId.includes("/")
+      ? entryId.split("/").filter(Boolean).pop()
+      : entryId;
+    return this.request<Comment[]>(`/api/entries/${id}/comments/`);
   }
 
   async createComment(
@@ -271,7 +285,11 @@ class ApiService {
       content_type?: string;
     }
   ): Promise<Comment> {
-    return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
+    // Extract ID from URL if full URL is passed
+    const id = entryId.includes("/")
+      ? entryId.split("/").filter(Boolean).pop()
+      : entryId;
+    return this.request<Comment>(`/api/entries/${id}/comments/`, {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -279,13 +297,21 @@ class ApiService {
 
   // Like endpoints - backend completed
   async likeEntry(entryId: string): Promise<Like> {
-    return this.request<Like>(`/api/entries/${entryId}/likes/`, {
+    // Extract ID from URL if full URL is passed
+    const id = entryId.includes("/")
+      ? entryId.split("/").filter(Boolean).pop()
+      : entryId;
+    return this.request<Like>(`/api/entries/${id}/likes/`, {
       method: "POST",
     });
   }
 
   async unlikeEntry(entryId: string): Promise<void> {
-    await this.request(`/api/entries/${entryId}/likes/`, {
+    // Extract ID from URL if full URL is passed
+    const id = entryId.includes("/")
+      ? entryId.split("/").filter(Boolean).pop()
+      : entryId;
+    await this.request(`/api/entries/${id}/likes/`, {
       method: "DELETE",
     });
   }
@@ -293,8 +319,12 @@ class ApiService {
   async getEntryLikeStatus(
     entryId: string
   ): Promise<{ like_count: number; liked_by_current_user: boolean }> {
+    // Extract ID from URL if full URL is passed
+    const id = entryId.includes("/")
+      ? entryId.split("/").filter(Boolean).pop()
+      : entryId;
     return this.request<{ like_count: number; liked_by_current_user: boolean }>(
-      `/api/entries/${entryId}/likes/`,
+      `/api/entries/${id}/likes/`,
       {
         method: "GET",
       }
@@ -303,54 +333,105 @@ class ApiService {
 
   // Follow endpoints - backend implemented
   async followAuthor(authorId: string): Promise<Follow> {
-    return this.request<Follow>(`/api/authors/${authorId}/follow/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request<Follow>(`/api/authors/${id}/follow/`, {
       method: "POST",
     });
   }
 
   async unfollowAuthor(authorId: string): Promise<void> {
-    await this.request(`/api/authors/${authorId}/follow/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    await this.request(`/api/authors/${id}/follow/`, {
       method: "DELETE",
     });
   }
 
   async getFollowers(authorId: string): Promise<Author[]> {
-    return this.request<Author[]>(`/api/authors/${authorId}/followers/`);
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    const response = await this.request<{
+      type: "followers";
+      followers: Author[];
+    }>(`/api/authors/${id}/followers/`);
+    return response.followers;
   }
 
   async getFollowing(authorId: string): Promise<Author[]> {
-    return this.request<Author[]>(`/api/authors/${authorId}/following/`);
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    const response = await this.request<{
+      type: "following";
+      following: Author[];
+    }>(`/api/authors/${id}/following/`);
+    return response.following;
   }
 
   async getFriends(authorId: string): Promise<Author[]> {
-    return this.request<Author[]>(`/api/authors/${authorId}/friends/`);
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    const response = await this.request<{ type: "friends"; friends: Author[] }>(
+      `/api/authors/${id}/friends/`
+    );
+    return response.friends;
   }
 
   // Admin endpoints
   async approveAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/approve/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/approve/`, {
       method: "POST",
     });
   }
 
   async deactivateAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/deactivate/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/deactivate/`, {
       method: "POST",
     });
   }
 
   async activateAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/activate/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/activate/`, {
       method: "POST",
     });
   }
 
   async deleteAuthor(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/`, { method: "DELETE" });
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/`, { method: "DELETE" });
   }
 
   async promoteToAdmin(authorId: string): Promise<void> {
-    return this.request(`/api/authors/${authorId}/promote_to_admin/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/promote_to_admin/`, {
       method: "POST",
     });
   }
@@ -362,17 +443,27 @@ class ApiService {
   }
 
   async markInboxItemRead(id: string): Promise<Inbox> {
+    // Extract ID from URL if full URL is passed
+    const inboxId = id.includes("/") ? id.split("/").filter(Boolean).pop() : id;
     // This endpoint needs to be implemented in backend
-    return this.request<Inbox>(`/api/inbox/${id}/read/`, {
+    return this.request<Inbox>(`/api/inbox/${inboxId}/read/`, {
       method: "POST",
     });
   }
   async getAuthorEntries(authorId: string): Promise<Entry[]> {
-    const response = await this.request<Entry[]>(
-      `/api/authors/${authorId}/entries/`
-    );
-    // The backend returns the entries directly as an array, not in a results field
-    return response;
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    const response = await this.request<{
+      type: "entries";
+      page_number: number;
+      size: number;
+      count: number;
+      src: Entry[];
+    }>(`/api/authors/${id}/entries/`);
+    // Return the entries from the CMPUT 404 compliant format
+    return response.src;
   }
 
   async clearInbox(): Promise<void> {

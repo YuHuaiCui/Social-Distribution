@@ -1,4 +1,7 @@
 from rest_framework import serializers
+from django.conf import settings
+from django.utils import timezone
+import binascii
 from app.models import Entry
 from app.models import Author
 from app.serializers.author import AuthorSerializer
@@ -93,24 +96,76 @@ class EntrySerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """
-        Customize the representation to match project spec format.
+        Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
+        Returns entry objects in the required format:
+        {
+            "type": "entry",
+            "title": "An entry title about an entry about web dev",
+            "id": "http://nodebbbb/api/authors/222/entries/249",
+            "web": "http://nodebbbb/authors/222/entries/293",
+            "description": "This entry discusses stuff -- brief",
+            "contentType": "text/plain",
+            "content": "...",
+            "author": { author object },
+            "comments": { comments object },
+            "likes": { likes object },
+            "published": "2015-03-09T13:07:04+00:00",
+            "visibility": "PUBLIC"
+        }
         """
         data = super().to_representation(instance)
         
-        # ✅ Use UUID as the `id`
-        data['id'] = str(instance.id)
-
-        # ✅ Provide full URL separately
-        data['url'] = instance.url
-
+        # Get counts for nested objects
+        comments_count = instance.comments.count()
+        likes_count = instance.likes.count()
         
-        # Include full author object as per spec
-        if instance.author:
-            data['author'] = AuthorSerializer(instance.author, context=self.context).data
+        # CMPUT 404 compliant format with compatibility fields
+        result = {
+            # CMPUT 404 required fields
+            "type": "entry",
+            "title": instance.title,
+            "id": instance.url,  # Full URL as ID per spec
+            "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+            "description": instance.description or "",
+            "contentType": instance.content_type,
+            "content": instance.content,
+            "author": AuthorSerializer(instance.author, context=self.context).data,
+            "comments": {
+                "type": "comments",
+                "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+                "id": f"{instance.url}/comments",
+                "page_number": 1,
+                "size": 5,
+                "count": comments_count,
+                "src": []
+            },
+            "likes": {
+                "type": "likes",
+                "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+                "id": f"{instance.url}/likes",
+                "page_number": 1,
+                "size": 50,
+                "count": likes_count,
+                "src": []
+            },
+            "published": instance.created_at.isoformat() if instance.created_at else None,
+            "visibility": instance.visibility,
+            
+            # Additional fields for frontend compatibility  
+            "url": instance.url,
+            "content_type": instance.content_type,  # Snake case version
+            "source": instance.source,
+            "origin": instance.origin,
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+            "comments_count": comments_count,
+            "likes_count": likes_count,
+            "image": data.get("image"),
+            "is_liked": data.get("is_liked"),
+            "is_saved": data.get("is_saved"),
+        }
         
-        return data
-
-    from django.utils import timezone
+        return result
 
     def update(self, instance, validated_data):
         print("ENTRY UPDATE VALIDATED DATA:", validated_data)
@@ -138,7 +193,7 @@ class EntrySerializer(serializers.ModelSerializer):
                     # ✅ Force updated_at to change
                     instance.updated_at = timezone.now()
 
-                except base64.binascii.Error:
+                except binascii.Error:
                     raise serializers.ValidationError("Invalid base64 image data.")
         else:
             if 'content_type' in validated_data:

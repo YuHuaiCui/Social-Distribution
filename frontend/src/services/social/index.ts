@@ -83,7 +83,11 @@ export class SocialService extends BaseApiService {
    * Follow an author
    */
   async followAuthor(authorId: string): Promise<FollowResponse> {
-    return this.request<FollowResponse>(`/api/authors/${authorId}/follow/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request<FollowResponse>(`/api/authors/${id}/follow/`, {
       method: "POST",
     });
   }
@@ -92,7 +96,11 @@ export class SocialService extends BaseApiService {
    * Unfollow an author
    */
   async unfollowAuthor(authorId: string): Promise<void> {
-    await this.request(`/api/authors/${authorId}/follow/`, {
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    await this.request(`/api/authors/${id}/follow/`, {
       method: "DELETE",
     });
   }
@@ -101,14 +109,30 @@ export class SocialService extends BaseApiService {
    * Get followers of an author
    */
   async getFollowers(authorId: string): Promise<Author[]> {
-    return this.request<Author[]>(`/api/authors/${authorId}/followers/`);
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    const response = await this.request<{
+      type: "followers";
+      followers: Author[];
+    }>(`/api/authors/${id}/followers/`);
+    return response.followers;
   }
 
   /**
    * Get authors that an author is following
    */
   async getFollowing(authorId: string): Promise<Author[]> {
-    return this.request<Author[]>(`/api/authors/${authorId}/following/`);
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    const response = await this.request<{
+      type: "following";
+      following: Author[];
+    }>(`/api/authors/${id}/following/`);
+    return response.following;
   }
 
   /**
@@ -148,16 +172,25 @@ export class SocialService extends BaseApiService {
    * Get friends of an author (mutual follows)
    */
   async getFriends(authorId: string): Promise<Author[]> {
-    return this.request<Author[]>(`/api/authors/${authorId}/friends/`);
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    const response = await this.request<{ type: "friends"; friends: Author[] }>(
+      `/api/authors/${id}/friends/`
+    );
+    return response.friends;
   }
 
   /**
    * Get friendship stats for an author
    */
   async getFriendshipStats(authorId: string): Promise<FriendshipStats> {
-    return this.request<FriendshipStats>(
-      `/api/authors/${authorId}/social-stats/`
-    );
+    // Extract ID from URL if full URL is passed
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request<FriendshipStats>(`/api/authors/${id}/social-stats/`);
   }
 
   /**
