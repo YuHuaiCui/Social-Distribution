@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
+from uuid import UUID
 
 from app.models import Like, Entry, Comment
 from app.serializers.like import LikeSerializer
@@ -20,6 +21,33 @@ class EntryLikeView(APIView):
         permission_classes: Requires authentication for all operations
     """
     permission_classes = [permissions.IsAuthenticated]
+
+    def dispatch(self, request, *args, **kwargs):
+        """Route requests based on available parameters."""
+        if 'entry_fqid' in kwargs:
+            # Extract entry ID from FQID for FQID-based endpoints
+            entry_fqid = kwargs['entry_fqid']
+            try:
+                # Try to extract UUID from the FQID
+                if entry_fqid.startswith('http'):
+                    # Full URL - extract last part
+                    entry_id = entry_fqid.split('/')[-1] if entry_fqid.split('/')[-1] else entry_fqid.split('/')[-2]
+                else:
+                    # Assume it's already a UUID
+                    entry_id = entry_fqid
+                
+                # Validate UUID format
+                UUID(entry_id)
+                kwargs['entry_id'] = entry_id
+                # Remove the entry_fqid parameter since view methods expect entry_id
+                del kwargs['entry_fqid']
+            except (ValueError, IndexError):
+                return Response(
+                    {"detail": "Invalid entry FQID format"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        return super().dispatch(request, *args, **kwargs)
 
     def post(self, request, entry_id):
         """

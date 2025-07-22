@@ -1,5 +1,7 @@
-from rest_framework import generics, permissions, serializers
+from rest_framework import generics, permissions, serializers, status
+from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
+from uuid import UUID
 from app.models.comment import Comment
 from app.models.entry import Entry
 from app.serializers.comment import CommentSerializer
@@ -12,6 +14,33 @@ class CommentListCreateView(generics.ListCreateAPIView):
     """
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def dispatch(self, request, *args, **kwargs):
+        """Route requests based on available parameters - support both entry_id and entry_fqid."""
+        if 'entry_fqid' in kwargs:
+            # Extract entry ID from FQID for FQID-based endpoints
+            entry_fqid = kwargs['entry_fqid']
+            try:
+                # Try to extract UUID from the FQID
+                if entry_fqid.startswith('http'):
+                    # Full URL - extract last part
+                    entry_id = entry_fqid.split('/')[-1] if entry_fqid.split('/')[-1] else entry_fqid.split('/')[-2]
+                else:
+                    # Assume it's already a UUID
+                    entry_id = entry_fqid
+                
+                # Validate UUID format
+                UUID(entry_id)
+                kwargs['entry_id'] = entry_id
+                # Remove the entry_fqid parameter since view methods expect entry_id
+                del kwargs['entry_fqid']
+            except (ValueError, IndexError):
+                return Response(
+                    {"detail": "Invalid entry FQID format"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         entry_id = self.kwargs["entry_id"]

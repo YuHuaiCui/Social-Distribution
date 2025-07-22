@@ -117,6 +117,11 @@ class Entry(models.Model):
         max_length=50, choices=CONTENT_TYPE_CHOICES, default=TEXT_PLAIN
     )
 
+    # Categories for organizing entries
+    categories = models.JSONField(
+        default=list, blank=True, help_text="List of categories this entry belongs to"
+    )
+
     visibility = models.CharField(
         max_length=20, choices=VISIBILITY_CHOICES, default=PUBLIC
     )

@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, NotFound
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import models
@@ -12,6 +12,11 @@ from app.permissions import IsAuthorSelfOrReadOnly
 import uuid
 import os
 import logging
+from app.models import Like
+from django.db.models import Count, F
+from django.utils import timezone
+from datetime import timedelta
+
 
 logger = logging.getLogger(__name__)
 
@@ -173,15 +178,16 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         - Create/update/delete: Require authentication and author ownership
         - Retrieve: Allow public access (visibility rules applied in get_object)
-        - List/feed/liked: Require authentication
-        """
+        - Custom actions: Require authentication only (no object-level permissions)
+        """        
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsAuthenticated(), IsAuthorSelfOrReadOnly()]
         elif self.action == "retrieve":
             # Allow public access to individual entries (visibility rules applied in get_object)
-            return []
+            return [AllowAny()]
         else:
-            # For list, feed, liked, etc., require authentication
+            # For all other actions (list, custom actions), require authentication only
+            # Do NOT apply IsAuthorSelfOrReadOnly to avoid 400 errors on actions without objects
             return [IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
@@ -247,10 +253,19 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         user = request.user
 
+        if not user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         try:
+            # The user is already an Author instance since Author extends AbstractUser
+            user_author = user
+
             # Get entries that this user has liked
             liked_entry_ids = Like.objects.filter(
-                author=user,  # User is already an Author object
+                author=user_author,  # Use the correct author instance
             ).values_list("entry__id", flat=True)
 
             entries = Entry.objects.filter(id__in=liked_entry_ids).order_by(
@@ -285,12 +300,15 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         user = request.user
 
+        if not user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         try:
-            # Get the current user's author instance
-            if hasattr(user, "author"):
-                user_author = user.author
-            else:
-                user_author = user
+            # The user is already an Author instance since Author extends AbstractUser
+            user_author = user
 
             # Get entries that this user has saved
             saved_entry_ids = SavedEntry.objects.filter(
@@ -330,12 +348,15 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         user = request.user
 
+        if not user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         try:
-            # Get the current user's author instance
-            if hasattr(user, "author"):
-                current_author = user.author
-            else:
-                current_author = user
+            # The user is already an Author instance since Author extends AbstractUser
+            current_author = user
 
             # Get all users that the current user is following with ACCEPTED status
             following_ids = set(
@@ -377,6 +398,113 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["get"], url_path="trending", permission_classes=[AllowAny])
+    def trending_entries(self, request):
+        """
+        Get trending entries based on like count and recent activity.
+        
+        Returns entries ordered by a combination of like count and recency,
+        giving preference to recent posts with high engagement.
+        """
+
+        try:
+            # Get entries from the last 30 days with like counts
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            
+            entries = (
+                Entry.objects
+                .filter(visibility__in=[Entry.PUBLIC, Entry.FRIENDS_ONLY])
+                .exclude(visibility=Entry.DELETED)
+                .filter(created_at__gte=thirty_days_ago)
+                .annotate(like_count=Count('likes'))
+                .order_by('-like_count', '-created_at')
+            )
+
+            # Apply visibility filtering for the current user
+            if request.user.is_authenticated:
+                # Get user's friends
+                from app.models import Follow
+                
+                user_author = getattr(request.user, 'author', request.user)
+                
+                # Get users that the current user is following and who follow back (mutual)
+                following = Follow.objects.filter(
+                    follower=user_author, 
+                    status=Follow.ACCEPTED
+                ).values_list('followed_id', flat=True)
+                
+                followers = Follow.objects.filter(
+                    followed=user_author, 
+                    status=Follow.ACCEPTED
+                ).values_list('follower_id', flat=True)
+                
+                # Friends are users who appear in both lists
+                friends = list(set(following) & set(followers))
+                
+                # Include public posts and posts from friends
+                entries = entries.filter(
+                    Q(visibility=Entry.PUBLIC) |
+                    (Q(visibility=Entry.FRIENDS_ONLY) & Q(author_id__in=friends))
+                )
+            else:
+                # Non-authenticated users can only see public entries
+                entries = entries.filter(visibility=Entry.PUBLIC)
+
+            # Apply pagination
+            page = self.paginate_queryset(entries)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(entries, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(f"Error retrieving trending entries: {str(e)}")
+            return Response(
+                {"error": f"Could not retrieve trending entries: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"], url_path="categories", permission_classes=[AllowAny])
+    def get_categories(self, request):
+        """
+        Get all categories used in entries.
+        
+        Returns a list of unique categories from all entries,
+        ordered by frequency of use.
+        """
+        try:
+            from django.db.models import Count
+            from collections import Counter
+            
+            # Get all categories from all entries (excluding deleted)
+            entries = Entry.objects.exclude(visibility=Entry.DELETED)
+            
+            # Extract all categories from JSONField
+            all_categories = []
+            for entry in entries:
+                if entry.categories:
+                    all_categories.extend(entry.categories)
+            
+            # Count occurrences and sort by frequency
+            category_counts = Counter(all_categories)
+            
+            # Return categories sorted by frequency (most used first)
+            categories = [
+                {"name": category, "count": count}
+                for category, count in category_counts.most_common()
+            ]
+            
+            return Response(categories)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving categories: {str(e)}")
+            return Response(
+                {"error": f"Could not retrieve categories: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["post", "delete"], url_path="save")
     def save_entry(self, request, id=None):
         """
@@ -390,11 +518,8 @@ class EntryViewSet(viewsets.ModelViewSet):
         user = request.user
 
         try:
-            # Get the current user's author instance
-            if hasattr(user, "author"):
-                user_author = user.author
-            else:
-                user_author = user
+            # The user is already an Author instance since Author extends AbstractUser
+            user_author = user
 
             # Check if entry is already saved
             existing_save = SavedEntry.objects.filter(
@@ -442,7 +567,178 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    def save_entry_by_fqid(self, request, entry_fqid=None):
+        """
+        Save or unsave a post by FQID.
+        
+        Uses the SavedEntry model to track which entries users have saved.
+        """
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Extract UUID from FQID
+            if '/' in entry_fqid:
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Validate UUID
+            import uuid
+            uuid.UUID(entry_id)
+            
+            # Use existing save logic
+            self.kwargs['id'] = entry_id
+            return self.save_entry(request, id=entry_id)
+            
+        except ValueError:
+            return Response(
+                {"error": "Invalid entry ID format"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error saving entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not save/unsave entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for entry updates with logging"""
         logger.debug(f"Updating entry - User: {request.user}, Data: {request.data}")
         return super().partial_update(request, *args, **kwargs)
+
+    def retrieve_by_fqid(self, request, entry_fqid=None):
+        """
+        Retrieve an entry by its fully qualified ID (FQID).
+        
+        This is for CMPUT 404 compliance where entries can be referenced
+        by their full URL/FQID instead of just UUID.
+        """
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # For now, treat FQID as a simple UUID extraction
+            # In a full implementation, this would parse the full URL
+            if '/' in entry_fqid:
+                # Extract UUID from the end of the path
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Try to parse as UUID
+            import uuid
+            try:
+                uuid.UUID(entry_id)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid entry ID format"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get the entry using the existing get_object logic
+            self.kwargs['id'] = entry_id
+            entry = self.get_object()
+            
+            serializer = self.get_serializer(entry)
+            return Response(serializer.data)
+            
+        except Entry.DoesNotExist:
+            return Response(
+                {"error": "Entry not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def partial_update_by_fqid(self, request, entry_fqid=None):
+        """PATCH an entry by FQID"""
+        return self._update_by_fqid(request, entry_fqid, partial=True)
+
+    def update_by_fqid(self, request, entry_fqid=None):
+        """PUT an entry by FQID"""
+        return self._update_by_fqid(request, entry_fqid, partial=False)
+
+    def destroy_by_fqid(self, request, entry_fqid=None):
+        """DELETE an entry by FQID"""
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Extract UUID from FQID
+            if '/' in entry_fqid:
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Validate UUID
+            import uuid
+            uuid.UUID(entry_id)
+            
+            # Use existing destroy logic
+            self.kwargs['id'] = entry_id
+            return self.destroy(request, id=entry_id)
+            
+        except ValueError:
+            return Response(
+                {"error": "Invalid entry ID format"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error deleting entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not delete entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _update_by_fqid(self, request, entry_fqid, partial=True):
+        """Helper method for update operations by FQID"""
+        if not entry_fqid:
+            return Response(
+                {"error": "Entry FQID is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            # Extract UUID from FQID
+            if '/' in entry_fqid:
+                entry_id = entry_fqid.rstrip('/').split('/')[-1]
+            else:
+                entry_id = entry_fqid
+            
+            # Validate UUID
+            import uuid
+            uuid.UUID(entry_id)
+            
+            # Use existing update logic
+            self.kwargs['id'] = entry_id
+            if partial:
+                return self.partial_update(request, id=entry_id)
+            else:
+                return self.update(request, id=entry_id)
+            
+        except ValueError:
+            return Response(
+                {"error": "Invalid entry ID format"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error updating entry by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not update entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
