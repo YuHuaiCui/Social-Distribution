@@ -57,6 +57,27 @@ urlpatterns = [
     # Entry Image API: /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/image
     path("authors/<uuid:author_id>/entries/<uuid:entry_id>/image/", ImageUploadView.as_view(), name="author-entry-image"),
     
+    # Legacy endpoints for backward compatibility - MUST BE BEFORE FQID patterns
+    path("entries/", EntryViewSet.as_view({'get': 'list', 'post': 'create'}), name="entry-list"),
+    path("entries/trending/", EntryViewSet.as_view({'get': 'trending_entries'}), name="entry-trending"),
+    path("entries/categories/", EntryViewSet.as_view({'get': 'get_categories'}), name="entry-categories"),
+    path("entries/liked/", EntryViewSet.as_view({'get': 'liked_entries'}), name="entry-liked"),
+    path("entries/feed/", EntryViewSet.as_view({'get': 'feed_entries'}), name="entry-feed"),
+    path("entries/saved/", EntryViewSet.as_view({'get': 'saved_entries'}), name="entry-saved"),
+    path("entries/<uuid:id>/", EntryViewSet.as_view({
+        'get': 'retrieve',
+        'patch': 'partial_update',
+        'put': 'update',
+        'delete': 'destroy'
+    }), name="entry-detail"),    
+    path("entries/<uuid:id>/save/", EntryViewSet.as_view({
+        'post': 'save_entry',
+        'delete': 'save_entry'
+    }), name="entry-save"),    
+    path("entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
+    path("entries/<uuid:entry_id>/comments/", CommentListCreateView.as_view(), name="entry-comments"),
+    path("entries/<uuid:entry_id>/comments/<uuid:pk>/", CommentDetailView.as_view(), name="entry-comment-detail"),
+    
     # Entry Likes by FQID: /api/entries/{ENTRY_FQID}/likes
     path("entries/<path:entry_fqid>/likes/", EntryLikeView.as_view(), name="entry-likes-by-fqid"),
     
@@ -107,26 +128,6 @@ urlpatterns = [
     # Like by FQID: /api/liked/{LIKE_FQID}
     path("liked/<path:like_fqid>/", EntryLikeView.as_view(), name="like-by-fqid"),
     
-    # Legacy endpoints for backward compatibility
-    path("entries/", EntryViewSet.as_view({'get': 'list', 'post': 'create'}), name="entry-list"),
-    path("entries/trending/", EntryViewSet.as_view({'get': 'trending_entries'}), name="entry-trending"),
-    path("entries/categories/", EntryViewSet.as_view({'get': 'get_categories'}), name="entry-categories"),
-    path("entries/liked/", EntryViewSet.as_view({'get': 'liked_entries'}), name="entry-liked"),
-    path("entries/feed/", EntryViewSet.as_view({'get': 'feed_entries'}), name="entry-feed"),
-    path("entries/saved/", EntryViewSet.as_view({'get': 'saved_entries'}), name="entry-saved"),
-    path("entries/<uuid:id>/", EntryViewSet.as_view({
-        'get': 'retrieve',
-        'patch': 'partial_update',
-        'put': 'update',
-        'delete': 'destroy'
-    }), name="entry-detail"),    
-    path("entries/<uuid:id>/save/", EntryViewSet.as_view({
-        'post': 'save_entry',
-        'delete': 'save_entry'
-    }), name="entry-save"),    
-    path("entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
-    path("entries/<uuid:entry_id>/comments/", CommentListCreateView.as_view(), name="entry-comments"),
-    path("entries/<uuid:entry_id>/comments/<uuid:pk>/", CommentDetailView.as_view(), name="entry-comment-detail"),
     path("comments/<uuid:comment_id>/likes/", CommentLikeView.as_view(), name="comment-likes"),
     
     # Other endpoints

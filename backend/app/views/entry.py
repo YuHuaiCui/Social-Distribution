@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, NotFound
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import models
@@ -12,6 +12,11 @@ from app.permissions import IsAuthorSelfOrReadOnly
 import uuid
 import os
 import logging
+from app.models import Like
+from django.db.models import Count, F
+from django.utils import timezone
+from datetime import timedelta
+
 
 logger = logging.getLogger(__name__)
 
@@ -173,15 +178,16 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         - Create/update/delete: Require authentication and author ownership
         - Retrieve: Allow public access (visibility rules applied in get_object)
-        - List/feed/liked: Require authentication
-        """
+        - Custom actions: Require authentication only (no object-level permissions)
+        """        
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsAuthenticated(), IsAuthorSelfOrReadOnly()]
         elif self.action == "retrieve":
             # Allow public access to individual entries (visibility rules applied in get_object)
-            return []
+            return [AllowAny()]
         else:
-            # For list, feed, liked, etc., require authentication
+            # For all other actions (list, custom actions), require authentication only
+            # Do NOT apply IsAuthorSelfOrReadOnly to avoid 400 errors on actions without objects
             return [IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
@@ -392,7 +398,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=False, methods=["get"], url_path="trending")
+    @action(detail=False, methods=["get"], url_path="trending", permission_classes=[AllowAny])
     def trending_entries(self, request):
         """
         Get trending entries based on like count and recent activity.
@@ -400,10 +406,6 @@ class EntryViewSet(viewsets.ModelViewSet):
         Returns entries ordered by a combination of like count and recency,
         giving preference to recent posts with high engagement.
         """
-        from app.models import Like
-        from django.db.models import Count, F
-        from django.utils import timezone
-        from datetime import timedelta
 
         try:
             # Get entries from the last 30 days with like counts
@@ -464,7 +466,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=False, methods=["get"], url_path="categories")
+    @action(detail=False, methods=["get"], url_path="categories", permission_classes=[AllowAny])
     def get_categories(self, request):
         """
         Get all categories used in entries.
