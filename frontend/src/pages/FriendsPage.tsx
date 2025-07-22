@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Users, UserPlus, UserCheck, Search, Loader, Bell, ArrowRight } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  UserCheck,
+  Search,
+  Loader,
+  Bell,
+  ArrowRight,
+} from "lucide-react";
 import type { Author } from "../types/models";
 import { api } from "../services/api";
 import { socialService } from "../services/social";
@@ -11,8 +19,6 @@ import Input from "../components/ui/Input";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
 import Card from "../components/ui/Card";
 import { useParams } from "react-router-dom";
-import { i } from "framer-motion/client";
-
 
 type FilterType = "friends" | "following" | "followers";
 
@@ -20,10 +26,12 @@ type FriendsPageProps = {
   defaultFilter?: FilterType;
 };
 
-export const FriendsPage: React.FC<FriendsPageProps> = ({ defaultFilter = "friends" }) => {
+export const FriendsPage: React.FC<FriendsPageProps> = ({
+  defaultFilter = "friends",
+}) => {
   const { user: currentUser } = useAuth();
   //const [filter, setFilter] = useState<FilterType>("friends");
-  const { id: authorId } = useParams()
+  const { id: authorId } = useParams();
   const [filter, setFilter] = useState<FilterType>(defaultFilter);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,24 +42,18 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ defaultFilter = "frien
   const [followersCount, setFollowersCount] = useState(0);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchAuthors();
-      loadAllCounts();
-    }
-  }, [filter, currentUser]);
-
-  const loadAllCounts = async () => {
+  const loadAllCounts = useCallback(async () => {
     if (!currentUser) return;
-    
+
     try {
-      const [friends, following, followers, pendingRequests] = await Promise.all([
-        api.getFriends(authorId ?? currentUser.id),
-        api.getFollowing(authorId ?? currentUser.id),
-        api.getFollowers(authorId ?? currentUser.id),
-        socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
-      ]);
-      
+      const [friends, following, followers, pendingRequests] =
+        await Promise.all([
+          api.getFriends(authorId ?? currentUser.id),
+          api.getFollowing(authorId ?? currentUser.id),
+          api.getFollowers(authorId ?? currentUser.id),
+          socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
+        ]);
+
       setFriendsCount(friends.length);
       setFollowingCount(following.length);
       setFollowersCount(followers.length);
@@ -59,11 +61,11 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ defaultFilter = "frien
     } catch (error) {
       console.error("Error loading counts:", error);
     }
-  };
+  }, [currentUser, authorId]);
 
-  const fetchAuthors = async () => {
+  const fetchAuthors = useCallback(async () => {
     if (!currentUser) return;
-    
+
     setIsLoading(true);
     try {
       let fetchedAuthors: Author[] = [];
@@ -87,21 +89,28 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ defaultFilter = "frien
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser, authorId, filter]);
 
-  const handleFollowToggle = async (isFollowing: boolean) => {
+  useEffect(() => {
+    if (currentUser) {
+      fetchAuthors();
+      loadAllCounts();
+    }
+  }, [filter, currentUser, fetchAuthors, loadAllCounts]);
+
+  const handleFollowToggle = async () => {
     // Refresh the current list and counts after follow/unfollow action
-    await Promise.all([
-      fetchAuthors(),
-      loadAllCounts(),
-    ]);
+    await Promise.all([fetchAuthors(), loadAllCounts()]);
   };
 
-  const filteredAuthors = authors.filter(
+  const filteredAuthors = (authors || []).filter(
     (author) =>
       author.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (author.github_username && author.github_username.toLowerCase().includes(searchQuery.toLowerCase()))
+      (author.github_username &&
+        author.github_username
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()))
   );
 
   const getEmptyMessage = () => {
@@ -264,104 +273,119 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ defaultFilter = "frien
       {/* Follow Requests Notification */}
       {(() => {
         const isSelf = authorId === undefined || authorId === currentUser?.id;
-        return isSelf && pendingRequestsCount > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
-          >
-            <Link to="/follow-requests">
-              <Card
-                variant="prominent"
-                className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
+        return (
+          isSelf &&
+          pendingRequestsCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <Link to="/follow-requests">
+                <Card
+                  variant="prominent"
+                  className="p-4 bg-gradient-to-r from-[var(--primary-violet)]/10 to-[var(--primary-purple)]/10 
                            border border-[var(--primary-violet)]/20 hover:border-[var(--primary-violet)]/40 
                            transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
-                      <Bell size={20} className="text-[var(--primary-violet)]" />
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 rounded-full bg-[var(--primary-violet)]/20 group-hover:bg-[var(--primary-violet)]/30 transition-colors">
+                        <Bell
+                          size={20}
+                          className="text-[var(--primary-violet)]"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-text-1">
+                          {pendingRequestsCount} pending follow{" "}
+                          {pendingRequestsCount === 1 ? "request" : "requests"}
+                        </h3>
+                        <p className="text-sm text-text-2">
+                          Review and manage who can follow you
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-text-1">
-                        {pendingRequestsCount} pending follow {pendingRequestsCount === 1 ? 'request' : 'requests'}
-                      </h3>
-                      <p className="text-sm text-text-2">
-                        Review and manage who can follow you
-                      </p>
-                    </div>
+                    <motion.div
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <ArrowRight
+                        size={20}
+                        className="text-[var(--primary-violet)]"
+                      />
+                    </motion.div>
                   </div>
-                  <motion.div
-                    animate={{ x: [0, 5, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    <ArrowRight size={20} className="text-[var(--primary-violet)]" />
-                  </motion.div>
-                </div>
-              </Card>
-            </Link>
-          </motion.div>
+                </Card>
+              </Link>
+            </motion.div>
+          )
         );
       })()}
 
       {/* Content */}
       <div className="flex-1 flex flex-col">
-      {isLoading ? (
-        <div className="flex-1 flex justify-center items-center py-16">
+        {isLoading ? (
+          <div className="flex-1 flex justify-center items-center py-16">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="glass-card-main rounded-full p-5 shadow-lg"
+            >
+              <Loader className="w-8 h-8 text-brand-500" />
+            </motion.div>
+          </div>
+        ) : filteredAuthors.length === 0 ? (
           <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="glass-card-main rounded-full p-5 shadow-lg"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex-1 flex flex-col"
           >
-            <Loader className="w-8 h-8 text-brand-500" />
+            <Card
+              variant="main"
+              className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full"
+            >
+              <div className="flex justify-center text-text-2 mb-4">
+                {getIcon()}
+              </div>
+              <h3 className="font-medium text-lg mb-2 text-text-1">
+                {searchQuery ? "No results found" : `No ${filter} yet`}
+              </h3>
+              <p className="text-text-2 max-w-md mx-auto">
+                {searchQuery
+                  ? `Try searching with a different term.`
+                  : getEmptyMessage()}
+              </p>
+            </Card>
           </motion.div>
-        </div>
-      ) : filteredAuthors.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex-1 flex flex-col"
-        >
-          <Card variant="main" className="text-center py-16 px-0 flex-1 flex flex-col justify-center w-full">
-            <div className="flex justify-center text-text-2 mb-4">{getIcon()}</div>
-            <h3 className="font-medium text-lg mb-2 text-text-1">
-              {searchQuery ? "No results found" : `No ${filter} yet`}
-            </h3>
-            <p className="text-text-2 max-w-md mx-auto">
-              {searchQuery
-                ? `Try searching with a different term.`
-                : getEmptyMessage()}
-            </p>
-          </Card>
-        </motion.div>
-      ) : (
-        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 flex-1">
-          <AnimatePresence mode="popLayout">
-            {filteredAuthors.map((author, index) => {
-              const isSelf = !authorId || authorId === currentUser?.id;
-              return (
-                <motion.div
-                  key={author.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  layout
-                >
-                  <AuthorCard
-                    author={author}
-                    variant="default"
-                    showStats={true}
-                    showBio={true}
-                    showActions={isSelf}
-                    onFollow={handleFollowToggle}
-                  />
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
-      )}
+        ) : (
+          <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 flex-1">
+            <AnimatePresence mode="popLayout">
+              {filteredAuthors.map((author, index) => {
+                const isSelf = !authorId || authorId === currentUser?.id;
+                return (
+                  <motion.div
+                    key={author.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    layout
+                  >
+                    <AuthorCard
+                      author={author}
+                      variant="default"
+                      showStats={true}
+                      showBio={true}
+                      showActions={isSelf}
+                      onFollow={handleFollowToggle}
+                    />
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
     </div>
   );

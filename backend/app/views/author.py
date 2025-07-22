@@ -3,11 +3,15 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from django.http import Http404
+from urllib.parse import unquote
 
 from app.models import Author, Entry, Follow
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
 from app.serializers.follow import FollowSerializer
+from app.serializers.collections import AuthorsSerializer, FollowersSerializer
 
 from django.http import HttpResponse
 import base64
@@ -252,10 +256,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         follows = Follow.objects.filter(follower=author, status=Follow.ACCEPTED)
         following = [follow.followed for follow in follows]
 
-        serializer = AuthorListSerializer(
+        serializer = AuthorSerializer(
             following, many=True, context={"request": request}
         )
-        return Response(serializer.data)
+        return Response({
+            "type": "following",
+            "following": serializer.data
+        })
 
     @action(detail=True, methods=["get"])
     def friends(self, request, pk=None):
@@ -397,8 +404,14 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 visible_entries = Entry.objects.visible_to_author(user_author)
                 entries = visible_entries.filter(author=author)
 
-            serializer = EntrySerializer(entries, many=True)
-            return Response(serializer.data)
+            serializer = EntrySerializer(entries, many=True, context={'request': request})
+            return Response({
+                "type": "entries",
+                "page_number": 1,
+                "size": len(serializer.data),
+                "count": len(serializer.data),
+                "src": serializer.data
+            })
 
         if request.method == "POST":
             # Ensure only the author can post their own entry
@@ -567,3 +580,115 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    # CMPUT 404 Compliant API Endpoints
+    
+    def list(self, request, *args, **kwargs):
+        """
+        GET [local, remote]: retrieve all profiles on the node (paginated)
+        
+        Returns authors in the CMPUT 404 compliant format:
+        {
+            "type": "authors",
+            "authors": [...]
+        }
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            serializer = AuthorSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response({
+                "type": "authors",
+                "authors": serializer.data
+            })
+        
+        serializer = AuthorSerializer(queryset, many=True, context={'request': request})
+        return Response({
+            "type": "authors", 
+            "authors": serializer.data
+        })
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        GET [local]: retrieve AUTHOR_SERIAL's profile
+        GET [remote]: retrieve AUTHOR_FQID's profile
+        
+        Returns author in the CMPUT 404 compliant format
+        """
+        instance = self.get_object()
+        serializer = AuthorSerializer(instance, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='followers')
+    def followers(self, request, pk=None):
+        """
+        GET [local, remote]: get a list of authors who are AUTHOR_SERIAL's followers
+        
+        Returns followers in the CMPUT 404 compliant format:
+        {
+            "type": "followers",
+            "followers": [...]
+        }
+        """
+        author = self.get_object()
+        followers = author.get_followers()
+        serializer = AuthorSerializer(followers, many=True, context={'request': request})
+        
+        return Response({
+            "type": "followers",
+            "followers": serializer.data
+        })
+
+    @action(detail=True, methods=['get', 'put', 'delete'], url_path='followers/(?P<foreign_author_fqid>.+)')
+    def follower_detail(self, request, pk=None, foreign_author_fqid=None):
+        """
+        DELETE [local]: remove FOREIGN_AUTHOR_FQID as a follower of AUTHOR_SERIAL (must be authenticated)
+        PUT [local]: Add FOREIGN_AUTHOR_FQID as a follower of AUTHOR_SERIAL (must be authenticated)
+        GET [local, remote] check if FOREIGN_AUTHOR_FQID is a follower of AUTHOR_SERIAL
+        """
+        author = self.get_object()
+        
+        # Decode the URL-encoded FQID
+        decoded_fqid = unquote(foreign_author_fqid)
+        
+        try:
+            foreign_author = Author.objects.get(url=decoded_fqid)
+        except Author.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        
+        if request.method == 'GET':
+            # Check if foreign_author is following author
+            is_follower = Follow.objects.filter(
+                follower=foreign_author, 
+                followed=author, 
+                status=Follow.ACCEPTED
+            ).exists()
+            
+            if is_follower:
+                serializer = AuthorSerializer(foreign_author, context={'request': request})
+                return Response(serializer.data)
+            else:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+        
+        elif request.method == 'PUT':
+            # Add as follower (approve follow request)
+            follow, created = Follow.objects.get_or_create(
+                follower=foreign_author,
+                followed=author,
+                defaults={'status': Follow.ACCEPTED}
+            )
+            if not created and follow.status != Follow.ACCEPTED:
+                follow.status = Follow.ACCEPTED
+                follow.save()
+                
+            serializer = AuthorSerializer(foreign_author, context={'request': request})
+            return Response(serializer.data)
+        
+        elif request.method == 'DELETE':
+            # Remove as follower
+            Follow.objects.filter(
+                follower=foreign_author,
+                followed=author
+            ).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)

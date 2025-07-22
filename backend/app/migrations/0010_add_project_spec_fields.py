@@ -31,6 +31,11 @@ class Migration(migrations.Migration):
             name='description',
             field=models.TextField(blank=True, help_text='Brief description of the entry for preview purposes'),
         ),
+        migrations.AddField(
+            model_name='entry',
+            name='categories',
+            field=models.JSONField(default=list, blank=True, help_text='List of categories this entry belongs to'),
+        ),
         
         # Add new fields to Author model
         migrations.AddField(

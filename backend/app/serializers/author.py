@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.conf import settings
 
 from app.models import Author, Node
 
@@ -120,25 +121,54 @@ class AuthorSerializer(serializers.ModelSerializer):
     
     def to_representation(self, instance):
         """
-        Customize the representation to match project spec format.
+        Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
+        Returns author objects in the required format:
+        {
+            "type": "author",
+            "id": "http://nodeaaaa/api/authors/111",
+            "host": "http://nodeaaaa/api/",
+            "displayName": "Greg Johnson",
+            "github": "http://github.com/gjohnson",
+            "profileImage": "https://i.imgur.com/k7XVwpB.jpeg",
+            "web": "http://nodeaaaa/authors/greg"
+        }
         """
         data = super().to_representation(instance)
         
-        # Override id to be the full URL as per spec
-        data['id'] = str(instance.id)
-        data['url'] = instance.url
-
-        
-        # Convert github_username to full URL format
-        if instance.github_username:
-            data['github'] = f"https://github.com/{instance.github_username}"
-        else:
-            data['github'] = None
+        # CMPUT 404 compliant format with compatibility fields
+        result = {
+            # CMPUT 404 required fields
+            "type": "author",
+            "id": instance.url,  # Full URL as ID per spec
+            "host": f"{settings.SITE_URL}/api/",
+            "displayName": instance.display_name,
+            "github": f"https://github.com/{instance.github_username}" if instance.github_username else None,
+            "profileImage": instance.profile_image or None,
+            "web": f"{settings.SITE_URL}/authors/{instance.id}",
             
-        # Remove the github_username field as it's replaced by github
-        data.pop('github_username', None)
+            # Additional fields for frontend compatibility
+            "url": instance.url,
+            "username": instance.username,
+            "email": instance.email,
+            "first_name": instance.first_name,
+            "last_name": instance.last_name,
+            "display_name": instance.display_name,  # Snake case version
+            "github_username": instance.github_username,
+            "profile_image": instance.profile_image,
+            "bio": instance.bio,
+            "location": instance.location,
+            "website": instance.website,
+            "node": data.get("node"),
+            "is_approved": instance.is_approved,
+            "is_active": instance.is_active,
+            "is_staff": instance.is_staff,
+            "is_superuser": instance.is_superuser,
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+            "is_following": data.get("is_following"),
+        }
         
-        return data
+        return result
 
 
 class AuthorListSerializer(serializers.ModelSerializer):
@@ -198,26 +228,39 @@ class AuthorListSerializer(serializers.ModelSerializer):
     
     def to_representation(self, instance):
         """
-        Customize the representation to match project spec format.
+        Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
         """
         data = super().to_representation(instance)
         
-        # Keep UUID for ID
-        data['id'] = str(instance.id)
-
-        # Add full URL separately
-        data['url'] = instance.url
-        
-        # Convert github_username to full URL format
-        if instance.github_username:
-            data['github'] = f"https://github.com/{instance.github_username}"
-        else:
-            data['github'] = None
+        # CMPUT 404 compliant format with compatibility fields
+        result = {
+            # CMPUT 404 required fields
+            "type": "author",
+            "id": instance.url,  # Full URL as ID per spec
+            "host": f"{settings.SITE_URL}/api/",
+            "displayName": instance.display_name,
+            "github": f"https://github.com/{instance.github_username}" if instance.github_username else None,
+            "profileImage": instance.profile_image or None,
+            "web": f"{settings.SITE_URL}/authors/{instance.id}",
             
-        # Remove the github_username field as it's replaced by github
-        data.pop('github_username', None)
+            # Additional fields for frontend compatibility
+            "url": instance.url,
+            "username": instance.username,
+            "email": instance.email,
+            "display_name": instance.display_name,  # Snake case version
+            "github_username": instance.github_username,
+            "profile_image": instance.profile_image,
+            "location": instance.location,
+            "website": instance.website,
+            "is_approved": instance.is_approved,
+            "is_active": instance.is_active,
+            "created_at": data.get("created_at"),
+            "followers_count": data.get("followers_count"),
+            "following_count": data.get("following_count"),
+            "is_following": data.get("is_following"),
+        }
         
-        return data
+        return result
 
 
 class NodeSerializer(serializers.ModelSerializer):

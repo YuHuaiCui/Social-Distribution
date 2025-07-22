@@ -472,7 +472,7 @@ class EntryAPITest(BaseAPITestCase):
             content_type=Entry.TEXT_MARKDOWN,
             visibility=Entry.PUBLIC
         )
-        self.assertIn("![Image 1]", entry.content)
+        self.assertIn("![---------------------------------------------------------------------------- 1]", entry.content)
         self.assertIn("![Image 2]", entry.content)
 
     

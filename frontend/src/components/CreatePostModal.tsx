@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -57,36 +57,41 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   >("content");
   // Pre-fill form when editing
   React.useEffect(() => {
-  if (editingPost) {
-    setTitle(editingPost.title|| "");
-    setContent(editingPost.content|| "");
-    setContentType(editingPost.content_type || "text/markdown");
+    if (editingPost) {
+      setTitle(editingPost.title || "");
+      setContent(editingPost.content || "");
+      setContentType(editingPost.content_type || "text/markdown");
 
-    const validVisibilities: Visibility[] = ["PUBLIC", "FRIENDS", "UNLISTED"];
-    setVisibility(
-      validVisibilities.includes(editingPost.visibility as Visibility)
-        ? (editingPost.visibility as Visibility)
-        : defaultVisibility
-    );
+      const validVisibilities: Visibility[] = ["PUBLIC", "FRIENDS", "UNLISTED"];
+      setVisibility(
+        validVisibilities.includes(editingPost.visibility as Visibility)
+          ? (editingPost.visibility as Visibility)
+          : defaultVisibility
+      );
 
-    setCategories(editingPost.categories || []);
-    setReplacingImage(false);
-    // DO NOT reset images[] here
-    setImages([]);
-    setCurrentImage(editingPost.image || null);
-  } else {
-    setTitle("");
-    setContent("");
-    setContentType("text/markdown");
-    setVisibility(defaultVisibility);
-    setCategories([]);
-    setImages([]);
-    setReplacingImage(false);
-    setCurrentImage(null);
-  }
-}, [editingPost?.id, defaultVisibility]); // 🛠 use editingPost?.id to ensure clean re-run
+      setCategories(editingPost.categories || []);
+      setReplacingImage(false);
+      // DO NOT reset images[] here
+      setImages([]);
+      setCurrentImage(editingPost.image || null);
+    } else {
+      setTitle("");
+      setContent("");
+      setContentType("text/markdown");
+      setVisibility(defaultVisibility);
+      setCategories([]);
+      setImages([]);
+      setReplacingImage(false);
+      setCurrentImage(null);
+    }
+  }, [editingPost?.id, defaultVisibility]); // 🛠 use editingPost?.id to ensure clean re-run
 
-
+  // Memoize the onImagesChange callback to prevent infinite re-renders
+  const handleImagesChange = useCallback((newImages: File[]) => {
+    setImages(newImages);
+    setReplacingImage(true); // hide uploader after user picks a file
+    setCurrentImage(null); // clear preview
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,8 +127,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     try {
       const entryData: CreateEntryData = {
         title,
-        content: contentType.startsWith("image/") 
-          ? (content || "Image post")  // Use caption for image posts
+        content: contentType.startsWith("image/")
+          ? content || "Image post" // Use caption for image posts
           : content,
         content_type: contentType,
         visibility,
@@ -137,16 +142,15 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           setError("Cannot update: missing post ID");
           return;
         }
-        const id = editingPost.id.includes("/") ? editingPost.id.split("/").pop() : editingPost.id;
+        const id = editingPost.id.includes("/")
+          ? editingPost.id.split("/").pop()
+          : editingPost.id;
         if (!id) {
           setError("Cannot update: invalid post ID");
           setIsLoading(false);
           return;
         }
-        const updatedPost = await entryService.updateEntry(
-          id,
-          entryData
-        );
+        const updatedPost = await entryService.updateEntry(id, entryData);
 
         onSuccess?.(updatedPost);
         triggerRefresh(); // Trigger posts refresh
@@ -164,7 +168,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         onSuccess?.(newPost);
         triggerRefresh(); // Trigger posts refresh
         // Dispatch event for other components to update
-        window.dispatchEvent(new Event('post-created'));
+        window.dispatchEvent(new Event("post-created"));
         handleClose();
       }
     } catch (err: unknown) {
@@ -220,8 +224,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ 
-              opacity: 1, 
+            animate={{
+              opacity: 1,
               scale: 1,
               // Animate the style properties
               left: isFullscreen ? "0%" : "50%",
@@ -234,7 +238,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
               borderRadius: isFullscreen ? "0px" : "8px",
             }}
             exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ 
+            transition={{
               type: "spring",
               stiffness: 300,
               damping: 30,
@@ -360,35 +364,31 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         >
                           {contentType && contentType.startsWith("image/") ? (
                             <div>
-
-                              {replacingImage || images.length > 0 || !editingPost?.image  ? (
-                              <ImageUploader
-                                onImagesChange={(newImages) => {
-                                  setImages(newImages);
-                                  setReplacingImage(true); // hide uploader after user picks a file
-                                  setCurrentImage(null); // clear preview
-                                }}
-                                maxImages={1}
-                                className="mt-3"
-                                uploadToServer={false}
-                              />
-                            ) : (
-                              <div className="mt-3 space-y-2">
-                                <img
-                                  key={editingPost.updated_at || Date.now()} // force rerender
-                                  src={editingPost.image}
-                                  alt="Current uploaded"
-                                  className="rounded-lg max-h-64 object-contain border border-border-1"
+                              {replacingImage ||
+                              images.length > 0 ||
+                              !editingPost?.image ? (
+                                <ImageUploader
+                                  onImagesChange={handleImagesChange}
+                                  maxImages={1}
+                                  className="mt-3"
+                                  uploadToServer={false}
                                 />
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => setReplacingImage(true)} // triggers file upload
-                                  className="text-sm text-primary hover:underline"
-                                >
-                                </button>
-                              </div>
-                            )}
+                              ) : (
+                                <div className="mt-3 space-y-2">
+                                  <img
+                                    key={editingPost.updated_at || Date.now()} // force rerender
+                                    src={editingPost.image}
+                                    alt="Current uploaded"
+                                    className="rounded-lg max-h-64 object-contain border border-border-1"
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setReplacingImage(true)} // triggers file upload
+                                    className="text-sm text-primary hover:underline"
+                                  ></button>
+                                </div>
+                              )}
                               {images.length > 0 && (
                                 <div className="mt-3">
                                   <textarea
