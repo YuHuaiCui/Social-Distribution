@@ -110,6 +110,7 @@ urlpatterns = [
     # Legacy endpoints for backward compatibility
     path("entries/", EntryViewSet.as_view({'get': 'list', 'post': 'create'}), name="entry-list"),
     path("entries/trending/", EntryViewSet.as_view({'get': 'trending_entries'}), name="entry-trending"),
+    path("entries/categories/", EntryViewSet.as_view({'get': 'get_categories'}), name="entry-categories"),
     path("entries/liked/", EntryViewSet.as_view({'get': 'liked_entries'}), name="entry-liked"),
     path("entries/feed/", EntryViewSet.as_view({'get': 'feed_entries'}), name="entry-feed"),
     path("entries/saved/", EntryViewSet.as_view({'get': 'saved_entries'}), name="entry-saved"),

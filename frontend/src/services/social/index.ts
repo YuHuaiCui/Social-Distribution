@@ -40,7 +40,11 @@ export class SocialService extends BaseApiService {
    * Like a comment
    */
   async likeComment(commentId: string): Promise<Like> {
-    return this.request<Like>(`/api/comments/${commentId}/likes/`, {
+    // Extract ID from URL if full URL is passed
+    const id = commentId.includes("/")
+      ? commentId.split("/").filter(Boolean).pop()
+      : commentId;
+    return this.request<Like>(`/api/comments/${id}/likes/`, {
       method: "POST",
     });
   }
@@ -49,7 +53,11 @@ export class SocialService extends BaseApiService {
    * Unlike a comment
    */
   async unlikeComment(commentId: string): Promise<void> {
-    await this.request(`/api/comments/${commentId}/likes/`, {
+    // Extract ID from URL if full URL is passed
+    const id = commentId.includes("/")
+      ? commentId.split("/").filter(Boolean).pop()
+      : commentId;
+    await this.request(`/api/comments/${id}/likes/`, {
       method: "DELETE",
     });
   }
@@ -74,7 +82,11 @@ export class SocialService extends BaseApiService {
     like_count: number;
     liked_by_current_user: boolean;
   }> {
-    return this.request(`/api/comments/${commentId}/likes/`);
+    // Extract ID from URL if full URL is passed
+    const id = commentId.includes("/")
+      ? commentId.split("/").filter(Boolean).pop()
+      : commentId;
+    return this.request(`/api/comments/${id}/likes/`);
   }
 
   // Follow-related methods

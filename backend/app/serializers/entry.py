@@ -86,11 +86,8 @@ class EntrySerializer(serializers.ModelSerializer):
             return False
         
         from app.models import SavedEntry
-        # Get the user's author instance
-        if hasattr(request.user, 'author'):
-            user_author = request.user.author
-        else:
-            user_author = request.user
+        # The user is already an Author instance since Author extends AbstractUser
+        user_author = request.user
             
         return SavedEntry.objects.filter(author=user_author, entry=obj).exists()
 

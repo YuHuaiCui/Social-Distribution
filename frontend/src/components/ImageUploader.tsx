@@ -1,12 +1,17 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Upload, X, Image as ImageIcon, AlertCircle, 
-  Check, Loader2, Plus 
-} from 'lucide-react';
-import LoadingImage from './ui/LoadingImage';
-import { imageService, type ImageUploadResponse } from '../services/image';
-import { useToast } from './context/ToastContext';
+import React, { useState, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Upload,
+  X,
+  Image as ImageIcon,
+  AlertCircle,
+  Check,
+  Loader2,
+  Plus,
+} from "lucide-react";
+import LoadingImage from "./ui/LoadingImage";
+import { imageService, type ImageUploadResponse } from "../services/image";
+import { useToast } from "./context/ToastContext";
 
 interface UploadedImage {
   id: string;
@@ -34,8 +39,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImagesUploaded,
   maxImages = 4,
   maxSizeInMB = 5,
-  acceptedFormats = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-  className = '',
+  acceptedFormats = ["image/jpeg", "image/png", "image/gif", "image/webp"],
+  className = "",
   disabled = false,
   uploadToServer = false,
 }) => {
@@ -44,59 +49,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showError } = useToast();
 
-  const handleFiles = useCallback((files: FileList) => {
-    const newImages: UploadedImage[] = [];
-    const errors: string[] = [];
-
-    Array.from(files).forEach((file) => {
-      // Check if we've reached max images
-      if (images.length + newImages.length >= maxImages) {
-        errors.push(`Maximum ${maxImages} images allowed`);
-        return;
-      }
-
-      // Check file type
-      if (!acceptedFormats.includes(file.type)) {
-        errors.push(`${file.name} is not a supported format`);
-        return;
-      }
-
-      // Check file size
-      const sizeInMB = file.size / (1024 * 1024);
-      if (sizeInMB > maxSizeInMB) {
-        errors.push(`${file.name} exceeds ${maxSizeInMB}MB limit`);
-        return;
-      }
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const uploadedImage: UploadedImage = {
-          id: `${Date.now()}-${file.name}`,
-          file,
-          preview: reader.result as string,
-          progress: 0,
-          uploaded: false,
-        };
-        
-        setImages(prev => [...prev, uploadedImage]);
-        
-        // Upload to server or simulate
-        if (uploadToServer) {
-          uploadImageToServer(uploadedImage.id, file);
-        } else {
-          simulateUpload(uploadedImage.id);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    if (errors.length > 0) {
-      // In a real app, show these errors in a toast
-      errors.forEach(error => showError(error));
-    }
-  }, [images.length, maxImages, acceptedFormats, maxSizeInMB, uploadToServer, showError]);
-
   const simulateUpload = (imageId: string) => {
     let progress = 0;
     const interval = setInterval(() => {
@@ -104,69 +56,149 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (progress >= 100) {
         progress = 100;
         clearInterval(interval);
-        
-        setImages(prev => prev.map(img => 
-          img.id === imageId 
-            ? { ...img, progress: 100, uploaded: true }
-            : img
-        ));
+
+        setImages((prev) =>
+          prev.map((img) =>
+            img.id === imageId ? { ...img, progress: 100, uploaded: true } : img
+          )
+        );
       } else {
-        setImages(prev => prev.map(img => 
-          img.id === imageId 
-            ? { ...img, progress }
-            : img
-        ));
+        setImages((prev) =>
+          prev.map((img) => (img.id === imageId ? { ...img, progress } : img))
+        );
       }
     }, 500);
   };
 
-  const uploadImageToServer = async (imageId: string, file: File) => {
-    try {
-      // Show initial progress
-      setImages(prev => prev.map(img => 
-        img.id === imageId 
-          ? { ...img, progress: 10 }
-          : img
-      ));
+  const uploadImageToServer = React.useCallback(
+    async (imageId: string, file: File) => {
+      try {
+        // Show initial progress
+        setImages((prev) =>
+          prev.map((img) =>
+            img.id === imageId ? { ...img, progress: 10 } : img
+          )
+        );
 
-      // Upload to server
-      const response = await imageService.uploadImage(file);
+        // Upload to server
+        const response = await imageService.uploadImage(file);
 
-      // Update with success
-      setImages(prev => prev.map(img => 
-        img.id === imageId 
-          ? { ...img, progress: 100, uploaded: true, uploadedData: response }
-          : img
-      ));
-    } catch (error) {
-      console.error('Upload error:', error);
-      setImages(prev => prev.map(img => 
-        img.id === imageId 
-          ? { ...img, error: 'Upload failed', progress: 0 }
-          : img
-      ));
-      showError(`Failed to upload ${file.name}`);
-    }
-  };
+        // Update with success
+        setImages((prev) =>
+          prev.map((img) =>
+            img.id === imageId
+              ? {
+                  ...img,
+                  progress: 100,
+                  uploaded: true,
+                  uploadedData: response,
+                }
+              : img
+          )
+        );
+      } catch (error) {
+        console.error("Upload error:", error);
+        setImages((prev) =>
+          prev.map((img) =>
+            img.id === imageId
+              ? { ...img, error: "Upload failed", progress: 0 }
+              : img
+          )
+        );
+        showError(`Failed to upload ${file.name}`);
+      }
+    },
+    [showError]
+  );
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    if (disabled) return;
-    
-    const { files } = e.dataTransfer;
-    if (files && files.length > 0) {
-      handleFiles(files);
-    }
-  }, [handleFiles, disabled]);
+  const handleFiles = useCallback(
+    (files: FileList) => {
+      const newImages: UploadedImage[] = [];
+      const errors: string[] = [];
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!disabled) {
-      setIsDragging(true);
-    }
-  }, [disabled]);
+      Array.from(files).forEach((file) => {
+        // Check if we've reached max images
+        if (images.length + newImages.length >= maxImages) {
+          errors.push(`Maximum ${maxImages} images allowed`);
+          return;
+        }
+
+        // Check file type
+        if (!acceptedFormats.includes(file.type)) {
+          errors.push(`${file.name} is not a supported format`);
+          return;
+        }
+
+        // Check file size
+        const sizeInMB = file.size / (1024 * 1024);
+        if (sizeInMB > maxSizeInMB) {
+          errors.push(`${file.name} exceeds ${maxSizeInMB}MB limit`);
+          return;
+        }
+
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const uploadedImage: UploadedImage = {
+            id: `${Date.now()}-${file.name}`,
+            file,
+            preview: reader.result as string,
+            progress: 0,
+            uploaded: false,
+          };
+
+          setImages((prev) => [...prev, uploadedImage]);
+
+          // Upload to server or simulate
+          if (uploadToServer) {
+            uploadImageToServer(uploadedImage.id, file);
+          } else {
+            simulateUpload(uploadedImage.id);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+
+      if (errors.length > 0) {
+        // In a real app, show these errors in a toast
+        errors.forEach((error) => showError(error));
+      }
+    },
+    [
+      images.length,
+      maxImages,
+      acceptedFormats,
+      maxSizeInMB,
+      uploadToServer,
+      showError,
+      uploadImageToServer,
+    ]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      if (disabled) return;
+
+      const { files } = e.dataTransfer;
+      if (files && files.length > 0) {
+        handleFiles(files);
+      }
+    },
+    [handleFiles, disabled]
+  );
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      if (!disabled) {
+        setIsDragging(true);
+      }
+    },
+    [disabled]
+  );
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -181,34 +213,44 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const removeImage = (imageId: string) => {
-    setImages(prev => {
-      const updated = prev.filter(img => img.id !== imageId);
-      onImagesChange(updated.map(img => img.file));
+    setImages((prev) => {
+      const updated = prev.filter((img) => img.id !== imageId);
+      onImagesChange(updated.map((img) => img.file));
       return updated;
     });
   };
 
+  // Track previous files to prevent infinite loops
+  const prevFilesRef = React.useRef<File[]>([]);
+
   // Update parent when images change
   React.useEffect(() => {
     // If not uploading to server, all images are considered ready
-    const readyImages = uploadToServer 
-      ? images.filter(img => img.uploaded)
-      : images.filter(img => !img.error);
-    const readyFiles = readyImages.map(img => img.file);
-    
+    const readyImages = uploadToServer
+      ? images.filter((img) => img.uploaded)
+      : images.filter((img) => !img.error);
+    const readyFiles = readyImages.map((img) => img.file);
+
     // Only call onImagesChange if the files have actually changed
-    onImagesChange(readyFiles);
-    
+    const filesChanged =
+      readyFiles.length !== prevFilesRef.current.length ||
+      readyFiles.some((file, index) => file !== prevFilesRef.current[index]);
+
+    if (filesChanged) {
+      prevFilesRef.current = readyFiles;
+      onImagesChange(readyFiles);
+    }
+
     // Also notify about uploaded image data if callback provided
     if (onImagesUploaded && uploadToServer) {
       const uploadedData = readyImages
-        .filter(img => img.uploadedData)
-        .map(img => img.uploadedData!);
+        .filter((img) => img.uploadedData)
+        .map((img) => img.uploadedData!);
       if (uploadedData.length > 0) {
         onImagesUploaded(uploadedData);
       }
     }
-  }, [images, onImagesChange, onImagesUploaded, uploadToServer]); // Depend on images to catch uploadedData changes
+  }, [images, uploadToServer]); // Remove onImagesChange from dependencies to prevent infinite loops
 
   return (
     <div className={className}>
@@ -230,7 +272,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   className="w-full h-full object-cover"
                   aspectRatio="1/1"
                 />
-                
+
                 {/* Upload Progress Overlay */}
                 {!image.uploaded && (
                   <motion.div
@@ -241,15 +283,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     <div className="text-center">
                       <motion.div
                         animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
                       >
                         <Loader2 size={24} className="text-white mb-2" />
                       </motion.div>
-                      <p className="text-xs text-white">{Math.round(image.progress)}%</p>
+                      <p className="text-xs text-white">
+                        {Math.round(image.progress)}%
+                      </p>
                     </div>
                   </motion.div>
                 )}
-                
+
                 {/* Success Overlay */}
                 {image.uploaded && (
                   <motion.div
@@ -260,7 +308,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     <Check size={14} className="text-white" />
                   </motion.div>
                 )}
-                
+
                 {/* Error Overlay */}
                 {image.error && (
                   <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center p-2">
@@ -270,7 +318,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     </div>
                   </div>
                 )}
-                
+
                 {/* Remove Button */}
                 <motion.button
                   initial={{ opacity: 0 }}
@@ -284,7 +332,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </motion.div>
           ))}
         </AnimatePresence>
-        
+
         {/* Add More Button */}
         {images.length < maxImages && (
           <motion.button
@@ -307,48 +355,52 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         onDragLeave={handleDragLeave}
         animate={{
           scale: isDragging ? 1.02 : 1,
-          borderColor: isDragging ? 'var(--primary-violet)' : 'var(--border-1)',
+          borderColor: isDragging ? "var(--primary-violet)" : "var(--border-1)",
         }}
         className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-        } ${isDragging ? 'bg-[var(--primary-violet)]/5' : ''}`}
+          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+        } ${isDragging ? "bg-[var(--primary-violet)]/5" : ""}`}
         onClick={() => !disabled && fileInputRef.current?.click()}
       >
         <input
           ref={fileInputRef}
           type="file"
           multiple
-          accept={acceptedFormats.join(',')}
+          accept={acceptedFormats.join(",")}
           onChange={handleFileSelect}
           disabled={disabled}
           className="hidden"
         />
-        
+
         <motion.div
           animate={{
             y: isDragging ? -5 : 0,
           }}
           className="flex flex-col items-center"
         >
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-            isDragging 
-              ? 'bg-[var(--primary-violet)]/20' 
-              : 'bg-glass-low'
-          }`}>
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+              isDragging ? "bg-[var(--primary-violet)]/20" : "bg-glass-low"
+            }`}
+          >
             {isDragging ? (
               <ImageIcon size={32} className="text-[var(--primary-violet)]" />
             ) : (
               <Upload size={32} className="text-text-2" />
             )}
           </div>
-          
+
           <p className="text-text-1 font-medium mb-1">
-            {isDragging ? 'Drop images here' : 'Drag & drop images here'}
+            {isDragging ? "Drop images here" : "Drag & drop images here"}
           </p>
           <p className="text-sm text-text-2 mb-4">
-            or <span className="text-[var(--primary-violet)] hover:underline">browse</span> to upload
+            or{" "}
+            <span className="text-[var(--primary-violet)] hover:underline">
+              browse
+            </span>{" "}
+            to upload
           </p>
-          
+
           <div className="flex flex-wrap justify-center gap-2 text-xs text-text-2">
             <span className="px-2 py-1 rounded-full bg-glass-low">
               Max {maxImages} images

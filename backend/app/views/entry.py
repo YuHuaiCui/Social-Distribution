@@ -247,10 +247,25 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         user = request.user
 
+        if not user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         try:
+            # The user is already an Author instance since Author extends AbstractUser
+            user_author = user
+
+            if not user_author:
+                return Response(
+                    {"error": "User has no author profile"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             # Get entries that this user has liked
             liked_entry_ids = Like.objects.filter(
-                author=user,  # User is already an Author object
+                author=user_author,  # Use the correct author instance
             ).values_list("entry__id", flat=True)
 
             entries = Entry.objects.filter(id__in=liked_entry_ids).order_by(
@@ -285,12 +300,21 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         user = request.user
 
+        if not user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         try:
-            # Get the current user's author instance
-            if hasattr(user, "author"):
-                user_author = user.author
-            else:
-                user_author = user
+            # The user is already an Author instance since Author extends AbstractUser
+            user_author = user
+
+            if not user_author:
+                return Response(
+                    {"error": "User has no author profile"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             # Get entries that this user has saved
             saved_entry_ids = SavedEntry.objects.filter(
@@ -330,12 +354,21 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         user = request.user
 
+        if not user.is_authenticated:
+            return Response(
+                {"error": "Authentication required"}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         try:
-            # Get the current user's author instance
-            if hasattr(user, "author"):
-                current_author = user.author
-            else:
-                current_author = user
+            # The user is already an Author instance since Author extends AbstractUser
+            current_author = user
+
+            if not current_author:
+                return Response(
+                    {"error": "User has no author profile"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             # Get all users that the current user is following with ACCEPTED status
             following_ids = set(
@@ -387,11 +420,12 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         from app.models import Like
         from django.db.models import Count, F
-        from datetime import datetime, timedelta
+        from django.utils import timezone
+        from datetime import timedelta
 
         try:
             # Get entries from the last 30 days with like counts
-            thirty_days_ago = datetime.now() - timedelta(days=30)
+            thirty_days_ago = timezone.now() - timedelta(days=30)
             
             entries = (
                 Entry.objects
@@ -448,6 +482,45 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["get"], url_path="categories")
+    def get_categories(self, request):
+        """
+        Get all categories used in entries.
+        
+        Returns a list of unique categories from all entries,
+        ordered by frequency of use.
+        """
+        try:
+            from django.db.models import Count
+            from collections import Counter
+            
+            # Get all categories from all entries (excluding deleted)
+            entries = Entry.objects.exclude(visibility=Entry.DELETED)
+            
+            # Extract all categories from JSONField
+            all_categories = []
+            for entry in entries:
+                if entry.categories:
+                    all_categories.extend(entry.categories)
+            
+            # Count occurrences and sort by frequency
+            category_counts = Counter(all_categories)
+            
+            # Return categories sorted by frequency (most used first)
+            categories = [
+                {"name": category, "count": count}
+                for category, count in category_counts.most_common()
+            ]
+            
+            return Response(categories)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving categories: {str(e)}")
+            return Response(
+                {"error": f"Could not retrieve categories: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["post", "delete"], url_path="save")
     def save_entry(self, request, id=None):
         """
@@ -461,11 +534,8 @@ class EntryViewSet(viewsets.ModelViewSet):
         user = request.user
 
         try:
-            # Get the current user's author instance
-            if hasattr(user, "author"):
-                user_author = user.author
-            else:
-                user_author = user
+            # The user is already an Author instance since Author extends AbstractUser
+            user_author = user
 
             # Check if entry is already saved
             existing_save = SavedEntry.objects.filter(
