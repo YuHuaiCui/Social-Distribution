@@ -46,6 +46,11 @@ class EntryLikeView(APIView):
                     {"detail": "Invalid entry FQID format"}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
+        elif 'author_fqid' in kwargs:
+            # Handle author FQID for liked endpoints
+            from urllib.parse import unquote
+            author_fqid = unquote(kwargs['author_fqid'])
+            kwargs['author_fqid_decoded'] = author_fqid
         
         return super().dispatch(request, *args, **kwargs)
 
@@ -109,41 +114,54 @@ class EntryLikeView(APIView):
         return Response({"detail": "Like not found, treated as success."}, status=status.HTTP_204_NO_CONTENT)
 
 
-    def get(self, request, entry_id):
+
+
+    def get(self, request, entry_id=None, author_id=None, **kwargs):
         """
-        Get like statistics for an entry.
-        
-        Returns the total number of likes for an entry and whether the current
-        authenticated user has liked it. This is useful for displaying like
-        counts and the like button state in the UI.
-        
-        Args:
-            request: The HTTP request (authentication optional)
-            entry_id: UUID of the entry to get like stats for
+        Handle GET requests for entry likes or author's liked entries.
+        """
+        # If we have an entry_id, return like stats for that entry
+        if entry_id:
+            entry = get_object_or_404(Entry, id=entry_id)
+            like_count = Like.objects.filter(entry=entry).count()
+
+            # Check if current user has liked this entry
+            liked_by_current_user = False
             
-        Returns:
-            Response:
-                - 200 OK with like_count and liked_by_current_user
-                - 404 Not Found if entry doesn't exist
-                
-        Response format:
-            {
-                "like_count": int,
-                "liked_by_current_user": bool
-            }
-        """
-        entry = get_object_or_404(Entry, id=entry_id)
-        like_count = Like.objects.filter(entry=entry).count()
+            if request.user.is_authenticated:
+                liked_by_current_user = Like.objects.filter(author=request.user, entry=entry).exists()
 
-        # Check if current user has liked this entry
-        liked_by_current_user = False
+            return Response({
+                "like_count": like_count,
+                "liked_by_current_user": liked_by_current_user
+            })
         
-        if request.user.is_authenticated:
-            liked_by_current_user = Like.objects.filter(author=request.user, entry=entry).exists()
-
+        # Otherwise, handle liked entries by author
+        # Check if this is an author FQID request
+        if 'author_fqid_decoded' in kwargs:
+            author_fqid = kwargs['author_fqid_decoded']
+            try:
+                from app.models import Author
+                author = Author.objects.get(url=author_fqid)
+            except Author.DoesNotExist:
+                return Response({"detail": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
+        elif author_id:
+            from app.models import Author
+            try:
+                author = Author.objects.get(id=author_id)
+            except Author.DoesNotExist:
+                return Response({"detail": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({"detail": "Author ID required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get likes by this author
+        likes = Like.objects.filter(author=author, entry__isnull=False).select_related('entry')
+        from app.serializers.like import LikeSerializer
+        serializer = LikeSerializer(likes, many=True, context={'request': request})
+        
         return Response({
-            "like_count": like_count,
-            "liked_by_current_user": liked_by_current_user
+            "type": "liked",
+            "items": serializer.data
         })
 
 
@@ -162,7 +180,7 @@ class CommentLikeView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
 
-    def post(self, request, comment_id):
+    def post(self, request, comment_id=None, **kwargs):
         """
         Create a like for a comment.
         
@@ -180,6 +198,17 @@ class CommentLikeView(APIView):
                 - 200 OK if comment was already liked by this user
                 - 404 Not Found if comment doesn't exist
         """
+        # Handle different parameter names from URL patterns
+        if comment_id is None:
+            if 'comment_fqid' in kwargs:
+                comment_fqid = kwargs['comment_fqid']
+                if comment_fqid.startswith('http'):
+                    comment_id = comment_fqid.split('/')[-1] if comment_fqid.split('/')[-1] else comment_fqid.split('/')[-2]
+                else:
+                    comment_id = comment_fqid
+            else:
+                return Response({"detail": "Comment ID required"}, status=status.HTTP_400_BAD_REQUEST)
+        
         comment = get_object_or_404(Comment, id=comment_id)
         author = request.user
 
@@ -192,7 +221,7 @@ class CommentLikeView(APIView):
         serializer = LikeSerializer(like)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def delete(self, request, comment_id):
+    def delete(self, request, comment_id=None, **kwargs):
         """
         Remove a like from a comment.
         
@@ -210,6 +239,17 @@ class CommentLikeView(APIView):
                 - 204 No Content if no like was found (treated as success)
                 - 404 Not Found if comment doesn't exist
         """
+        # Handle different parameter names from URL patterns
+        if comment_id is None:
+            if 'comment_fqid' in kwargs:
+                comment_fqid = kwargs['comment_fqid']
+                if comment_fqid.startswith('http'):
+                    comment_id = comment_fqid.split('/')[-1] if comment_fqid.split('/')[-1] else comment_fqid.split('/')[-2]
+                else:
+                    comment_id = comment_fqid
+            else:
+                return Response({"detail": "Comment ID required"}, status=status.HTTP_400_BAD_REQUEST)
+        
         author = request.user
         comment = get_object_or_404(Comment, id=comment_id)
 
@@ -222,7 +262,7 @@ class CommentLikeView(APIView):
         return Response({"detail": "Like not found, treated as success."}, status=status.HTTP_204_NO_CONTENT)
 
 
-    def get(self, request, comment_id):
+    def get(self, request, comment_id=None, **kwargs):
         """
         Get like statistics for a comment.
         
@@ -245,6 +285,17 @@ class CommentLikeView(APIView):
                 "liked_by_current_user": bool
             }
         """
+        # Handle different parameter names from URL patterns
+        if comment_id is None:
+            if 'comment_fqid' in kwargs:
+                comment_fqid = kwargs['comment_fqid']
+                if comment_fqid.startswith('http'):
+                    comment_id = comment_fqid.split('/')[-1] if comment_fqid.split('/')[-1] else comment_fqid.split('/')[-2]
+                else:
+                    comment_id = comment_fqid
+            else:
+                return Response({"detail": "Comment ID required"}, status=status.HTTP_400_BAD_REQUEST)
+        
         comment = get_object_or_404(Comment, id=comment_id)
         like_count = Like.objects.filter(comment=comment).count()
 
