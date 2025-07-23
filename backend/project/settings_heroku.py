@@ -12,6 +12,8 @@ ALLOWED_HOSTS = [
     '.herokuapp.com',
     os.environ.get('HEROKU_APP_NAME', '') + '.herokuapp.com',
 ]
+LOGIN_REDIRECT_URL = os.environ.get('HEROKU_APP_NAME', '') + '.herokuapp.com'
+LOGOUT_REDIRECT_URL = os.environ.get('HEROKU_APP_NAME', '') + '.herokuapp.com'
 
 # CORS settings for production
 CORS_ALLOWED_ORIGINS = [
