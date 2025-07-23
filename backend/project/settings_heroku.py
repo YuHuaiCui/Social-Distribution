@@ -69,3 +69,43 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+# Production CSP Configuration (more restrictive)
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = (
+    "'self'",
+    "https://github.githubassets.com",
+    "https://cdn.jsdelivr.net",
+)
+CSP_STYLE_SRC = (
+    "'self'",
+    "'unsafe-inline'",  # Required for inline styles
+    "https://github.githubassets.com",
+    "https://fonts.googleapis.com",
+)
+CSP_FONT_SRC = (
+    "'self'",
+    "https://fonts.gstatic.com",
+    "https://github.githubassets.com",
+)
+CSP_IMG_SRC = (
+    "'self'",
+    "data:",
+    "https:",
+)
+CSP_CONNECT_SRC = (
+    "'self'",
+    "https://api.github.com",
+    "https://github.com",
+)
+CSP_FRAME_SRC = (
+    "'self'",
+    "https://github.com",
+)
+CSP_MEDIA_SRC = ("'self'",)
+CSP_OBJECT_SRC = ("'none'",)
+CSP_BASE_URI = ("'self'",)
+CSP_FORM_ACTION = ("'self'",)
+
+# Use nonces in production instead of unsafe-inline
+CSP_INCLUDE_NONCE_IN = ["script-src"]

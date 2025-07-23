@@ -39,6 +39,7 @@ ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
 INSTALLED_APPS = [
     "app",
     "corsheaders",
+    "csp",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -54,6 +55,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -237,3 +239,61 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 AUTO_APPROVE_NEW_USERS = os.getenv("AUTO_APPROVE_NEW_USERS", "False") == "True"
 
 os.makedirs(MEDIA_ROOT, exist_ok=True)
+
+# Content Security Policy Configuration
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = (
+    "'self'",
+    "'unsafe-inline'",  # Allow inline scripts - use with caution
+    "'unsafe-eval'",    # Allow eval() - needed for some JS frameworks
+    "'sha256-ieoeWczDHkReVBsRBqaal5AFMlBtNjMzgwKvLqi/tSU='",  # Allow specific inline script
+    "https://github.githubassets.com",
+    "https://cdn.jsdelivr.net",
+    "https://unpkg.com",
+    "https://cdnjs.cloudflare.com",
+)
+CSP_STYLE_SRC = (
+    "'self'",
+    "'unsafe-inline'",
+    "https://github.githubassets.com",
+    "https://cdn.jsdelivr.net",
+    "https://fonts.googleapis.com",
+)
+CSP_FONT_SRC = (
+    "'self'",
+    "https://fonts.gstatic.com",
+    "https://github.githubassets.com",
+)
+CSP_IMG_SRC = (
+    "'self'",
+    "data:",
+    "https:",
+    "http:",  # Allow HTTP images in development
+)
+CSP_CONNECT_SRC = (
+    "'self'",
+    "https://api.github.com",
+    "https://github.com",
+    "http://localhost:8000",
+    "http://localhost:5173",
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:5173",
+)
+CSP_FRAME_SRC = (
+    "'self'",
+    "https://github.com",
+)
+CSP_MEDIA_SRC = ("'self'",)
+CSP_OBJECT_SRC = ("'none'",)
+CSP_BASE_URI = ("'self'",)
+CSP_FORM_ACTION = ("'self'",)
+
+# CSP nonce for inline scripts (more secure alternative to 'unsafe-inline')
+# Temporarily disabled to resolve CSP issues in development
+# CSP_INCLUDE_NONCE_IN = ["script-src"]
+
+# Report CSP violations in development
+if DEBUG:
+    CSP_REPORT_ONLY = True  # Only report violations, don't block
+else:
+    CSP_REPORT_ONLY = False
