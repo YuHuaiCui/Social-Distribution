@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Compass,
   Search,
-  TrendingUp,
   Users,
   Hash,
   Grid3X3,
   List,
   Filter as FilterIcon,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import type { Entry, Author } from "../types/models";
 import PostCard from "../components/PostCard";
+import { extractUUID } from "../utils/extractId";
 import AnimatedButton from "../components/ui/AnimatedButton";
 import AnimatedGradient from "../components/ui/AnimatedGradient";
 import Card from "../components/ui/Card";
@@ -29,6 +31,7 @@ interface TrendingAuthor extends Author {
   follower_count?: number;
   post_count?: number;
   is_following?: boolean;
+  follow_status?: "none" | "pending" | "accepted" | "rejected";
 }
 
 interface Category {
@@ -50,6 +53,24 @@ export const ExplorePage: React.FC = () => {
   );
   const { user } = useAuth();
   const isAdmin = user?.is_staff || user?.is_superuser;
+
+  // Helper function to get button text and variant based on follow status
+  const getFollowButtonState = (author: TrendingAuthor) => {
+    const followStatus =
+      author.follow_status || (author.is_following ? "accepted" : "none");
+
+    switch (followStatus) {
+      case "accepted":
+        return { text: "Following", variant: "secondary" as const };
+      case "pending":
+        return { text: "Requested", variant: "secondary" as const };
+      case "rejected":
+      case "none":
+      default:
+        return { text: "Follow", variant: "primary" as const };
+    }
+  };
+
   useEffect(() => {
     fetchExploreData();
   }, [activeTab, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,15 +112,63 @@ export const ExplorePage: React.FC = () => {
         const fetchedAuthors = response.results || [];
 
         // Map authors to TrendingAuthor type with default values
-        setAuthors(
-          fetchedAuthors.map(
-            (author: Author): TrendingAuthor => ({
-              ...author,
-              follower_count: (author as TrendingAuthor).follower_count ?? 0,
-              post_count: (author as TrendingAuthor).post_count ?? 0,
-            })
-          )
+        const authorsWithDefaults = fetchedAuthors.map(
+          (author: Author): TrendingAuthor => ({
+            ...author,
+            follower_count: (author as TrendingAuthor).follower_count ?? 0,
+            post_count: (author as TrendingAuthor).post_count ?? 0,
+          })
         );
+
+        // Check follow status for each author if user is logged in
+        if (user) {
+          const authorsWithFollowStatus = await Promise.all(
+            authorsWithDefaults.map(async (author) => {
+              try {
+                // Skip checking follow status for own profile
+                if (extractUUID(user.id) === extractUUID(author.id)) {
+                  return author;
+                }
+
+                const currentUserUrl =
+                  user?.url ||
+                  `${window.location.origin}/api/authors/${user?.id}`;
+                const authorUrl =
+                  author.url ||
+                  `${window.location.origin}/api/authors/${author.id}`;
+
+                const status = await socialService.checkFollowStatus(
+                  currentUserUrl,
+                  authorUrl
+                );
+
+                return {
+                  ...author,
+                  is_following: status.is_following,
+                  follow_status: (status.follow_status || "none") as
+                    | "none"
+                    | "pending"
+                    | "accepted"
+                    | "rejected",
+                };
+              } catch (error) {
+                console.error(
+                  `Error checking follow status for author ${author.id}:`,
+                  error
+                );
+                // Return author with default follow status on error
+                return {
+                  ...author,
+                  is_following: false,
+                  follow_status: "none" as const,
+                };
+              }
+            })
+          );
+          setAuthors(authorsWithFollowStatus);
+        } else {
+          setAuthors(authorsWithDefaults);
+        }
       } else if (activeTab === "categories") {
         // Fetch categories from the API
         const categoriesResponse = await entryService.getCategories();
@@ -137,13 +206,44 @@ export const ExplorePage: React.FC = () => {
   const handleFollowAuthor = async (authorId: string) => {
     setFollowingAuthors((prev) => new Set(prev).add(authorId));
     try {
-      // Get current follow status
-      const currentAuthor = authors.find((author) => author.id === authorId);
-      const isCurrentlyFollowing = currentAuthor?.is_following;
+      // Prevent following yourself
+      const currentUserId = user?.id;
+      if (
+        currentUserId &&
+        extractUUID(currentUserId) === extractUUID(authorId)
+      ) {
+        console.error("Cannot follow yourself");
+        return;
+      }
 
-      if (isCurrentlyFollowing) {
+      console.log("Attempting to follow author:", authorId);
+      console.log("Extracted UUID:", extractUUID(authorId));
+      console.log("Current user ID:", currentUserId);
+
+      // Check current follow status from backend to ensure accuracy
+      const currentUserUrl =
+        user?.url || `${window.location.origin}/api/authors/${user?.id}`;
+      const authorUrl =
+        authors.find((a) => a.id === authorId)?.url ||
+        `${window.location.origin}/api/authors/${authorId}`;
+
+      let followStatus;
+      try {
+        const status = await socialService.checkFollowStatus(
+          currentUserUrl,
+          authorUrl
+        );
+        followStatus = status.follow_status;
+      } catch (error) {
+        console.error("Error checking follow status:", error);
+        // Fallback to current state from UI
+        const currentAuthor = authors.find((author) => author.id === authorId);
+        followStatus = currentAuthor?.is_following ? "accepted" : "none";
+      }
+
+      if (followStatus === "accepted") {
         // Unfollow the author
-        await socialService.unfollowAuthor(authorId);
+        await socialService.unfollowAuthor(extractUUID(authorId));
 
         // Update UI to show not following
         setAuthors((prev) =>
@@ -152,31 +252,79 @@ export const ExplorePage: React.FC = () => {
               ? {
                   ...author,
                   is_following: false,
+                  follow_status: "none",
                   follower_count: (author.follower_count || 1) - 1,
                 }
               : author
           )
         );
-      } else {
+      } else if (followStatus === "none" || followStatus === "rejected") {
         // Follow the author
-        await socialService.followAuthor(authorId);
+        await socialService.followAuthor(extractUUID(authorId));
 
-        // Update UI to show following
+        // Update UI to show pending/following (backend will determine the actual status)
         setAuthors((prev) =>
           prev.map((author) =>
             author.id === authorId
               ? {
                   ...author,
-                  is_following: true,
+                  is_following: true, // Show as following for now
+                  follow_status: "pending", // Assume pending until confirmed
                   follower_count: (author.follower_count || 0) + 1,
                 }
               : author
           )
         );
+      } else if (followStatus === "pending") {
+        // If already pending, don't do anything
+        console.log("Follow request already pending");
+        return;
       }
     } catch (error) {
       console.error("Error updating follow status:", error);
-      // Revert optimistic update on error
+      console.error("Author ID being followed:", authorId);
+      console.error("Extracted UUID:", extractUUID(authorId));
+
+      // Revert optimistic update on error by refetching the author data
+      try {
+        // Check the actual follow status from backend
+        const currentUserUrl =
+          user?.url || `${window.location.origin}/api/authors/${user?.id}`;
+        const authorUrl =
+          authors.find((a) => a.id === authorId)?.url ||
+          `${window.location.origin}/api/authors/${authorId}`;
+        const status = await socialService.checkFollowStatus(
+          currentUserUrl,
+          authorUrl
+        );
+
+        // Update the UI with the actual backend state
+        setAuthors((prev) =>
+          prev.map((author) =>
+            author.id === authorId
+              ? {
+                  ...author,
+                  is_following: status.is_following,
+                  follow_status: status.follow_status,
+                }
+              : author
+          )
+        );
+      } catch (statusError) {
+        console.error("Error checking follow status for revert:", statusError);
+        // If we can't check the status, just revert to original state
+        setAuthors((prev) =>
+          prev.map((author) =>
+            author.id === authorId
+              ? {
+                  ...author,
+                  // Revert to opposite of what we tried to do
+                  is_following: !author.is_following,
+                }
+              : author
+          )
+        );
+      }
       // Could show a toast notification here
     } finally {
       setFollowingAuthors((prev) => {
@@ -463,29 +611,34 @@ export const ExplorePage: React.FC = () => {
                           className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl"
                         >
                           <div className="flex flex-col items-center text-center">
-                            <motion.div
-                              whileHover={{ scale: 1.05 }}
-                              className="mb-4"
+                            <Link
+                              to={`/authors/${extractUUID(author.id)}`}
+                              className="flex flex-col items-center text-center hover:opacity-80 transition-opacity"
                             >
-                              <Avatar
-                                imgSrc={author.profile_image}
-                                alt={author.display_name}
-                                size="xl"
-                              />
-                            </motion.div>
+                              <motion.div
+                                whileHover={{ scale: 1.05 }}
+                                className="mb-4"
+                              >
+                                <Avatar
+                                  imgSrc={author.profile_image}
+                                  alt={author.display_name}
+                                  size="xl"
+                                />
+                              </motion.div>
 
-                            <h3 className="font-semibold text-lg text-text-1 mb-1">
-                              {author.display_name}
-                            </h3>
-                            <p className="text-sm text-text-2 mb-3">
-                              @{author.username}
-                            </p>
-
-                            {author.bio && (
-                              <p className="text-sm text-text-2 mb-4 line-clamp-2">
-                                {author.bio}
+                              <h3 className="font-semibold text-lg text-text-1 mb-1 hover:underline">
+                                {author.display_name}
+                              </h3>
+                              <p className="text-sm text-text-2 mb-3">
+                                @{author.username}
                               </p>
-                            )}
+
+                              {author.bio && (
+                                <p className="text-sm text-text-2 mb-4 line-clamp-2">
+                                  {author.bio}
+                                </p>
+                              )}
+                            </Link>
 
                             <div className="flex items-center space-x-4 mb-4 text-sm">
                               <div>
@@ -506,14 +659,15 @@ export const ExplorePage: React.FC = () => {
 
                             <AnimatedButton
                               size="sm"
-                              variant={
-                                author.is_following ? "secondary" : "primary"
-                              }
-                              onClick={() => handleFollowAuthor(author.id)}
+                              variant={getFollowButtonState(author).variant}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFollowAuthor(author.id);
+                              }}
                               loading={followingAuthors.has(author.id)}
                               className="w-full"
                             >
-                              {author.is_following ? "Followed" : "Follow"}
+                              {getFollowButtonState(author).text}
                             </AnimatedButton>
                           </div>
                         </Card>
