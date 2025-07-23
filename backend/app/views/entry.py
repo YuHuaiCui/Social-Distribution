@@ -170,7 +170,72 @@ class EntryViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You must have an author profile to create entries.")
 
         # Save the entry with the user's author
-        serializer.save(author=user_author)
+        entry = serializer.save(author=user_author)
+        
+        # Send to remote nodes if this is a public post
+        if entry.visibility == Entry.PUBLIC:
+            self._send_to_remote_nodes(entry)
+
+    def _send_to_remote_nodes(self, entry):
+        """
+        Send a public entry to remote nodes that are following the author.
+        """
+        try:
+            from app.models import Follow, Node
+            from requests.auth import HTTPBasicAuth
+            import requests
+            
+            # Get all remote followers
+            remote_followers = Follow.objects.filter(
+                followed=entry.author,
+                status=Follow.ACCEPTED,
+                follower__node__isnull=False  # Only remote authors
+            ).select_related('follower', 'follower__node')
+            
+            for follow in remote_followers:
+                remote_author = follow.follower
+                remote_node = remote_author.node
+                
+                if not remote_node or not remote_node.is_active:
+                    continue
+                
+                # Prepare the post data for ActivityPub
+                post_data = {
+                    "@context": "https://www.w3.org/ns/activitystreams",
+                    "type": "Create",
+                    "actor": entry.author.url,
+                    "object": {
+                        "type": "Post",
+                        "id": entry.url,
+                        "title": entry.title,
+                        "content": entry.content,
+                        "contentType": entry.content_type,
+                        "visibility": entry.visibility,
+                        "published": entry.created_at.isoformat(),
+                        "author": entry.author.url
+                    }
+                }
+                
+                # Send to remote node's inbox
+                try:
+                    inbox_url = f"{remote_author.host}authors/{remote_author.id.split('/')[-2]}/inbox/"
+                    
+                    response = requests.post(
+                        inbox_url,
+                        json=post_data,
+                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                        headers={'Content-Type': 'application/activity+json'},
+                        timeout=5
+                    )
+                    
+                    if response.status_code not in [200, 201, 202]:
+                        print(f"Failed to send post to {inbox_url}: {response.status_code}")
+                        
+                except Exception as e:
+                    print(f"Error sending post to remote node {remote_node.host}: {str(e)}")
+                    
+        except Exception as e:
+            print(f"Error in _send_to_remote_nodes: {str(e)}")
 
     def get_permissions(self):
         """
