@@ -19,17 +19,32 @@ export class AuthorService extends BaseApiService {
     params?: AuthorSearchParams
   ): Promise<PaginatedResponse<Author>> {
     const queryString = this.buildQueryString(params || {});
-    const response = await this.request<{ type: "authors"; authors: Author[] }>(
-      `/api/authors/${queryString}`
-    );
+    const response = await this.request<
+      | PaginatedResponse<Author> // Standard paginated format
+      | { type: "authors"; authors: Author[] } // CMPUT 404 format
+    >(`/api/authors/${queryString}`);
 
-    // Convert CMPUT 404 format to expected PaginatedResponse format
-    return {
-      count: response.authors.length,
-      next: null,
-      previous: null,
-      results: response.authors,
-    };
+    // Handle both paginated response format and CMPUT 404 format
+    if ("results" in response) {
+      // Standard paginated response
+      return response;
+    } else if ("authors" in response) {
+      // CMPUT 404 format - convert to paginated format
+      return {
+        count: response.authors.length,
+        next: null,
+        previous: null,
+        results: response.authors,
+      };
+    } else {
+      // Fallback - empty response
+      return {
+        count: 0,
+        next: null,
+        previous: null,
+        results: [],
+      };
+    }
   }
 
   /**
