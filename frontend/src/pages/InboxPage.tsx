@@ -264,7 +264,7 @@ export const InboxPage: React.FC = () => {
           }
 
           return {
-            id: apiItem.id,
+            id: String(apiItem.id), // Convert to string to ensure consistency
             type,
             from_author,
             created_at: apiItem.created_at,
@@ -298,18 +298,35 @@ export const InboxPage: React.FC = () => {
         } follow request with inbox item ID:`,
         itemId
       );
+      console.log("itemId type:", typeof itemId);
+      console.log("itemId value:", itemId);
+      console.log("itemId is string:", typeof itemId === "string");
+
+      // Convert itemId to string if it's not already (defensive programming)
+      const stringItemId = String(itemId);
+
+      // Check if itemId is valid before proceeding
+      if (
+        !stringItemId ||
+        stringItemId === "undefined" ||
+        stringItemId === "null"
+      ) {
+        throw new Error(`Invalid itemId: ${itemId} (type: ${typeof itemId})`);
+      }
+
+      console.log("Using stringItemId:", stringItemId);
 
       // Simple approach: directly call the inbox service methods
       if (accept) {
-        await inboxService.acceptFollowRequest(itemId);
+        await inboxService.acceptFollowRequest(stringItemId);
         console.log("Accept request sent successfully");
       } else {
-        await inboxService.rejectFollowRequest(itemId);
+        await inboxService.rejectFollowRequest(stringItemId);
         console.log("Reject request sent successfully");
       }
 
       // Remove item after processing
-      setItems((prev) => prev.filter((item) => item.id !== itemId));
+      setItems((prev) => prev.filter((item) => item.id !== stringItemId));
       console.log("Item removed from inbox successfully");
     } catch (error) {
       console.error("Error processing follow request:", error);
