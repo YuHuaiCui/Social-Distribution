@@ -18,6 +18,7 @@ import Card from "../components/ui/Card";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
 import { inboxService } from "../services/inbox";
+import { socialService } from "../services/social";
 import type { InboxItem as ApiInboxItem } from "../types/inbox";
 import { useAuth } from "../components/context/AuthContext";
 import { extractUUID } from "../utils/extractId";
@@ -292,10 +293,27 @@ export const InboxPage: React.FC = () => {
   const handleFollowRequest = async (itemId: string, accept: boolean) => {
     setProcessingItems((prev) => new Set(prev).add(itemId));
     try {
-      if (accept) {
-        await inboxService.acceptFollowRequest(itemId);
+      // Find the inbox item to get the follow ID
+      const inboxItem = items.find((item) => item.id === itemId);
+      if (!inboxItem || inboxItem.type !== "follow_request") {
+        throw new Error("Invalid follow request item");
+      }
+
+      // Get the original API item to extract follow ID
+      const response = await inboxService.getInboxItem(itemId);
+      if (
+        response.content_data?.type === "follow" &&
+        response.content_data?.data
+      ) {
+        const followId = response.content_data.data.id;
+
+        if (accept) {
+          await socialService.acceptFollowRequest(followId);
+        } else {
+          await socialService.rejectFollowRequest(followId);
+        }
       } else {
-        await inboxService.rejectFollowRequest(itemId);
+        throw new Error("Could not find follow data in inbox item");
       }
 
       // Remove item after processing
