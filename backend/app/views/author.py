@@ -245,7 +245,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
         serializer = AuthorListSerializer(
             followers, many=True, context={"request": request}
         )
-        return Response(serializer.data)
+        return Response({
+            "type": "followers",
+            "followers": serializer.data
+        })
 
     @action(detail=True, methods=["get"])
     def following(self, request, pk=None):
@@ -275,7 +278,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
         serializer = AuthorListSerializer(
             friends, many=True, context={"request": request}
         )
-        return Response(serializer.data)
+        return Response({
+            "type": "friends",
+            "friends": serializer.data
+        })
 
     @action(
         detail=True,
