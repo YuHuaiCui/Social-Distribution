@@ -7,7 +7,8 @@ from app.views.auth import auth_status, github_callback, author_me, logout_view
 from app.views.image import ImageUploadView
 from app.views.comment import CommentListCreateView, CommentDetailView
 from app.views.github import GitHubValidationView, GitHubActivityView  
-from app.views.inbox import InboxViewSet
+from app.views.inbox import InboxViewSet, InboxReceiveView
+from app.views.node import GetNodesView, UpdateNodeView, AddNodeView, DeleteNodeView, RemoteFolloweeView, RemoteAuthorsView
 
 # namespacing app
 app_name = "social-distribution"
@@ -149,4 +150,17 @@ urlpatterns = [
     path('api/auth/logout/', logout_view, name='logout'),
     path('github/validate/<str:username>/', GitHubValidationView.as_view(), name='github-validate'),
     path('github/activity/<str:username>/', GitHubActivityView.as_view(), name='github-activity'),
+    
+    # Node management endpoints
+    path('nodes/', GetNodesView.as_view(), name='get-nodes'),
+    path('nodes/add/', AddNodeView.as_view(), name='add-node'),
+    path('nodes/update/', UpdateNodeView.as_view(), name='update-node'),
+    path('nodes/remove/', DeleteNodeView.as_view(), name='delete-node'),
+    
+    # Remote API endpoints
+    path('remote/followee/<str:local_serial>/<path:remote_fqid>/', RemoteFolloweeView.as_view(), name='remote-followee'),
+    path('remote/authors/', RemoteAuthorsView.as_view(), name='remote-authors'),
+    
+    # ActivityPub inbox endpoint for receiving objects from remote nodes
+    path('authors/<uuid:author_id>/inbox/', InboxReceiveView.as_view(), name='inbox-receive'),
 ]

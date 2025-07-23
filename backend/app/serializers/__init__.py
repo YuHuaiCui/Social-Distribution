@@ -1,5 +1,6 @@
 # Import all serializers to make them available when importing from app.serializers
-from .author import AuthorSerializer, AuthorListSerializer, NodeSerializer
+from .author import AuthorSerializer, AuthorListSerializer
+from .node import NodeSerializer, NodeWithAuthenticationSerializer, NodeCreateSerializer, NodeUpdateSerializer
 from .inbox import InboxItemSerializer, InboxCreateSerializer, InboxStatsSerializer
 from .entry import EntrySerializer
 from .comment import CommentSerializer
@@ -18,6 +19,9 @@ __all__ = [
     "AuthorSerializer",
     "AuthorListSerializer", 
     "NodeSerializer",
+    "NodeWithAuthenticationSerializer",
+    "NodeCreateSerializer",
+    "NodeUpdateSerializer",
     "InboxItemSerializer",
     "InboxCreateSerializer",
     "InboxStatsSerializer",
