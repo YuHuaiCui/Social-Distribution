@@ -16,6 +16,8 @@ ALLOWED_HOSTS = [
 CORS_ALLOWED_ORIGINS = [
     "https://s25-black-dev-962e55a69a4c.herokuapp.com",
     "http://s25-black-dev-962e55a69a4c.herokuapp.com",
+    "https://cmp404-black-prod-melrita-8023e830960b.herokuapp.com",  # ✅ Add this
+    "http://cmp404-black-prod-melrita-8023e830960b.herokuapp.com",   # (optional)
 ]
 # Allow the app's own domain
 if os.environ.get('HEROKU_APP_NAME'):
