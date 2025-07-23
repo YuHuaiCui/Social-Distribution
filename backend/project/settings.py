@@ -14,7 +14,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 from corsheaders.defaults import default_headers
 import os
-import csp.constants
 
 load_dotenv()
 
@@ -253,7 +252,7 @@ CONTENT_SECURITY_POLICY_REPORT_ONLY = {
         'img-src': ["'self'", 'data:', 'https:'],
         'media-src': ["'self'"],
         'object-src': ["'none'"],
-        'script-src': ["'self'", 'https://github.githubassets.com', 'https://cdn.jsdelivr.net', csp.constants.NONCE],
+        'script-src': ["'self'", 'https://github.githubassets.com', 'https://cdn.jsdelivr.net', 'nonce'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://github.githubassets.com', 'https://fonts.googleapis.com']
     }
 }
