@@ -14,7 +14,6 @@ import {
   Heart,
   UserPlus,
   Server,
-  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../../lib/theme";
@@ -148,15 +147,6 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
               >
                 Inbox
               </Link>
-              <a
-                href="https://cmput404-black-prod-45c4a1d5f9e8.herokuapp.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-text-2 hover:text-text-1 transition-colors font-medium flex items-center gap-1"
-              >
-                External Site
-                <ExternalLink size={14} />
-              </a>
             </nav>
           )}
 
