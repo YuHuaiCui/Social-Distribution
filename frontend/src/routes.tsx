@@ -20,9 +20,7 @@ import SavedPostsPage from "./pages/SavedPostsPage";
 import LikedPostsPage from "./pages/LikedPostsPage";
 import FollowRequestsPage from "./pages/FollowRequestsPage";
 import DocsPage from "./pages/DocsPage";
-
-
-
+import NodeManagementPage from "./pages/NodeManagementPage";
 
 export const routes: RouteObject[] = [
   {
@@ -98,9 +96,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: "/posts/:postId",
-        element: (
-            <PostDetailPage />
-        ),
+        element: <PostDetailPage />,
       },
       {
         path: "/settings",
@@ -110,59 +106,67 @@ export const routes: RouteObject[] = [
           </Protected>
         ),
       },
-    {
-    path: "/authors/:id",
-    element: (
-      <Protected>
-        <AuthorProfilePage />
-      </Protected>
-    ),
-  },
-{
-  path: "/authors/:id/followers",
-  element: (
-    <Protected>
-      <FriendsPage defaultFilter="followers" />
-    </Protected>
-  ),
-},
-{
-  path: "/authors/:id/following",
-  element: (
-    <Protected>
-      <FriendsPage defaultFilter="following" />
-    </Protected>
-  ),
-},
+      {
+        path: "/node-management",
+        element: (
+          <Protected>
+            <NodeManagementPage />
+          </Protected>
+        ),
+      },
+      {
+        path: "/authors/:id",
+        element: (
+          <Protected>
+            <AuthorProfilePage />
+          </Protected>
+        ),
+      },
+      {
+        path: "/authors/:id/followers",
+        element: (
+          <Protected>
+            <FriendsPage defaultFilter="followers" />
+          </Protected>
+        ),
+      },
+      {
+        path: "/authors/:id/following",
+        element: (
+          <Protected>
+            <FriendsPage defaultFilter="following" />
+          </Protected>
+        ),
+      },
 
-    {
-      path: "/saved",
-      element: (
-        <Protected>
-          <SavedPostsPage />
-        </Protected>
-      ),
-    },
-    {
-      path: "/liked",
-      element: (
-        <Protected>
-          <LikedPostsPage />
-        </Protected>
-      ),
-    },
-    {
-      path: "/follow-requests",
-      element: (
-        <Protected>
-          <FollowRequestsPage />
-        </Protected>
-      ),
-    },
-    {
-      path: "/docs",
-      element: <DocsPage />,
-    },
+      {
+        path: "/saved",
+        element: (
+          <Protected>
+            <SavedPostsPage />
+          </Protected>
+        ),
+      },
+      {
+        path: "/liked",
+        element: (
+          <Protected>
+            <LikedPostsPage />
+          </Protected>
+        ),
+      },
+      {
+        path: "/follow-requests",
+        element: (
+          <Protected>
+            <FollowRequestsPage />
+          </Protected>
+        ),
+      },
+      {
+        path: "/docs",
+        element: <DocsPage />,
+      },
     ],
   },
   // Error pages with separate layout

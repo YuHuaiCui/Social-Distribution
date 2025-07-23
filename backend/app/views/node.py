@@ -42,11 +42,12 @@ class GetNodesView(APIView):
         """
         Fetch the list of `Node` table.
         """
-        # We only want to display these in the frontend
-        nodes = Node.objects.values('host', 'username', 'password', 'is_active')
-
-        # List of dictionaries automatically converted into JSON by DRF
-        return Response(nodes, status=status.HTTP_200_OK)
+        # Return all node fields for the frontend
+        nodes = Node.objects.all()
+        serializer = NodeSerializer(nodes, many=True)
+        print(f"GetNodesView: Returning {len(serializer.data)} nodes")
+        print(f"GetNodesView: Data: {serializer.data}")
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class AddNodeView(APIView):
@@ -251,14 +252,19 @@ class DeleteNodeView(APIView):
         """
         Remove a node from Node (hard-delete).
         """
-        # Updated call: http://localhost:8000/api/nodes/remove/?username=nodename
-        node_name = request.query_params.get('username')
+        # Support both query parameter and request body
+        node_identifier = request.query_params.get('username') or request.data.get('host')
 
-        if not node_name:
-            return Response({'error': 'Missing required field.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not node_identifier:
+            return Response({'error': 'Missing required field (username or host).'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            node = Node.objects.get(username=node_name)
+            # Try to find by host first, then by username
+            try:
+                node = Node.objects.get(host=node_identifier)
+            except Node.DoesNotExist:
+                node = Node.objects.get(username=node_identifier)
+            
             node.delete()
 
             return Response({'message': 'Node removed successfully'}, status=status.HTTP_200_OK)

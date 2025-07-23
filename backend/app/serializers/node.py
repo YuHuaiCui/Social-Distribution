@@ -10,9 +10,8 @@ class NodeSerializer(serializers.ModelSerializer):
         model = Node
         fields = ['id', 'name', 'host', 'username', 'password', 'is_active', 'created_at']
         read_only_fields = ['id', 'created_at']
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
+        # Remove write_only for password so it's included in GET requests for the frontend
+        extra_kwargs = {}
         
         examples = [
             OpenApiExample(
