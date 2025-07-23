@@ -49,6 +49,7 @@ jobs:
             exit 1
           }
           
+
           echo "✅ Build completed successfully"
 
           echo "📋 Copying build files to Django static directory..."
