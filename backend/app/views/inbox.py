@@ -31,15 +31,20 @@ class InboxReceiveView(APIView):
         """
         Receive an ActivityPub object in an author's inbox
         """
+        print(f"DEBUG: Received inbox request for author {author_id}")
+        print(f"DEBUG: Request data: {request.data}")
+        
         # Extract the author from the URL
         try:
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
+            print(f"DEBUG: Author {author_id} not found")
             return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
         
         # Check authentication
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Basic '):
+            print("DEBUG: No valid Authorization header")
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Verify credentials against known nodes
@@ -47,10 +52,14 @@ class InboxReceiveView(APIView):
         credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
         username, password = credentials.split(':', 1)
         
+        print(f"DEBUG: Authenticating with username: {username}")
+        
         # Check if this is a known node
         try:
             node = Node.objects.get(username=username, password=password, is_active=True)
+            print(f"DEBUG: Found matching node: {node.name} ({node.host})")
         except Node.DoesNotExist:
+            print(f"DEBUG: No matching node found for username: {username}")
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Process the incoming object
@@ -58,19 +67,23 @@ class InboxReceiveView(APIView):
             data = request.data
             object_type = data.get('type', '')
             
+            print(f"DEBUG: Processing object type: {object_type}")
+            
             if object_type == 'Follow':
                 return self._handle_follow_request(author, data, node)
             elif object_type == 'Like':
                 return self._handle_like(author, data, node)
             elif object_type == 'Comment':
                 return self._handle_comment(author, data, node)
-            elif object_type == 'Post':
+            elif object_type == 'Post' or object_type == 'Create':
                 return self._handle_post(author, data, node)
             else:
+                print(f"DEBUG: Unsupported object type: {object_type}")
                 return Response({"error": f"Unsupported object type: {object_type}"}, 
                               status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:
+            print(f"DEBUG: Error processing object: {str(e)}")
             return Response({"error": f"Failed to process object: {str(e)}"}, 
                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -168,25 +181,155 @@ class InboxReceiveView(APIView):
         """
         Handle incoming like from a remote node
         """
-        # Implementation for handling likes
-        # This would create a Like object and inbox item
-        return Response({"message": "Like received"}, status=status.HTTP_200_OK)
+        try:
+            # Extract like data
+            actor_data = data.get('actor', {})
+            object_data = data.get('object', {})
+            
+            # Get or create the remote author
+            remote_author, created = self._get_or_create_remote_author(actor_data, remote_node)
+            
+            # Determine what was liked (entry or comment)
+            object_url = object_data.get('id') if isinstance(object_data, dict) else object_data
+            
+            # Try to find the liked object
+            from app.models import Entry, Comment
+            
+            try:
+                # First try to find as entry
+                liked_object = Entry.objects.get(url=object_url)
+                object_type = 'entry'
+            except Entry.DoesNotExist:
+                try:
+                    # Then try to find as comment
+                    liked_object = Comment.objects.get(url=object_url)
+                    object_type = 'comment'
+                except Comment.DoesNotExist:
+                    # If object doesn't exist, we can't create the like
+                    return Response({"message": "Liked object not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Create the like
+            from app.models import Like
+            like, created = Like.objects.get_or_create(
+                author=remote_author,
+                entry=liked_object if object_type == 'entry' else None,
+                comment=liked_object if object_type == 'comment' else None,
+                defaults={'url': f"{remote_author.host}likes/{remote_author.id}/{liked_object.id}"}
+            )
+            
+            # Create inbox item
+            Inbox.objects.create(
+                recipient=recipient,
+                item_type=Inbox.LIKE,
+                like=like,
+                raw_data=data
+            )
+            
+            return Response({"message": "Like received"}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _handle_comment(self, recipient, data, remote_node):
         """
         Handle incoming comment from a remote node
         """
-        # Implementation for handling comments
-        # This would create a Comment object and inbox item
-        return Response({"message": "Comment received"}, status=status.HTTP_200_OK)
+        try:
+            # Extract comment data
+            actor_data = data.get('actor', {})
+            object_data = data.get('object', {})
+            comment_data = data.get('comment', {})
+            
+            # Get or create the remote author
+            remote_author, created = self._get_or_create_remote_author(actor_data, remote_node)
+            
+            # Find the entry being commented on
+            entry_url = object_data.get('id') if isinstance(object_data, dict) else object_data
+            
+            from app.models import Entry
+            try:
+                entry = Entry.objects.get(url=entry_url)
+            except Entry.DoesNotExist:
+                return Response({"message": "Entry not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Create the comment
+            from app.models import Comment
+            
+            # Generate a temporary URL first, then update it after creation
+            temp_url = f"{remote_author.host}comments/{remote_author.id}/{entry.id}/temp"
+            
+            comment = Comment.objects.create(
+                author=remote_author,
+                entry=entry,
+                content=comment_data.get('content', ''),
+                content_type=comment_data.get('contentType', 'text/plain'),
+                url=temp_url
+            )
+            
+            # Update the URL with the actual comment ID
+            comment.url = f"{remote_author.host}comments/{remote_author.id}/{entry.id}/{comment.id}"
+            comment.save(update_fields=['url'])
+            
+            # Create inbox item
+            Inbox.objects.create(
+                recipient=recipient,
+                item_type=Inbox.COMMENT,
+                comment=comment,
+                raw_data=data
+            )
+            
+            return Response({"message": "Comment received"}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _handle_post(self, recipient, data, remote_node):
         """
         Handle incoming post from a remote node
         """
-        # Implementation for handling posts
-        # This would create an Entry object and inbox item
-        return Response({"message": "Post received"}, status=status.HTTP_200_OK)
+        try:
+            # Extract post data
+            actor_data = data.get('actor', {})
+            post_data = data.get('object', {})
+            
+            # Get or create the remote author
+            remote_author, created = self._get_or_create_remote_author(actor_data, remote_node)
+            
+            # Create the entry
+            from app.models import Entry
+            
+            # Generate a temporary URL first, then update it after creation
+            temp_url = post_data.get('id', f"{remote_author.host}posts/{remote_author.id}/temp")
+            
+            entry = Entry.objects.create(
+                author=remote_author,
+                title=post_data.get('title', ''),
+                content=post_data.get('content', ''),
+                content_type=post_data.get('contentType', 'text/plain'),
+                visibility=post_data.get('visibility', 'PUBLIC'),
+                description=post_data.get('description', ''),
+                url=temp_url,
+                source=post_data.get('source', ''),
+                origin=post_data.get('origin', '')
+            )
+            
+            # Update the URL with the actual entry ID
+            if not post_data.get('id'):
+                entry.url = f"{remote_author.host}posts/{remote_author.id}/{entry.id}"
+                entry.save(update_fields=['url'])
+            
+            # Create inbox item
+            Inbox.objects.create(
+                recipient=recipient,
+                item_type=Inbox.ENTRY,
+                entry=entry,
+                raw_data=data
+            )
+            
+            return Response({"message": "Post received"}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class InboxViewSet(viewsets.ModelViewSet):
@@ -469,7 +612,9 @@ class InboxViewSet(viewsets.ModelViewSet):
             }
 
             # Send to remote node's inbox
-            inbox_url = f"{remote_author.host}authors/{remote_author.id.split('/')[-2]}/inbox/"
+            # Extract author ID from the URL properly
+            author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
+            inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
             
             response = requests.post(
                 inbox_url,
