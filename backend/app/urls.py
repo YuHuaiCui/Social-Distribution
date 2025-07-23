@@ -16,6 +16,7 @@ app_name = "social-distribution"
 # Main router for compliant endpoints
 router = DefaultRouter()
 router.register(r"authors", AuthorViewSet, basename="authors")
+router.register(r"inbox", InboxViewSet, basename="inbox")
 
 # Legacy views for backward compatibility
 entry_list = EntryViewSet.as_view({

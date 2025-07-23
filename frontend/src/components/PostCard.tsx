@@ -320,7 +320,10 @@ const PostCardComponent: React.FC<PostCardProps> = ({
         <div className="card-content">
           {/* Author info */}
           <div className="flex items-center mb-4">
-            <Link to={`/authors/${author.id}`} className="flex items-center">
+            <Link
+              to={`/authors/${extractUUID(author.id)}`}
+              className="flex items-center"
+            >
               <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
                 {author.profile_image ? (
                   <LoadingImage

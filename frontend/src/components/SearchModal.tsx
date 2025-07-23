@@ -1,13 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FileText, Hash, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, FileText, Hash, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-import { api } from '../services/api';
-import AnimatedGradient from './ui/AnimatedGradient';
-import type { Entry, Author, Comment } from '../types/models';
+import { api } from "../services/api";
+import AnimatedGradient from "./ui/AnimatedGradient";
+import type { Entry, Author, Comment } from "../types/models";
 import { useAuth } from "./context/AuthContext"; // adjust path as needed
-
+import { extractUUID } from "../utils/extractId";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -24,8 +24,9 @@ interface SearchResults {
 
 const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const showError = (message: string) => console.error('Search error:', message);
-  const [query, setQuery] = useState('');
+  const showError = (message: string) =>
+    console.error("Search error:", message);
+  const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<SearchResults | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +72,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         authors: [],
         comments: [],
         tags: [],
-        remoteResults: []
+        remoteResults: [],
       };
 
       // Search authors
@@ -83,9 +84,10 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
             ...(isAdmin ? {} : { is_approved: true }),
           });
           // Handle both paginated and direct array responses
-          searchResults.authors = authorsResponse.results || authorsResponse || [];
+          searchResults.authors =
+            authorsResponse.results || authorsResponse || [];
         } catch (error) {
-          console.error('Error searching authors:', error);
+          console.error("Error searching authors:", error);
         }
       }
 
@@ -94,7 +96,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
 
       setResults(searchResults);
     } catch (error) {
-      showError('Search failed. Please try again.');
+      showError("Search failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -102,17 +104,17 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
 
   const handleResultClick = (type: string, id: string) => {
     onClose();
-    setQuery('');
+    setQuery("");
     setResults(null);
 
     switch (type) {
-      case 'post':
+      case "post":
         navigate(`/posts/${id}`);
         break;
-      case 'author':
-        navigate(`/authors/${id}`);
+      case "author":
+        navigate(`/authors/${extractUUID(id)}`);
         break;
-      case 'tag':
+      case "tag":
         navigate(`/explore?tag=${id}`);
         break;
     }
@@ -120,32 +122,32 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
 
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.9, y: 20 },
-    visible: { 
-      opacity: 1, 
-      scale: 1, 
+    visible: {
+      opacity: 1,
+      scale: 1,
       y: 0,
-      transition: { 
-        type: "spring" as const, 
+      transition: {
+        type: "spring" as const,
         damping: 25,
         stiffness: 300,
-        duration: 0.4 
-      }
+        duration: 0.4,
+      },
     },
-    exit: { 
-      opacity: 0, 
-      scale: 0.9, 
+    exit: {
+      opacity: 0,
+      scale: 0.9,
       y: 20,
-      transition: { duration: 0.3 }
-    }
+      transition: { duration: 0.3 },
+    },
   };
 
-  const hasResults = results && (
-    results.posts.length > 0 ||
-    results.authors.length > 0 ||
-    results.comments.length > 0 ||
-    results.tags.length > 0 ||
-    results.remoteResults.length > 0
-  );
+  const hasResults =
+    results &&
+    (results.posts.length > 0 ||
+      results.authors.length > 0 ||
+      results.comments.length > 0 ||
+      results.tags.length > 0 ||
+      results.remoteResults.length > 0);
 
   return (
     <AnimatePresence>
@@ -159,7 +161,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
             transition={{ duration: 0.3 }}
             onClick={onClose}
           />
-          
+
           <motion.div
             className="fixed inset-0 z-[310] flex items-center justify-center pointer-events-none"
             initial={{ opacity: 0 }}
@@ -181,15 +183,38 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex items-center justify-center gap-3 mb-6"
                 >
-                  <span className="text-sm font-medium text-white/90 drop-shadow-lg">Popular:</span>
-                  {['React', 'TypeScript', 'Distributed Systems', 'CMPUT404'].map((suggestion, index) => {
+                  <span className="text-sm font-medium text-white/90 drop-shadow-lg">
+                    Popular:
+                  </span>
+                  {[
+                    "React",
+                    "TypeScript",
+                    "Distributed Systems",
+                    "CMPUT404",
+                  ].map((suggestion, index) => {
                     const gradientSets = [
-                      ['var(--primary-yellow)', 'var(--primary-pink)', 'var(--primary-purple)'],
-                      ['var(--primary-teal)', 'var(--primary-blue)', 'var(--primary-purple)'],
-                      ['var(--primary-coral)', 'var(--primary-violet)', 'var(--primary-pink)'],
-                      ['var(--primary-purple)', 'var(--primary-teal)', 'var(--primary-yellow)']
+                      [
+                        "var(--primary-yellow)",
+                        "var(--primary-pink)",
+                        "var(--primary-purple)",
+                      ],
+                      [
+                        "var(--primary-teal)",
+                        "var(--primary-blue)",
+                        "var(--primary-purple)",
+                      ],
+                      [
+                        "var(--primary-coral)",
+                        "var(--primary-violet)",
+                        "var(--primary-pink)",
+                      ],
+                      [
+                        "var(--primary-purple)",
+                        "var(--primary-teal)",
+                        "var(--primary-yellow)",
+                      ],
                     ];
-                    
+
                     return (
                       <motion.div
                         key={suggestion}
@@ -211,10 +236,13 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                   })}
                 </motion.div>
               )}
-              
+
               {/* Glassmorphic search bar */}
               <div className="relative mb-8">
-                <Search size={24} className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--text-2)] pointer-events-none z-10" />
+                <Search
+                  size={24}
+                  className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--text-2)] pointer-events-none z-10"
+                />
                 <input
                   ref={inputRef}
                   type="text"
@@ -223,7 +251,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                   placeholder="Search posts, authors, or tags..."
                   className="w-full pl-16 pr-6 py-6 text-lg bg-[rgba(var(--glass-rgb),0.6)] backdrop-blur-2xl border-2 border-[var(--glass-border-prominent)] rounded-full text-[var(--text-1)] placeholder:text-[var(--text-2)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-purple)]/30 focus:border-[var(--primary-purple)]/50 transition-all shadow-xl"
                   onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
+                    if (e.key === "Escape") {
                       onClose();
                     }
                   }}
@@ -242,7 +270,9 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                       <div className="inline-flex items-center justify-center">
                         <div className="w-8 h-8 rounded-full border-2 border-[var(--primary-purple)] border-t-transparent animate-spin" />
                       </div>
-                      <p className="mt-3 text-sm text-[var(--search-results-secondary)]">Searching...</p>
+                      <p className="mt-3 text-sm text-[var(--search-results-secondary)]">
+                        Searching...
+                      </p>
                     </div>
                   )}
 
@@ -258,24 +288,31 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                             {results.authors.map((author) => (
                               <motion.button
                                 key={author.id}
-                                onClick={() => handleResultClick('author', author.id)}
+                                onClick={() =>
+                                  handleResultClick("author", author.id)
+                                }
                                 className="w-full p-3 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] hover:bg-[rgba(var(--glass-rgb),0.5)] text-left transition-all group"
                                 whileHover={{ x: 4 }}
                                 whileTap={{ scale: 0.98 }}
                               >
                                 <div className="flex items-center">
                                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-pink)] flex items-center justify-center text-white font-semibold text-sm mr-3 shrink-0">
-                                    {author.display_name?.charAt(0).toUpperCase() || 'U'}
+                                    {author.display_name
+                                      ?.charAt(0)
+                                      .toUpperCase() || "U"}
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors">
-                                      {author.display_name || 'Unknown Author'}
+                                      {author.display_name || "Unknown Author"}
                                     </h4>
                                     <p className="text-xs text-[var(--search-results-secondary)] truncate">
-                                      @{author.username || 'unknown'}
+                                      @{author.username || "unknown"}
                                     </p>
                                   </div>
-                                  <ArrowRight size={14} className="text-[var(--search-results-secondary)] ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  <ArrowRight
+                                    size={14}
+                                    className="text-[var(--search-results-secondary)] ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  />
                                 </div>
                               </motion.button>
                             ))}
@@ -293,22 +330,32 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                             {results.posts.map((post) => (
                               <motion.button
                                 key={post.id}
-                                onClick={() => handleResultClick('post', post.id)}
+                                onClick={() =>
+                                  handleResultClick("post", post.id)
+                                }
                                 className="w-full p-3 rounded-lg bg-[rgba(var(--glass-rgb),0.3)] hover:bg-[rgba(var(--glass-rgb),0.5)] text-left transition-all group"
                                 whileHover={{ x: 4 }}
                                 whileTap={{ scale: 0.98 }}
                               >
                                 <div className="flex items-center">
-                                  <FileText size={16} className="text-[var(--primary-purple)] mr-3 shrink-0" />
+                                  <FileText
+                                    size={16}
+                                    className="text-[var(--primary-purple)] mr-3 shrink-0"
+                                  />
                                   <div className="flex-1 min-w-0">
                                     <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors">
                                       {post.title}
                                     </h4>
                                     <p className="text-xs text-[var(--search-results-secondary)] truncate">
-                                      {typeof post.author === 'object' ? post.author.display_name : 'Unknown Author'}
+                                      {typeof post.author === "object"
+                                        ? post.author.display_name
+                                        : "Unknown Author"}
                                     </p>
                                   </div>
-                                  <ArrowRight size={14} className="text-[var(--search-results-secondary)] ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  <ArrowRight
+                                    size={14}
+                                    className="text-[var(--search-results-secondary)] ml-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  />
                                 </div>
                               </motion.button>
                             ))}
@@ -326,7 +373,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                             {results.tags.map((tag, index) => (
                               <motion.button
                                 key={tag}
-                                onClick={() => handleResultClick('tag', tag)}
+                                onClick={() => handleResultClick("tag", tag)}
                                 className="px-3 py-1.5 rounded-full bg-gradient-to-r from-[var(--primary-purple)]/10 to-[var(--primary-pink)]/10 hover:from-[var(--primary-purple)]/20 hover:to-[var(--primary-pink)]/20 text-sm text-[var(--search-results-primary)] font-medium border border-[var(--glass-border)] transition-all"
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -346,9 +393,16 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
 
                   {!isLoading && query && !hasResults && (
                     <div className="p-8 text-center">
-                      <Search size={32} className="text-[var(--search-results-secondary)] mx-auto mb-4 opacity-50" />
-                      <p className="text-[var(--search-results-primary)] font-medium">No results found</p>
-                      <p className="text-sm text-[var(--search-results-secondary)] mt-1">Try searching with different keywords</p>
+                      <Search
+                        size={32}
+                        className="text-[var(--search-results-secondary)] mx-auto mb-4 opacity-50"
+                      />
+                      <p className="text-[var(--search-results-primary)] font-medium">
+                        No results found
+                      </p>
+                      <p className="text-sm text-[var(--search-results-secondary)] mt-1">
+                        Try searching with different keywords
+                      </p>
                     </div>
                   )}
                 </motion.div>

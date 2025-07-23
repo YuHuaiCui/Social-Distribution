@@ -21,6 +21,7 @@ import LoadingImage from "../ui/LoadingImage";
 import Button from "../ui/Button";
 import AnimatedGradient from "../ui/AnimatedGradient";
 import { NotificationBadge } from "../NotificationBadge";
+import { extractUUID } from "../../utils/extractId";
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -429,7 +430,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                         }}
                       >
                         <Link
-                          to={`/authors/${user.id}`}
+                          to={`/authors/${extractUUID(user.id)}`}
                           className="flex items-center px-4 py-2.5 text-text-1 hover:bg-glass-low transition-all relative overflow-hidden group cursor-pointer"
                           onClick={() => setShowUserMenu(false)}
                         >

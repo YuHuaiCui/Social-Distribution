@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  UserPlus, 
-  Check, 
-  X, 
+import {
+  UserPlus,
+  Check,
+  X,
   Users,
   Clock,
   UserCheck,
-  AlertCircle 
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "../components/context/AuthContext";
 import { socialService } from "../services/social";
 import Loader from "../components/ui/Loader";
+import { extractUUID } from "../utils/extractId";
 import Card from "../components/ui/Card";
 import Avatar from "../components/Avatar/Avatar";
 import AnimatedButton from "../components/ui/AnimatedButton";
@@ -65,7 +66,7 @@ export const FollowRequestsPage: React.FC = () => {
     try {
       await socialService.acceptFollowRequest(followId);
       showSuccess("Follow request accepted!");
-      
+
       // Remove from list
       setRequests((prev) => prev.filter((req) => req.id !== followId));
     } catch (error) {
@@ -86,7 +87,7 @@ export const FollowRequestsPage: React.FC = () => {
     try {
       await socialService.rejectFollowRequest(followId);
       showSuccess("Follow request rejected");
-      
+
       // Remove from list
       setRequests((prev) => prev.filter((req) => req.id !== followId));
     } catch (error) {
@@ -165,13 +166,15 @@ export const FollowRequestsPage: React.FC = () => {
               <UserPlus className="w-6 h-6 text-white" />
             </motion.div>
             <div>
-              <h1 className="text-2xl font-bold text-text-1">Follow Requests</h1>
+              <h1 className="text-2xl font-bold text-text-1">
+                Follow Requests
+              </h1>
               <p className="text-sm text-text-2">
                 People who want to follow you
               </p>
             </div>
           </div>
-          
+
           {requests.length > 0 && (
             <div className="flex items-center space-x-2 text-text-2">
               <Clock size={16} />
@@ -208,8 +211,8 @@ export const FollowRequestsPage: React.FC = () => {
               No pending follow requests
             </h2>
             <p className="text-text-2 mb-6 max-w-md mx-auto">
-              When someone requests to follow you, you'll see them here.
-              You can approve or deny their request.
+              When someone requests to follow you, you'll see them here. You can
+              approve or deny their request.
             </p>
             <AnimatedButton
               onClick={() => (window.location.href = "/friends")}
@@ -240,8 +243,12 @@ export const FollowRequestsPage: React.FC = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <Link 
-                          to={isAuthorObject(follower) ? `/authors/${follower.id}` : "#"}
+                        <Link
+                          to={
+                            isAuthorObject(follower)
+                              ? `/authors/${extractUUID(follower.id)}`
+                              : "#"
+                          }
                           className="hover:opacity-80 transition-opacity"
                         >
                           <motion.div whileHover={{ scale: 1.05 }}>
@@ -261,8 +268,12 @@ export const FollowRequestsPage: React.FC = () => {
                           </motion.div>
                         </Link>
                         <div>
-                          <Link 
-                            to={isAuthorObject(follower) ? `/authors/${follower.id}` : "#"}
+                          <Link
+                            to={
+                              isAuthorObject(follower)
+                                ? `/authors/${extractUUID(follower.id)}`
+                                : "#"
+                            }
                             className="hover:text-[var(--primary-violet)] transition-colors"
                           >
                             <h3 className="font-semibold text-text-1">
@@ -272,7 +283,10 @@ export const FollowRequestsPage: React.FC = () => {
                             </h3>
                           </Link>
                           <p className="text-sm text-text-2">
-                            @{isAuthorObject(follower) ? follower.username : "unknown"}
+                            @
+                            {isAuthorObject(follower)
+                              ? follower.username
+                              : "unknown"}
                           </p>
                           {isAuthorObject(follower) && follower.bio && (
                             <p className="text-sm text-text-2 mt-1 line-clamp-2">
@@ -343,13 +357,18 @@ export const FollowRequestsPage: React.FC = () => {
             className="mt-8 p-4 rounded-lg bg-[var(--primary-teal)]/10 border border-[var(--primary-teal)]/20"
           >
             <div className="flex items-start space-x-2">
-              <AlertCircle size={16} className="text-[var(--primary-teal)] mt-0.5" />
+              <AlertCircle
+                size={16}
+                className="text-[var(--primary-teal)] mt-0.5"
+              />
               <div className="text-sm text-text-2">
-                <p className="font-medium text-text-1 mb-1">About follow requests</p>
+                <p className="font-medium text-text-1 mb-1">
+                  About follow requests
+                </p>
                 <p>
-                  When you accept a follow request, the person will be able to see
-                  your posts marked as "Friends Only" and will be notified of your
-                  new posts.
+                  When you accept a follow request, the person will be able to
+                  see your posts marked as "Friends Only" and will be notified
+                  of your new posts.
                 </p>
               </div>
             </div>

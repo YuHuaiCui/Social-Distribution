@@ -7,7 +7,6 @@ import { BaseApiService } from "../base";
 import type {
   InboxItem,
   InboxFilterParams,
-  MarkAsReadData,
   InboxStats,
   PaginatedResponse,
 } from "../../types";
@@ -40,13 +39,17 @@ export class InboxService extends BaseApiService {
   async markAsRead(
     ids: string[]
   ): Promise<{ success: boolean; updated: number }> {
-    return this.request<{ success: boolean; updated: number }>(
-      "/api/inbox/mark-read/",
-      {
-        method: "POST",
-        body: JSON.stringify({ ids }),
+    // Use individual markItemAsRead calls since bulk endpoint has issues
+    let updated = 0;
+    for (const id of ids) {
+      try {
+        await this.markItemAsRead(id);
+        updated++;
+      } catch (error) {
+        console.error(`Failed to mark item ${id} as read:`, error);
       }
-    );
+    }
+    return { success: true, updated };
   }
 
   /**
