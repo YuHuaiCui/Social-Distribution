@@ -15,7 +15,6 @@ import type { Entry, CreateEntryData } from "../types";
 import AnimatedButton from "./ui/AnimatedButton";
 import MarkdownEditor from "./MarkdownEditor";
 import ImageUploader from "./ImageUploader";
-import type { ImageUploadResponse } from "../services/image";
 import CategoryTags from "./CategoryTags";
 import PrivacySelector from "./PrivacySelector";
 import { useDefaultVisibility, type Visibility } from "../utils/privacy";
@@ -50,7 +49,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [replacingImage, setReplacingImage] = useState(false);
-  const [currentImage, setCurrentImage] = useState<string | null>(null);
 
   const [expandedSection, setExpandedSection] = useState<
     "content" | "tags" | "privacy" | null
@@ -73,7 +71,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setReplacingImage(false);
       // DO NOT reset images[] here
       setImages([]);
-      setCurrentImage(editingPost.image || null);
     } else {
       setTitle("");
       setContent("");
@@ -82,15 +79,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setCategories([]);
       setImages([]);
       setReplacingImage(false);
-      setCurrentImage(null);
     }
-  }, [editingPost?.id, defaultVisibility]); // 🛠 use editingPost?.id to ensure clean re-run
+  }, [editingPost, defaultVisibility]);
 
   // Memoize the onImagesChange callback to prevent infinite re-renders
   const handleImagesChange = useCallback((newImages: File[]) => {
     setImages(newImages);
     setReplacingImage(true); // hide uploader after user picks a file
-    setCurrentImage(null); // clear preview
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,6 +186,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
+      setReplacingImage(false);
       setError("");
       setExpandedSection("content");
       setIsFullscreen(false);
@@ -374,29 +370,37 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                                   uploadToServer={false}
                                 />
                               ) : (
-                                <div className="mt-3 space-y-2">
-                                  <img
-                                    key={editingPost.updated_at || Date.now()} // force rerender
-                                    src={editingPost.image}
-                                    alt="Current uploaded"
-                                    className="rounded-lg max-h-64 object-contain border border-border-1"
-                                  />
+                                <div className="mt-3 space-y-3">
+                                  <div className="relative">
+                                    <img
+                                      key={editingPost.updated_at || Date.now()} // force rerender
+                                      src={editingPost.image}
+                                      alt="Current uploaded image"
+                                      className="w-full rounded-lg max-h-64 object-contain border border-border-1 bg-glass-subtle"
+                                    />
+                                  </div>
 
                                   <button
                                     type="button"
                                     onClick={() => setReplacingImage(true)} // triggers file upload
-                                    className="text-sm text-primary hover:underline"
-                                  ></button>
+                                    className="text-sm text-[var(--primary-violet)] hover:text-[var(--primary-purple)] transition-colors flex items-center space-x-1 bg-glass-subtle hover:bg-glass-low px-3 py-2 rounded-lg"
+                                  >
+                                    <ImageIcon size={14} />
+                                    <span>Replace Image</span>
+                                  </button>
                                 </div>
                               )}
-                              {images.length > 0 && (
+                              {(images.length > 0 || editingPost?.image) && (
                                 <div className="mt-3">
+                                  <label className="block text-sm font-medium text-text-2 mb-2">
+                                    Image Caption
+                                  </label>
                                   <textarea
                                     value={content}
                                     onChange={(e) => setContent(e.target.value)}
-                                    placeholder="Add a caption..."
+                                    placeholder="Add a caption for your image..."
                                     className="w-full px-3 py-2 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none text-sm"
-                                    rows={2}
+                                    rows={3}
                                   />
                                 </div>
                               )}
@@ -519,7 +523,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         >
                           <PrivacySelector
                             value={visibility}
-                            onChange={(value) => setVisibility(value)}
+                            onChange={(value: Visibility) =>
+                              setVisibility(value)
+                            }
                             showDescription={false}
                             className="mt-3"
                           />
