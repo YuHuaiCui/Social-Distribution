@@ -218,7 +218,9 @@ class EntryViewSet(viewsets.ModelViewSet):
                 
                 # Send to remote node's inbox
                 try:
-                    inbox_url = f"{remote_author.host}authors/{remote_author.id.split('/')[-2]}/inbox/"
+                    # Extract author ID from the URL properly
+                    author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
+                    inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
                     
                     response = requests.post(
                         inbox_url,

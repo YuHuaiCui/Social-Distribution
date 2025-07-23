@@ -254,13 +254,21 @@ class InboxReceiveView(APIView):
             
             # Create the comment
             from app.models import Comment
+            
+            # Generate a temporary URL first, then update it after creation
+            temp_url = f"{remote_author.host}comments/{remote_author.id}/{entry.id}/temp"
+            
             comment = Comment.objects.create(
                 author=remote_author,
                 entry=entry,
                 content=comment_data.get('content', ''),
                 content_type=comment_data.get('contentType', 'text/plain'),
-                url=f"{remote_author.host}comments/{remote_author.id}/{entry.id}/{comment.id}"
+                url=temp_url
             )
+            
+            # Update the URL with the actual comment ID
+            comment.url = f"{remote_author.host}comments/{remote_author.id}/{entry.id}/{comment.id}"
+            comment.save(update_fields=['url'])
             
             # Create inbox item
             Inbox.objects.create(
@@ -289,6 +297,10 @@ class InboxReceiveView(APIView):
             
             # Create the entry
             from app.models import Entry
+            
+            # Generate a temporary URL first, then update it after creation
+            temp_url = post_data.get('id', f"{remote_author.host}posts/{remote_author.id}/temp")
+            
             entry = Entry.objects.create(
                 author=remote_author,
                 title=post_data.get('title', ''),
@@ -296,10 +308,15 @@ class InboxReceiveView(APIView):
                 content_type=post_data.get('contentType', 'text/plain'),
                 visibility=post_data.get('visibility', 'PUBLIC'),
                 description=post_data.get('description', ''),
-                url=post_data.get('id', f"{remote_author.host}posts/{remote_author.id}/{entry.id}"),
+                url=temp_url,
                 source=post_data.get('source', ''),
                 origin=post_data.get('origin', '')
             )
+            
+            # Update the URL with the actual entry ID
+            if not post_data.get('id'):
+                entry.url = f"{remote_author.host}posts/{remote_author.id}/{entry.id}"
+                entry.save(update_fields=['url'])
             
             # Create inbox item
             Inbox.objects.create(
@@ -595,7 +612,9 @@ class InboxViewSet(viewsets.ModelViewSet):
             }
 
             # Send to remote node's inbox
-            inbox_url = f"{remote_author.host}authors/{remote_author.id.split('/')[-2]}/inbox/"
+            # Extract author ID from the URL properly
+            author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
+            inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
             
             response = requests.post(
                 inbox_url,
