@@ -10,6 +10,7 @@ from .settings import *
 DEBUG = False
 ALLOWED_HOSTS = [
     '.herokuapp.com',
+    'cmp404-black-prod-melrita-66c4dd1f85d5.herokuapp.com',
     os.environ.get('HEROKU_APP_NAME', '') + '.herokuapp.com',
 ]
 
