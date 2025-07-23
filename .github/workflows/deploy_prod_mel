@@ -44,7 +44,7 @@ jobs:
           }
 
           echo "🔨 Building React app for production..."
-          VITE_API_URL="" npx vite build || {
+          VITE_API_URL="https://cmp404-black-prod-melrita-8023e830960b.herokuapp.com" npx vite build || {
             echo "❌ Build failed!"
             exit 1
           }
