@@ -489,6 +489,47 @@ class ApiService {
       `/api/entries/liked/?${queryParams.toString()}`
     );
   }
+
+  // Node Management
+  async getNodes(): Promise<any[]> {
+    console.log("Calling getNodes API...");
+    const response = await this.request("/api/nodes/");
+    console.log("getNodes API response:", response);
+    return response;
+  }
+
+  async addNode(nodeData: {
+    name: string;
+    host: string;
+    username: string;
+    password: string;
+    is_active: boolean;
+  }): Promise<any> {
+    return this.request("/api/nodes/add/", {
+      method: "POST",
+      body: JSON.stringify(nodeData),
+    });
+  }
+
+  async updateNode(nodeData: {
+    oldHost: string;
+    host: string;
+    username: string;
+    password: string;
+    isAuth: boolean;
+  }): Promise<any> {
+    return this.request("/api/nodes/update/", {
+      method: "PUT",
+      body: JSON.stringify(nodeData),
+    });
+  }
+
+  async deleteNode(host: string): Promise<any> {
+    return this.request("/api/nodes/remove/", {
+      method: "DELETE",
+      body: JSON.stringify({ host }),
+    });
+  }
 }
 
 // Export a singleton instance

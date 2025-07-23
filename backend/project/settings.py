@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "drf_spectacular",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -228,6 +229,17 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.FormParser",
         "rest_framework.parsers.MultiPartParser",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# drf-spectacular Configuration
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Social Distribution API",
+    "DESCRIPTION": "API for the Social Distribution platform supporting federated social networking",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": "/api/",
 }
 
 # Site URL for generating author URLs

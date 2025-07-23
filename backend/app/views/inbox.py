@@ -3,11 +3,190 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from rest_framework.views import APIView
+from rest_framework.parsers import JSONParser
+from requests.auth import HTTPBasicAuth
+import requests
+import json
 
 from app.models.inbox import Inbox
 from app.models.follow import Follow
+from app.models.author import Author
+from app.models.node import Node
 from app.serializers.inbox import InboxItemSerializer, InboxStatsSerializer
 from rest_framework.permissions import IsAuthenticated
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class InboxReceiveView(APIView):
+    """
+    Handle incoming ActivityPub objects from remote nodes
+    """
+    parser_classes = [JSONParser]
+    permission_classes = []  # Will handle auth manually
+    
+    def post(self, request, author_id):
+        """
+        Receive an ActivityPub object in an author's inbox
+        """
+        # Extract the author from the URL
+        try:
+            author = Author.objects.get(id=author_id)
+        except Author.DoesNotExist:
+            return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check authentication
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Basic '):
+            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Verify credentials against known nodes
+        import base64
+        credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
+        username, password = credentials.split(':', 1)
+        
+        # Check if this is a known node
+        try:
+            node = Node.objects.get(username=username, password=password, is_active=True)
+        except Node.DoesNotExist:
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Process the incoming object
+        try:
+            data = request.data
+            object_type = data.get('type', '')
+            
+            if object_type == 'Follow':
+                return self._handle_follow_request(author, data, node)
+            elif object_type == 'Like':
+                return self._handle_like(author, data, node)
+            elif object_type == 'Comment':
+                return self._handle_comment(author, data, node)
+            elif object_type == 'Post':
+                return self._handle_post(author, data, node)
+            else:
+                return Response({"error": f"Unsupported object type: {object_type}"}, 
+                              status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({"error": f"Failed to process object: {str(e)}"}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _handle_follow_request(self, recipient, data, remote_node):
+        """
+        Handle incoming follow request from a remote node
+        """
+        actor_data = data.get('actor', {})
+        actor_url = actor_data.get('id') if isinstance(actor_data, dict) else actor_data
+        
+        if not actor_url:
+            return Response({"error": "Actor URL required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get or create the remote author
+        remote_author, created = self._get_or_create_remote_author(actor_data, remote_node)
+        
+        # Check if follow request already exists
+        existing_follow = Follow.objects.filter(
+            follower=remote_author,
+            followed=recipient
+        ).first()
+        
+        if existing_follow:
+            # Update existing follow request
+            existing_follow.status = Follow.PENDING
+            existing_follow.save()
+            follow = existing_follow
+        else:
+            # Create new follow request
+            follow = Follow.objects.create(
+                follower=remote_author,
+                followed=recipient,
+                status=Follow.PENDING
+            )
+        
+        # Create inbox item
+        Inbox.objects.create(
+            recipient=recipient,
+            item_type=Inbox.FOLLOW,
+            follow=follow,
+            raw_data=data
+        )
+        
+        return Response({"message": "Follow request received"}, status=status.HTTP_200_OK)
+    
+    def _get_or_create_remote_author(self, actor_data, remote_node):
+        """
+        Get or create a remote author based on actor data
+        """
+        if isinstance(actor_data, str):
+            # If actor_data is just a URL, we need to fetch the full data
+            try:
+                response = requests.get(
+                    actor_data,
+                    auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                    timeout=5
+                )
+                if response.status_code == 200:
+                    actor_data = response.json()
+                else:
+                    raise Exception(f"Failed to fetch actor data: {response.status_code}")
+            except Exception as e:
+                raise Exception(f"Failed to fetch actor data: {str(e)}")
+        
+        actor_url = actor_data.get('id')
+        if not actor_url:
+            raise Exception("Actor URL not found in data")
+        
+        # Try to get existing remote author
+        try:
+            return Author.objects.get(url=actor_url), False
+        except Author.DoesNotExist:
+            pass
+        
+        # Create new remote author
+        remote_author = Author.objects.create(
+            url=actor_url,
+            username=actor_data.get('username', ''),
+            display_name=actor_data.get('displayName', ''),
+            github_username=actor_data.get('github', ''),
+            profile_image=actor_data.get('profileImage', ''),
+            bio=actor_data.get('bio', ''),
+            location=actor_data.get('location', ''),
+            website=actor_data.get('website', ''),
+            host=actor_data.get('host', ''),
+            web=actor_data.get('page', ''),
+            node=remote_node,
+            is_approved=True,  # Remote authors are auto-approved
+            is_active=True
+        )
+        
+        return remote_author, True
+    
+    def _handle_like(self, recipient, data, remote_node):
+        """
+        Handle incoming like from a remote node
+        """
+        # Implementation for handling likes
+        # This would create a Like object and inbox item
+        return Response({"message": "Like received"}, status=status.HTTP_200_OK)
+    
+    def _handle_comment(self, recipient, data, remote_node):
+        """
+        Handle incoming comment from a remote node
+        """
+        # Implementation for handling comments
+        # This would create a Comment object and inbox item
+        return Response({"message": "Comment received"}, status=status.HTTP_200_OK)
+    
+    def _handle_post(self, recipient, data, remote_node):
+        """
+        Handle incoming post from a remote node
+        """
+        # Implementation for handling posts
+        # This would create an Entry object and inbox item
+        return Response({"message": "Post received"}, status=status.HTTP_200_OK)
 
 
 class InboxViewSet(viewsets.ModelViewSet):
@@ -103,86 +282,87 @@ class InboxViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def mark_read(self, request):
         """
-        Mark inbox items as read
-        Body: {"ids": ["id1", "id2", ...]}
+        Mark multiple inbox items as read
         """
-        ids = request.data.get("ids", [])
-        if not ids:
+        item_ids = request.data.get("item_ids", [])
+        if not item_ids:
             return Response(
-                {"error": "No IDs provided"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "item_ids is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        updated_count = Inbox.objects.filter(id__in=ids, recipient=request.user).update(
-            is_read=True
-        )
+        updated_count = Inbox.objects.filter(
+            id__in=item_ids, recipient=request.user
+        ).update(is_read=True)
 
-        return Response({"success": True, "updated": updated_count})
+        return Response(
+            {"message": f"Marked {updated_count} items as read"},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"])
     def read(self, request, pk=None):
         """
-        Mark a single inbox item as read
+        Mark a specific inbox item as read
         """
-        try:
-            inbox_item = get_object_or_404(Inbox, id=pk, recipient=request.user)
-            inbox_item.is_read = True
-            inbox_item.save()
+        inbox_item = get_object_or_404(Inbox, id=pk, recipient=request.user)
+        inbox_item.is_read = True
+        inbox_item.save()
 
-            serializer = self.get_serializer(inbox_item)
-            return Response(serializer.data)
-        except Inbox.DoesNotExist:
-            return Response(
-                {"error": "Inbox item not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+        return Response(
+            {"message": "Item marked as read"}, status=status.HTTP_200_OK
+        )
 
     @action(detail=False, methods=["post"])
     def mark_processed(self, request):
         """
-        Mark inbox items as processed (ActivityPub compatibility)
-        For now, we'll treat this the same as mark_read
+        Mark multiple inbox items as processed (ActivityPub compatibility)
         """
         return self.mark_read(request)
 
     @action(detail=False, methods=["post"])
     def clear(self, request):
         """
-        Clear all inbox items for the user
+        Clear all inbox items for the authenticated user
         """
-        deleted_count, _ = Inbox.objects.filter(recipient=request.user).delete()
+        deleted_count = Inbox.objects.filter(recipient=request.user).delete()[0]
 
-        return Response({"success": True, "deleted": deleted_count})
+        return Response(
+            {"message": f"Cleared {deleted_count} inbox items"},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=["get"])
     def stats(self, request):
         """
-        Get inbox statistics
+        Get inbox statistics for the authenticated user
         """
-        user = request.user
+        user_inbox = Inbox.objects.filter(recipient=request.user)
 
-        # Get counts
-        total_items = Inbox.objects.filter(recipient=user).count()
-        unread_count = Inbox.objects.filter(recipient=user, is_read=False).count()
-        pending_follows = Inbox.objects.filter(
-            recipient=user, item_type=Inbox.FOLLOW, follow__status=Follow.PENDING
-        ).count()
-
-        stats_data = {
-            "unread_count": unread_count,
-            "pending_follows": pending_follows,
-            "total_items": total_items,
+        stats = {
+            "total_items": user_inbox.count(),
+            "unread_items": user_inbox.filter(is_read=False).count(),
+            "read_items": user_inbox.filter(is_read=True).count(),
+            "by_type": {},
         }
 
-        serializer = InboxStatsSerializer(stats_data)
-        return Response(serializer.data)
+        # Count by item type
+        for item_type, _ in Inbox.ITEM_TYPE_CHOICES:
+            count = user_inbox.filter(item_type=item_type).count()
+            if count > 0:
+                stats["by_type"][item_type] = count
+
+        return Response(stats, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
     def unread_count(self, request):
         """
-        Get unread notifications count
+        Get the count of unread inbox items
         """
-        count = Inbox.objects.filter(recipient=request.user, is_read=False).count()
+        count = Inbox.objects.filter(
+            recipient=request.user, is_read=False
+        ).count()
 
-        return Response({"count": count})
+        return Response({"unread_count": count}, status=status.HTTP_200_OK)
 
     @action(
         detail=True,
@@ -192,41 +372,37 @@ class InboxViewSet(viewsets.ModelViewSet):
     )
     def accept_follow(self, request, pk=None):
         """
-        Accept a follow request from inbox item
+        Accept a follow request from the inbox
         """
-        try:
-            inbox_item = get_object_or_404(
-                Inbox, id=pk, recipient=request.user, item_type=Inbox.FOLLOW
-            )
+        inbox_item = get_object_or_404(Inbox, id=pk, recipient=request.user)
 
-            if not inbox_item.follow:
-                return Response(
-                    {"error": "No associated follow request"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Check if the follow request is still pending
-            if inbox_item.follow.status != Follow.PENDING:
-                return Response(
-                    {"error": "Follow request is not pending"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Accept the follow request
-            inbox_item.follow.status = Follow.ACCEPTED
-            inbox_item.follow.save()
-
-            # Delete the inbox item since it's been processed
-            inbox_item.delete()
-
+        if inbox_item.item_type != Inbox.FOLLOW:
             return Response(
-                {"status": "accepted", "message": "Follow request accepted"}
+                {"error": "This inbox item is not a follow request"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        except Inbox.DoesNotExist:
+        if not inbox_item.follow:
             return Response(
-                {"error": "Inbox item not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Follow object not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+        # Update follow status
+        follow = inbox_item.follow
+        follow.status = Follow.ACCEPTED
+        follow.save()
+
+        # Mark inbox item as read
+        inbox_item.is_read = True
+        inbox_item.save()
+
+        # Send acceptance notification to remote node if it's a remote follow
+        if follow.follower.is_remote:
+            self._send_follow_response(follow, "Accept")
+
+        return Response(
+            {"message": "Follow request accepted"}, status=status.HTTP_200_OK
+        )
 
     @action(
         detail=True,
@@ -236,38 +412,75 @@ class InboxViewSet(viewsets.ModelViewSet):
     )
     def reject_follow(self, request, pk=None):
         """
-        Reject a follow request from inbox item
+        Reject a follow request from the inbox
+        """
+        inbox_item = get_object_or_404(Inbox, id=pk, recipient=request.user)
+
+        if inbox_item.item_type != Inbox.FOLLOW:
+            return Response(
+                {"error": "This inbox item is not a follow request"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not inbox_item.follow:
+            return Response(
+                {"error": "Follow object not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Update follow status
+        follow = inbox_item.follow
+        follow.status = Follow.REJECTED
+        follow.save()
+
+        # Mark inbox item as read
+        inbox_item.is_read = True
+        inbox_item.save()
+
+        # Send rejection notification to remote node if it's a remote follow
+        if follow.follower.is_remote:
+            self._send_follow_response(follow, "Reject")
+
+        return Response(
+            {"message": "Follow request rejected"}, status=status.HTTP_200_OK
+        )
+
+    def _send_follow_response(self, follow, response_type):
+        """
+        Send follow response (Accept/Reject) to remote node
         """
         try:
-            inbox_item = get_object_or_404(
-                Inbox, id=pk, recipient=request.user, item_type=Inbox.FOLLOW
+            remote_author = follow.follower
+            if not remote_author.is_remote or not remote_author.node:
+                return
+
+            # Get the remote node credentials
+            remote_node = remote_author.node
+            
+            # Prepare the response data
+            response_data = {
+                "@context": "https://www.w3.org/ns/activitystreams",
+                "type": response_type,
+                "actor": follow.followed.url,
+                "object": {
+                    "type": "Follow",
+                    "actor": follow.follower.url,
+                    "object": follow.followed.url
+                }
+            }
+
+            # Send to remote node's inbox
+            inbox_url = f"{remote_author.host}authors/{remote_author.id.split('/')[-2]}/inbox/"
+            
+            response = requests.post(
+                inbox_url,
+                json=response_data,
+                auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                headers={'Content-Type': 'application/activity+json'},
+                timeout=5
             )
-
-            if not inbox_item.follow:
-                return Response(
-                    {"error": "No associated follow request"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Check if the follow request is still pending
-            if inbox_item.follow.status != Follow.PENDING:
-                return Response(
-                    {"error": "Follow request is not pending"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Reject the follow request
-            inbox_item.follow.status = Follow.REJECTED
-            inbox_item.follow.save()
-
-            # Delete the inbox item since it's been processed
-            inbox_item.delete()
-
-            return Response(
-                {"status": "rejected", "message": "Follow request rejected"}
-            )
-
-        except Inbox.DoesNotExist:
-            return Response(
-                {"error": "Inbox item not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+            
+            if response.status_code not in [200, 201, 202]:
+                print(f"Failed to send follow response to {inbox_url}: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Error sending follow response: {str(e)}")
