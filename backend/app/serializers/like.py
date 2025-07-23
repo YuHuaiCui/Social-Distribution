@@ -53,4 +53,7 @@ class LikeSerializer(serializers.ModelSerializer):
             "created_at": data.get("created_at"),
         }
         
+        # For backward compatibility, also include author as URL string
+        result["author"] = instance.author.url
+        
         return result

@@ -128,7 +128,7 @@ class AuthAPITest(BaseAPITestCase):
         self.assertEqual(response.data["message"], "Your account is awaiting admin approval.")
         
         # Admin approves the user
-        approve_url = reverse('social-distribution:author-approve', args=[pending_user.id])
+        approve_url = reverse('social-distribution:authors-approve', args=[pending_user.id])
         response = self.admin_client.post(approve_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['author']['is_approved'])

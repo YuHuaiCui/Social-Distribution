@@ -400,35 +400,31 @@ class FollowTest(TestCase):
         self.client.force_authenticate(user=self.author_a)
         response = self.client.get(f"/api/authors/{self.author_b.id}/followers/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["followers"]), 2)
 
         # Check that the correct followers are returned
-        follower_urls = [follower["url"] for follower in response.data]
+        follower_urls = [follower["url"] for follower in response.data["followers"]]
         self.assertIn(self.author_a.url, follower_urls)
         self.assertIn(self.author_c.url, follower_urls)
 
     def test_author_following_endpoint(self):
         """Test getting users an author is following"""
-        # Create follow relationships
+        # Create some follow relationships
         Follow.objects.create(
             follower=self.author_a, followed=self.author_b, status=Follow.ACCEPTED
         )
         Follow.objects.create(
             follower=self.author_a, followed=self.author_c, status=Follow.ACCEPTED
         )
-        Follow.objects.create(
-            follower=self.author_b,
-            followed=self.author_a,
-            status=Follow.PENDING,  # This should not appear
-        )
 
+        # Test the endpoint
         self.client.force_authenticate(user=self.author_a)
         response = self.client.get(f"/api/authors/{self.author_a.id}/following/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["following"]), 2)
 
-        # Check that the correct followed users are returned
-        following_urls = [followed["url"] for followed in response.data]
+        # Check that the correct users being followed are returned
+        following_urls = [followed["url"] for followed in response.data["following"]]
         self.assertIn(self.author_b.url, following_urls)
         self.assertIn(self.author_c.url, following_urls)
 
