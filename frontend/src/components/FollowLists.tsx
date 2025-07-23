@@ -1,36 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Users, UserPlus, Search, Filter, 
-  ChevronDown, Check
-} from 'lucide-react';
-import type { Author } from '../types/models';
-import AuthorCard from './AuthorCard';
-import Input from './ui/Input';
-import Loader from './ui/Loader';
-import Card from './ui/Card';
-import AnimatedButton from './ui/AnimatedButton';
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Users,
+  UserPlus,
+  Search,
+  Filter,
+  ChevronDown,
+  Check,
+} from "lucide-react";
+import type { Author } from "../types/models";
+import AuthorCard from "./AuthorCard";
+import Input from "./ui/Input";
+import Loader from "./ui/Loader";
+import Card from "./ui/Card";
+import AnimatedButton from "./ui/AnimatedButton";
+import { socialService } from "../services";
 
 interface FollowListProps {
   authorId?: string;
-  type: 'followers' | 'following';
+  type: "followers" | "following";
   className?: string;
 }
 
 export const FollowList: React.FC<FollowListProps> = ({
   authorId,
   type,
-  className = '',
+  className = "",
 }) => {
   const params = useParams();
   const targetAuthorId = authorId || params.authorId;
-  
+
   const [users, setUsers] = useState<Author[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<Author[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterOption, setFilterOption] = useState<'all' | 'mutual' | 'verified'>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterOption, setFilterOption] = useState<
+    "all" | "mutual" | "verified"
+  >("all");
   const [showFilter, setShowFilter] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -54,31 +61,31 @@ export const FollowList: React.FC<FollowListProps> = ({
     }
 
     try {
-      // Mock data - replace with API calls
-      const mockUsers: Author[] = Array.from({ length: 20 }, (_, i) => ({
-        id: `${type}-${page}-${i}`,
-        url: `http://localhost:8000/api/authors/${type}-${page}-${i}/`,
-        username: `user${i + (page - 1) * 20}`,
-        email: `user${i}@example.com`,
-        display_name: `User ${i + (page - 1) * 20}`,
-        profile_image: `https://i.pravatar.cc/150?u=${type}${i + (page - 1) * 20}`,
-        bio: i % 3 === 0 ? `Bio for user ${i}. Passionate about technology and open source.` : undefined,
-        is_approved: true,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
+      if (!targetAuthorId) {
+        console.error("No author ID provided");
+        return;
+      }
+
+      let fetchedUsers: Author[] = [];
+
+      // Make actual API calls using the social service
+      if (type === "followers") {
+        fetchedUsers = await socialService.getFollowers(targetAuthorId);
+      } else if (type === "following") {
+        fetchedUsers = await socialService.getFollowing(targetAuthorId);
+      }
 
       if (loadMore) {
-        setUsers(prev => [...prev, ...mockUsers]);
+        setUsers((prev) => [...prev, ...fetchedUsers]);
       } else {
-        setUsers(mockUsers);
+        setUsers(fetchedUsers);
       }
-      
-      setHasMore(mockUsers.length === 20);
-      setPage(prev => prev + 1);
+
+      // For now, disable pagination since we're loading all at once
+      setHasMore(false);
     } catch (error) {
       console.error(`Error fetching ${type}:`, error);
+      setUsers([]);
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -90,20 +97,22 @@ export const FollowList: React.FC<FollowListProps> = ({
 
     // Search filter
     if (searchQuery) {
-      filtered = filtered.filter(user => 
-        user.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (user.bio && user.bio.toLowerCase().includes(searchQuery.toLowerCase()))
+      filtered = filtered.filter(
+        (user) =>
+          user.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (user.bio &&
+            user.bio.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
 
     // Additional filters
     switch (filterOption) {
-      case 'mutual':
+      case "mutual":
         // In real app, filter by mutual follows
         filtered = filtered.filter((_, i) => i % 2 === 0);
         break;
-      case 'verified':
+      case "verified":
         // In real app, filter by verified status
         filtered = filtered.filter((_, i) => i % 3 === 0);
         break;
@@ -122,19 +131,19 @@ export const FollowList: React.FC<FollowListProps> = ({
     if (searchQuery) {
       return `No ${type} found matching "${searchQuery}"`;
     }
-    
+
     switch (type) {
-      case 'followers':
-        return 'No followers yet. Share great content to attract followers!';
-      case 'following':
-        return 'Not following anyone yet. Explore and follow interesting people!';
+      case "followers":
+        return "No followers yet. Share great content to attract followers!";
+      case "following":
+        return "Not following anyone yet. Explore and follow interesting people!";
     }
   };
 
   const filterOptions = [
-    { value: 'all', label: 'All Users' },
-    { value: 'mutual', label: 'Mutual Follows' },
-    { value: 'verified', label: 'Verified Only' },
+    { value: "all", label: "All Users" },
+    { value: "mutual", label: "Mutual Follows" },
+    { value: "verified", label: "Verified Only" },
   ];
 
   if (isLoading) {
@@ -151,26 +160,31 @@ export const FollowList: React.FC<FollowListProps> = ({
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
-            <motion.div 
+            <motion.div
               className="w-12 h-12 rounded-full gradient-secondary flex items-center justify-center"
               animate={{
-                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
               }}
               transition={{
                 duration: 25,
                 repeat: Infinity,
               }}
               style={{
-                background: 'var(--gradient-secondary)',
-                backgroundSize: '200% 200%',
+                background: "var(--gradient-secondary)",
+                backgroundSize: "200% 200%",
               }}
             >
               <Users className="w-6 h-6 text-white" />
             </motion.div>
             <div>
-              <h2 className="text-xl font-bold text-text-1 capitalize">{type}</h2>
+              <h2 className="text-xl font-bold text-text-1 capitalize">
+                {type}
+              </h2>
               <p className="text-sm text-text-2">
-                {filteredUsers.length} {type === 'followers' ? 'people follow this user' : 'people being followed'}
+                {filteredUsers.length}{" "}
+                {type === "followers"
+                  ? "people follow this user"
+                  : "people being followed"}
               </p>
             </div>
           </div>
@@ -187,17 +201,22 @@ export const FollowList: React.FC<FollowListProps> = ({
               icon={<Search size={18} />}
             />
           </div>
-          
+
           <div className="relative">
             <AnimatedButton
               variant="secondary"
               onClick={() => setShowFilter(!showFilter)}
               icon={<Filter size={16} />}
             >
-              {filterOptions.find(opt => opt.value === filterOption)?.label}
-              <ChevronDown size={16} className={`ml-1 transition-transform ${showFilter ? 'rotate-180' : ''}`} />
+              {filterOptions.find((opt) => opt.value === filterOption)?.label}
+              <ChevronDown
+                size={16}
+                className={`ml-1 transition-transform ${
+                  showFilter ? "rotate-180" : ""
+                }`}
+              />
             </AnimatedButton>
-            
+
             <AnimatePresence>
               {showFilter && (
                 <motion.div
@@ -217,7 +236,10 @@ export const FollowList: React.FC<FollowListProps> = ({
                     >
                       <span>{option.label}</span>
                       {filterOption === option.value && (
-                        <Check size={16} className="text-[var(--primary-violet)]" />
+                        <Check
+                          size={16}
+                          className="text-[var(--primary-violet)]"
+                        />
                       )}
                     </button>
                   ))}
@@ -240,7 +262,7 @@ export const FollowList: React.FC<FollowListProps> = ({
             <h3 className="text-lg font-medium text-text-1 mb-2">
               {getEmptyMessage()}
             </h3>
-            {!searchQuery && type === 'following' && (
+            {!searchQuery && type === "following" && (
               <AnimatedButton
                 variant="primary"
                 icon={<UserPlus size={16} />}
@@ -297,12 +319,16 @@ export const FollowList: React.FC<FollowListProps> = ({
 };
 
 // Followers List Component
-export const FollowersList: React.FC<Omit<FollowListProps, 'type'>> = (props) => {
+export const FollowersList: React.FC<Omit<FollowListProps, "type">> = (
+  props
+) => {
   return <FollowList {...props} type="followers" />;
 };
 
 // Following List Component
-export const FollowingList: React.FC<Omit<FollowListProps, 'type'>> = (props) => {
+export const FollowingList: React.FC<Omit<FollowListProps, "type">> = (
+  props
+) => {
   return <FollowList {...props} type="following" />;
 };
 
@@ -316,7 +342,7 @@ interface MutualFollowersProps {
 export const MutualFollowers: React.FC<MutualFollowersProps> = ({
   authorId,
   currentUserId,
-  className = '',
+  className = "",
 }) => {
   const [mutuals, setMutuals] = useState<Author[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -330,8 +356,11 @@ export const MutualFollowers: React.FC<MutualFollowersProps> = ({
     try {
       // Mock data - in real app, fetch mutual followers
       const mockMutuals: Author[] = Array.from({ length: 3 }, (_, i) => ({
+        type: "author" as const,
         id: `mutual-${i}`,
         url: `http://localhost:8000/api/authors/mutual-${i}/`,
+        host: "http://localhost:8000",
+        web: "http://localhost:3000",
         username: `mutual${i}`,
         email: `mutual${i}@example.com`,
         display_name: `Mutual Friend ${i}`,
@@ -341,17 +370,21 @@ export const MutualFollowers: React.FC<MutualFollowersProps> = ({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
-      
+
       setMutuals(mockMutuals);
     } catch (error) {
-      console.error('Error fetching mutual followers:', error);
+      console.error("Error fetching mutual followers:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   if (isLoading) {
-    return <div className="text-center py-4"><Loader size="sm" /></div>;
+    return (
+      <div className="text-center py-4">
+        <Loader size="sm" />
+      </div>
+    );
   }
 
   if (mutuals.length === 0) {
@@ -380,7 +413,9 @@ export const MutualFollowers: React.FC<MutualFollowersProps> = ({
         ))}
         {mutuals.length > 5 && (
           <div className="w-8 h-8 rounded-full bg-glass-low border-2 border-bg-1 flex items-center justify-center">
-            <span className="text-xs text-text-2 font-medium">+{mutuals.length - 5}</span>
+            <span className="text-xs text-text-2 font-medium">
+              +{mutuals.length - 5}
+            </span>
           </div>
         )}
       </div>
