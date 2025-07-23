@@ -18,6 +18,7 @@ import Card from "../components/ui/Card";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
 import { inboxService } from "../services/inbox";
+import { socialService } from "../services/social";
 import type { InboxItem as ApiInboxItem } from "../types/inbox";
 import { useAuth } from "../components/context/AuthContext";
 import { extractUUID } from "../utils/extractId";
@@ -298,17 +299,64 @@ export const InboxPage: React.FC = () => {
         throw new Error("Invalid follow request item");
       }
 
-      // Use inbox service methods to accept/reject the follow request
-      if (accept) {
-        await inboxService.acceptFollowRequest(itemId);
+      console.log(
+        `${
+          accept ? "Accepting" : "Rejecting"
+        } follow request with inbox item ID:`,
+        itemId
+      );
+
+      // Get the full inbox item to extract follow ID
+      const fullInboxItem = await inboxService.getInboxItem(itemId);
+      console.log("Full inbox item:", fullInboxItem);
+
+      // Try to extract follow ID from various possible locations in the data
+      let followId = null;
+
+      // Check if content_data has follow data with an ID
+      if (fullInboxItem.content_data?.type === "follow") {
+        const followData = fullInboxItem.content_data.data as any;
+        if (followData?.id) {
+          followId = followData.id;
+        }
+      }
+
+      console.log("Extracted follow ID:", followId);
+
+      if (!followId) {
+        // Fallback: try to use inbox service methods
+        console.log("No follow ID found, trying inbox service methods");
+        if (accept) {
+          await inboxService.acceptFollowRequest(itemId);
+        } else {
+          await inboxService.rejectFollowRequest(itemId);
+        }
       } else {
-        await inboxService.rejectFollowRequest(itemId);
+        // Use social service methods with the follow ID
+        if (accept) {
+          const result = await socialService.acceptFollowRequest(followId);
+          console.log("Accept result:", result);
+        } else {
+          await socialService.rejectFollowRequest(followId);
+          console.log("Reject result: success");
+        }
       }
 
       // Remove item after processing
       setItems((prev) => prev.filter((item) => item.id !== itemId));
+      console.log("Item removed from inbox successfully");
     } catch (error) {
       console.error("Error processing follow request:", error);
+      console.error("Item ID:", itemId);
+      console.error("Accept:", accept);
+      console.error("Full error:", error);
+
+      // Show user-friendly error message
+      alert(
+        `Failed to ${
+          accept ? "accept" : "reject"
+        } follow request. Please try again.`
+      );
     } finally {
       setProcessingItems((prev) => {
         const newSet = new Set(prev);
