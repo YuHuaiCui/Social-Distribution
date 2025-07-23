@@ -18,7 +18,6 @@ import Card from "../components/ui/Card";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
 import { inboxService } from "../services/inbox";
-import { socialService } from "../services/social";
 import type { InboxItem as ApiInboxItem } from "../types/inbox";
 import { useAuth } from "../components/context/AuthContext";
 import { extractUUID } from "../utils/extractId";
@@ -293,12 +292,6 @@ export const InboxPage: React.FC = () => {
   const handleFollowRequest = async (itemId: string, accept: boolean) => {
     setProcessingItems((prev) => new Set(prev).add(itemId));
     try {
-      // Find the inbox item to validate it's a follow request
-      const inboxItem = items.find((item) => item.id === itemId);
-      if (!inboxItem || inboxItem.type !== "follow_request") {
-        throw new Error("Invalid follow request item");
-      }
-
       console.log(
         `${
           accept ? "Accepting" : "Rejecting"
@@ -306,40 +299,13 @@ export const InboxPage: React.FC = () => {
         itemId
       );
 
-      // Get the full inbox item to extract follow ID
-      const fullInboxItem = await inboxService.getInboxItem(itemId);
-      console.log("Full inbox item:", fullInboxItem);
-
-      // Try to extract follow ID from various possible locations in the data
-      let followId = null;
-
-      // Check if content_data has follow data with an ID
-      if (fullInboxItem.content_data?.type === "follow") {
-        const followData = fullInboxItem.content_data.data as any;
-        if (followData?.id) {
-          followId = followData.id;
-        }
-      }
-
-      console.log("Extracted follow ID:", followId);
-
-      if (!followId) {
-        // Fallback: try to use inbox service methods
-        console.log("No follow ID found, trying inbox service methods");
-        if (accept) {
-          await inboxService.acceptFollowRequest(itemId);
-        } else {
-          await inboxService.rejectFollowRequest(itemId);
-        }
+      // Simple approach: directly call the inbox service methods
+      if (accept) {
+        await inboxService.acceptFollowRequest(itemId);
+        console.log("Accept request sent successfully");
       } else {
-        // Use social service methods with the follow ID
-        if (accept) {
-          const result = await socialService.acceptFollowRequest(followId);
-          console.log("Accept result:", result);
-        } else {
-          await socialService.rejectFollowRequest(followId);
-          console.log("Reject result: success");
-        }
+        await inboxService.rejectFollowRequest(itemId);
+        console.log("Reject request sent successfully");
       }
 
       // Remove item after processing
@@ -347,16 +313,23 @@ export const InboxPage: React.FC = () => {
       console.log("Item removed from inbox successfully");
     } catch (error) {
       console.error("Error processing follow request:", error);
-      console.error("Item ID:", itemId);
-      console.error("Accept:", accept);
-      console.error("Full error:", error);
 
-      // Show user-friendly error message
-      alert(
-        `Failed to ${
-          accept ? "accept" : "reject"
-        } follow request. Please try again.`
-      );
+      // Log more detailed error information
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+
+      // Check if it's a network error
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        alert("Network error. Please check if the backend server is running.");
+      } else {
+        alert(
+          `Failed to ${accept ? "accept" : "reject"} follow request. Error: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      }
     } finally {
       setProcessingItems((prev) => {
         const newSet = new Set(prev);
