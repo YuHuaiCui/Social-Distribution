@@ -91,6 +91,8 @@ class AuthorViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(node__isnull=True)
         elif author_type == "remote":
             queryset = queryset.filter(node__isnull=False)
+        # If no type filter is specified, include both local and remote authors
+        # Remote authors are already in the database from inbox processing
 
         # Search by username, display name, github username, or email
         search = self.request.query_params.get("search", None)
