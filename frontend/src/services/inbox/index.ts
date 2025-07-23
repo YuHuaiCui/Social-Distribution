@@ -187,10 +187,22 @@ export class InboxService extends BaseApiService {
   async acceptFollowRequest(
     inboxItemId: string
   ): Promise<{ status: string; message: string }> {
+    // Validate input
+    if (!inboxItemId || typeof inboxItemId !== "string") {
+      throw new Error(
+        `Invalid inboxItemId: ${inboxItemId} (type: ${typeof inboxItemId})`
+      );
+    }
+
     // Extract ID from URL if full URL is passed
     const id = inboxItemId.includes("/")
       ? inboxItemId.split("/").filter(Boolean).pop()
       : inboxItemId;
+
+    if (!id) {
+      throw new Error(`Failed to extract ID from inboxItemId: ${inboxItemId}`);
+    }
+
     return this.request<{ status: string; message: string }>(
       `/api/inbox/${id}/accept-follow/`,
       {
@@ -205,10 +217,22 @@ export class InboxService extends BaseApiService {
   async rejectFollowRequest(
     inboxItemId: string
   ): Promise<{ status: string; message: string }> {
+    // Validate input
+    if (!inboxItemId || typeof inboxItemId !== "string") {
+      throw new Error(
+        `Invalid inboxItemId: ${inboxItemId} (type: ${typeof inboxItemId})`
+      );
+    }
+
     // Extract ID from URL if full URL is passed
     const id = inboxItemId.includes("/")
       ? inboxItemId.split("/").filter(Boolean).pop()
       : inboxItemId;
+
+    if (!id) {
+      throw new Error(`Failed to extract ID from inboxItemId: ${inboxItemId}`);
+    }
+
     return this.request<{ status: string; message: string }>(
       `/api/inbox/${id}/reject-follow/`,
       {
