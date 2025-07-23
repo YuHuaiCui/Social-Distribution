@@ -241,8 +241,8 @@ AUTO_APPROVE_NEW_USERS = os.getenv("AUTO_APPROVE_NEW_USERS", "False") == "True"
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # Content Security Policy Configuration
-CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = (
+CSP_DEFAULT_SRC = ["'self'",]
+CSP_SCRIPT_SRC = [  
     "'self'",
     "'unsafe-inline'",  # Allow inline scripts - use with caution
     "'unsafe-eval'",    # Allow eval() - needed for some JS frameworks
@@ -251,26 +251,26 @@ CSP_SCRIPT_SRC = (
     "https://cdn.jsdelivr.net",
     "https://unpkg.com",
     "https://cdnjs.cloudflare.com",
-)
-CSP_STYLE_SRC = (
+]
+CSP_STYLE_SRC = [
     "'self'",
     "'unsafe-inline'",
     "https://github.githubassets.com",
     "https://cdn.jsdelivr.net",
     "https://fonts.googleapis.com",
-)
-CSP_FONT_SRC = (
+]
+CSP_FONT_SRC = [
     "'self'",
     "https://fonts.gstatic.com",
     "https://github.githubassets.com",
-)
-CSP_IMG_SRC = (
+]
+CSP_IMG_SRC = [
     "'self'",
     "data:",
     "https:",
     "http:",  # Allow HTTP images in development
-)
-CSP_CONNECT_SRC = (
+]
+CSP_CONNECT_SRC = [ 
     "'self'",
     "https://api.github.com",
     "https://github.com",
@@ -278,15 +278,15 @@ CSP_CONNECT_SRC = (
     "http://localhost:5173",
     "http://127.0.0.1:8000",
     "http://127.0.0.1:5173",
-)
-CSP_FRAME_SRC = (
+]
+CSP_FRAME_SRC = [
     "'self'",
     "https://github.com",
-)
-CSP_MEDIA_SRC = ("'self'",)
-CSP_OBJECT_SRC = ("'none'",)
-CSP_BASE_URI = ("'self'",)
-CSP_FORM_ACTION = ("'self'",)
+]
+CSP_MEDIA_SRC = ["'self'",]
+CSP_OBJECT_SRC = ["'none'",]
+CSP_BASE_URI = ["'self'",]
+CSP_FORM_ACTION = ["'self'",]
 
 # CSP nonce for inline scripts (more secure alternative to 'unsafe-inline')
 # Temporarily disabled to resolve CSP issues in development
