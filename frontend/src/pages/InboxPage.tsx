@@ -45,6 +45,11 @@ interface FrontendInboxItem {
     post_id?: string;
     post_title?: string;
     comment_text?: string;
+    // Report-specific fields
+    reported_user_id?: string;
+    reported_user_name?: string;
+    report_type?: string;
+    report_time?: string;
   };
 }
 
@@ -95,6 +100,7 @@ export const InboxPage: React.FC = () => {
   const [processingItems, setProcessingItems] = useState<Set<string>>(
     new Set()
   );
+  const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
   const [showAllRequests, setShowAllRequests] = useState(false);
 
   // Check if current user is admin
@@ -306,6 +312,10 @@ export const InboxPage: React.FC = () => {
   };
 
   const markAsRead = async (itemId: string) => {
+    // Don't mark as read if already processing or already read
+    if (markingAsRead.has(itemId)) return;
+
+    setMarkingAsRead((prev) => new Set(prev).add(itemId));
     try {
       await inboxService.markItemAsRead(itemId);
       setItems((prev) =>
@@ -315,6 +325,13 @@ export const InboxPage: React.FC = () => {
       );
     } catch (error) {
       console.error("Error marking as read:", error);
+      // Don't show error to user, just log it
+    } finally {
+      setMarkingAsRead((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
     }
   };
 
@@ -375,7 +392,7 @@ export const InboxPage: React.FC = () => {
         {filterButtons.map((btn) => (
           <motion.button
             key={btn.value}
-            onClick={() => setFilter(btn.value as any)}
+            onClick={() => setFilter(btn.value as InboxItemType | "all")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               filter === btn.value
                 ? "bg-[var(--gradient-primary)] text-white"
@@ -465,7 +482,6 @@ export const InboxPage: React.FC = () => {
             {items.map((item, index) => {
               const config = inboxTypeConfig[item.type];
               const Icon = config.icon;
-              const isProcessing = processingItems.has(item.id);
 
               return (
                 <motion.div
@@ -592,8 +608,8 @@ export const InboxPage: React.FC = () => {
                                   onClick={() =>
                                     handleFollowRequest(item.id, true)
                                   }
-                                  disabled={isProcessing}
-                                  loading={isProcessing}
+                                  disabled={processingItems.has(item.id)}
+                                  loading={processingItems.has(item.id)}
                                   icon={<Check size={16} />}
                                   className="!outline-none !ring-0"
                                 >
@@ -605,7 +621,7 @@ export const InboxPage: React.FC = () => {
                                   onClick={() =>
                                     handleFollowRequest(item.id, false)
                                   }
-                                  disabled={isProcessing}
+                                  disabled={processingItems.has(item.id)}
                                   icon={<X size={16} />}
                                   className="!outline-none !ring-0"
                                 >
