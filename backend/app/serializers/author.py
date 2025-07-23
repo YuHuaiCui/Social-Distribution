@@ -263,10 +263,4 @@ class AuthorListSerializer(serializers.ModelSerializer):
         return result
 
 
-class NodeSerializer(serializers.ModelSerializer):
-    """Serializer for Node model (used in nested serialization)"""
 
-    class Meta:
-        model = Node
-        fields = ["id", "name", "host", "is_active", "created_at"]
-        read_only_fields = ["id", "created_at"]

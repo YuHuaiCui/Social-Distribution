@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Heart,
   UserPlus,
+  Server,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../../lib/theme";
@@ -467,6 +468,33 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                           <span className="relative z-10">Settings</span>
                         </Link>
                       </motion.div>
+                      {(user?.is_staff || user?.is_superuser) && (
+                        <motion.div
+                          whileHover={{ x: 4 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 30,
+                          }}
+                        >
+                          <Link
+                            to="/node-management"
+                            className="flex items-center px-4 py-2.5 text-text-1 hover:bg-glass-low transition-all relative overflow-hidden group cursor-pointer"
+                            onClick={() => setShowUserMenu(false)}
+                          >
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-[var(--primary-yellow)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
+                              initial={{ x: "-100%" }}
+                              whileHover={{ x: 0 }}
+                              transition={{ duration: 0.3 }}
+                            />
+                            <Server size={18} className="mr-3 relative z-10" />
+                            <span className="relative z-10">
+                              Node Management
+                            </span>
+                          </Link>
+                        </motion.div>
+                      )}
                       <hr className="my-2 border-border-1" />
                       <motion.div
                         whileHover={{ x: 4 }}

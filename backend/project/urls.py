@@ -8,8 +8,8 @@ Function views
     1. Add an import:  from my_app import views
     2. Add a URL to urlpatterns:  path('', views.home, name='home')
 Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+    1. Add an import:  from other_app import views
+    2. Add a URL to urlpatterns:  path('', views.Home.as_view(), name='home')
 Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
@@ -25,6 +25,7 @@ from django.conf.urls.static import static
 from app.views.follow import FollowViewSet
 from app.views.inbox import InboxViewSet
 from rest_framework.routers import DefaultRouter
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 router = DefaultRouter()
 router.register(r"api/follows", FollowViewSet, basename="follow")
@@ -45,6 +46,10 @@ urlpatterns = [
     path("api/", include("app.urls")),
     # Follow endpoints via router
     path("", include(router.urls)),
+    # API Documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     # Catch-all pattern for React app - must be last!
     re_path(
         r"^(?!api|admin|accounts|static).*$", ReactAppView.as_view(), name="react-app"
