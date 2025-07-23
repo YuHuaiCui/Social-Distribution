@@ -5,7 +5,7 @@ dj-database-url==2.1.0
 Django==5.2.1
 django-allauth==65.9.0
 django-cors-headers==4.7.0
-django-csp==3.7
+django-csp==3.8
 django-filter==25.1
 djangorestframework==3.16.0
 drf-nested-routers==0.94.2
