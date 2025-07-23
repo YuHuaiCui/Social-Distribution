@@ -3,45 +3,58 @@
 from django.db import migrations, models
 
 
-def add_categories_safely(apps, schema_editor):
-    """Add categories column if it doesn't exist"""
-    db_alias = schema_editor.connection.alias
+# Generated manually to add missing categories field
+
+from django.db import migrations, models
+
+
+def add_categories_column_if_missing(apps, schema_editor):
+    """Safely add categories column only if it doesn't exist"""
+    table_name = "app_entry"
     
     with schema_editor.connection.cursor() as cursor:
-        # Check if column exists in a database-agnostic way
-        if schema_editor.connection.vendor == 'sqlite':
-            cursor.execute("PRAGMA table_info(app_entry);")
-            columns = [row[1] for row in cursor.fetchall()]
-        elif schema_editor.connection.vendor == 'postgresql':
-            cursor.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'app_entry' AND column_name = 'categories';
-            """)
-            columns = [row[0] for row in cursor.fetchall()]
-        else:
-            # For other databases, try a generic approach
-            try:
-                cursor.execute("SELECT categories FROM app_entry LIMIT 1;")
-                columns = ['categories']  # Column exists
-            except:
-                columns = []  # Column doesn't exist
+        # Check if column exists using database-specific queries
+        column_exists = False
         
-        if 'categories' not in columns:
-            # Add the column with default empty JSON array
+        if schema_editor.connection.vendor == 'postgresql':
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_name = %s AND column_name = %s
+                );
+            """, [table_name, 'categories'])
+            column_exists = cursor.fetchone()[0]
+            
+        elif schema_editor.connection.vendor == 'sqlite':
+            cursor.execute(f"PRAGMA table_info({table_name});")
+            columns = [row[1] for row in cursor.fetchall()]
+            column_exists = 'categories' in columns
+            
+        else:
+            # Generic fallback - try to query the column
+            try:
+                cursor.execute(f"SELECT categories FROM {table_name} LIMIT 1;")
+                column_exists = True
+            except Exception:
+                column_exists = False
+        
+        # Only add column if it doesn't exist
+        if not column_exists:
             if schema_editor.connection.vendor == 'postgresql':
-                cursor.execute("ALTER TABLE app_entry ADD COLUMN categories JSONB DEFAULT '[]'::jsonb;")
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN categories JSONB DEFAULT '[]'::jsonb;")
             else:
-                cursor.execute("ALTER TABLE app_entry ADD COLUMN categories TEXT DEFAULT '[]';")
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN categories TEXT DEFAULT '[]';")
 
 
-def remove_categories_safely(apps, schema_editor):
-    """Remove categories column"""
-    with schema_editor.connection.cursor() as cursor:
-        if schema_editor.connection.vendor != 'sqlite':
-            # Most databases support DROP COLUMN
-            cursor.execute("ALTER TABLE app_entry DROP COLUMN IF EXISTS categories;")
-        # SQLite doesn't support DROP COLUMN, so this is a no-op for SQLite
+def remove_categories_column_if_exists(apps, schema_editor):
+    """Safely remove categories column if it exists (reverse operation)"""
+    table_name = "app_entry"
+    
+    # Only attempt to remove if not SQLite (which doesn't support DROP COLUMN easily)
+    if schema_editor.connection.vendor != 'sqlite':
+        with schema_editor.connection.cursor() as cursor:
+            cursor.execute(f"ALTER TABLE {table_name} DROP COLUMN IF EXISTS categories;")
 
 
 class Migration(migrations.Migration):
@@ -51,15 +64,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # First add the physical column to the database
-        migrations.RunPython(
-            add_categories_safely,
-            remove_categories_safely
-        ),
-        # Then tell Django about the model field
-        migrations.AddField(
-            model_name='entry',
-            name='categories',
-            field=models.JSONField(blank=True, default=list, help_text='List of categories this entry belongs to'),
+        # Separate database and state operations to handle existing columns gracefully
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    add_categories_column_if_missing,
+                    remove_categories_column_if_exists,
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='entry',
+                    name='categories',
+                    field=models.JSONField(blank=True, default=list, help_text='List of categories this entry belongs to'),
+                ),
+            ]
         ),
     ] 
