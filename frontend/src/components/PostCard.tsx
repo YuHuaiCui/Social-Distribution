@@ -32,6 +32,8 @@ import AnimatedGradient from "./ui/AnimatedGradient";
 import { extractUUID } from "../utils/extractId";
 import { ShareModal } from "./ShareModal";
 
+
+
 // Debounce utility
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
   let timeout: NodeJS.Timeout;
@@ -197,7 +199,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       setShowShareModal(true);
     } else {
       // For non-public posts, just copy the link
-      const url = `${window.location.origin}/posts/${post.id}`;
+      const url = `${window.location.origin}/posts/${extractUUID(post.id)}`;
       navigator.clipboard
         .writeText(url)
         .then(() => {
