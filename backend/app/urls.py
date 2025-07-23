@@ -12,6 +12,7 @@ from app.views.inbox import InboxViewSet
 # namespacing app
 app_name = "social-distribution"
 
+
 # Main router for compliant endpoints
 router = DefaultRouter()
 router.register(r"authors", AuthorViewSet, basename="authors")
