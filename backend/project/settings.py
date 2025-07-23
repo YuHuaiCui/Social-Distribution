@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from corsheaders.defaults import default_headers
 import os
+import csp.constants
 
 load_dotenv()
 
@@ -54,6 +55,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -237,3 +239,20 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 AUTO_APPROVE_NEW_USERS = os.getenv("AUTO_APPROVE_NEW_USERS", "False") == "True"
 
 os.makedirs(MEDIA_ROOT, exist_ok=True)
+
+# Content Security Policy Configuration
+CONTENT_SECURITY_POLICY_REPORT_ONLY = {
+    'DIRECTIVES': {
+        'base-uri': ["'self'"],
+        'connect-src': ["'self'", 'https://api.github.com', 'https://github.com'],
+        'default-src': ["'self'"],
+        'font-src': ["'self'", 'https://fonts.gstatic.com', 'https://github.githubassets.com'],
+        'form-action': ["'self'"],
+        'frame-src': ["'self'", 'https://github.com'],
+        'img-src': ["'self'", 'data:', 'https:'],
+        'media-src': ["'self'"],
+        'object-src': ["'none'"],
+        'script-src': ["'self'", 'https://github.githubassets.com', 'https://cdn.jsdelivr.net', csp.constants.NONCE],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://github.githubassets.com', 'https://fonts.googleapis.com']
+    }
+}
