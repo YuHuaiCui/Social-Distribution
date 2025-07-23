@@ -66,6 +66,10 @@ jobs:
           echo "DISABLE_COLLECTSTATIC=1" > .env
           echo "✅ .env file created"
 
+          echo "📋 Removing root package.json to prevent Node.js buildpack detection..."
+          rm -f package.json
+          echo "✅ Root package.json removed"
+
       - name: Set Heroku Config Vars
         run: |
           echo "🔧 Setting Heroku production configuration..."
@@ -84,3 +88,6 @@ jobs:
           heroku_email: ${{ secrets.HEROKU_EMAIL_MEL }}
           buildpack: heroku/python
           dontautocreate: true
+          usedocker: false
+          appdir: "."
+          procfile: "Procfile"
