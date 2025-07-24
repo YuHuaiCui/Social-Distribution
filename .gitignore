@@ -70,3 +70,4 @@ Thumbs.db
 .env.production
 
 db.sqlite3
+frontend/.env.production
