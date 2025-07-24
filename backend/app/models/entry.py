@@ -50,7 +50,7 @@ class EntryManager(models.Manager):
             follower=viewing_author, followed=OuterRef("author"), status=Follow.ACCEPTED
         )
 
-        return self.filter(
+        queryset = self.filter(
             Q(visibility=Entry.PUBLIC)  # Public entries visible to all
             | Q(visibility=Entry.UNLISTED, author=viewing_author)  # Own unlisted posts
             | Q(visibility=Entry.UNLISTED)
@@ -63,6 +63,22 @@ class EntryManager(models.Manager):
             | Q(visibility=Entry.FRIENDS_ONLY)
             & Exists(friendship_exists)  # Friends-only posts from friends
         ).exclude(visibility=Entry.DELETED)
+        
+        # Debug logging
+        from .author import Author
+        public_posts = queryset.filter(visibility=Entry.PUBLIC)
+        remote_public_count = public_posts.filter(author__node__isnull=False).count()
+        local_public_count = public_posts.filter(author__node__isnull=True).count()
+        
+        if remote_public_count > 0 or local_public_count > 0:
+            print(f"DEBUG visible_to_author: Found {local_public_count} local PUBLIC posts and {remote_public_count} remote PUBLIC posts")
+            
+            # Log sample remote posts
+            remote_posts = public_posts.filter(author__node__isnull=False)[:2]
+            for post in remote_posts:
+                print(f"DEBUG visible_to_author: Remote post - Title: {post.title}, Author: {post.author.username}, Node: {post.author.node.name if post.author.node else 'Unknown'}")
+        
+        return queryset
 
 
 class Entry(models.Model):

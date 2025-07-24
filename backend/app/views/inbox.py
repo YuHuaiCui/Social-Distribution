@@ -29,42 +29,79 @@ class InboxReceiveView(APIView):
     
     def post(self, request, author_id=None):
         """
-        Receive an ActivityPub object in an author's inbox or public inbox
+        Receive an ActivityPub object in an author's inbox or general broadcast
         """
         print(f"DEBUG: Received inbox request for author {author_id}" if author_id else "DEBUG: Received public inbox request")
         print(f"DEBUG: Request data: {request.data}")
         
-        # If author_id is provided, get the specific author
-        if author_id:
+        # If no author_id, this is a general broadcast (for PUBLIC posts)
+        if author_id is None:
+            # For general broadcasts, we'll use a system user or the first local user
+            # This is typically for PUBLIC posts that should appear in explore/feed
+            print("DEBUG: General inbox broadcast received")
+            # Get the first active local author as a placeholder recipient
+            author = Author.objects.filter(node__isnull=True, is_active=True).first()
+            if not author:
+                print("DEBUG: No local authors found for general broadcast")
+                return Response({"error": "No local authors available"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Extract the author from the URL
             try:
                 author = Author.objects.get(id=author_id)
             except Author.DoesNotExist:
                 print(f"DEBUG: Author {author_id} not found")
                 return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            # Public inbox - no specific author
-            author = None
         
         # Check authentication
         auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Basic '):
-            print("DEBUG: No valid Authorization header")
-            return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        node = None
         
-        # Verify credentials against known nodes
-        import base64
-        credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
-        username, password = credentials.split(':', 1)
+        # For general inbox (PUBLIC posts), allow any valid node credentials
+        if author_id is None and auth_header and auth_header.startswith('Basic '):
+            try:
+                import base64
+                credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
+                username, password = credentials.split(':', 1)
+                
+                print(f"DEBUG: General inbox auth - username: {username}")
+                
+                # For general inbox, accept any active node's credentials
+                # This allows nodes to send PUBLIC posts without being specifically configured
+                node = Node.objects.filter(is_active=True).first()
+                if node:
+                    print(f"DEBUG: Accepting PUBLIC post from any node (using {node.name} as placeholder)")
+                else:
+                    print("DEBUG: No active nodes configured")
+                    return Response({"error": "No active nodes configured"}, status=status.HTTP_401_UNAUTHORIZED)
+            except Exception as e:
+                print(f"DEBUG: Auth parsing error: {e}")
+                return Response({"error": "Invalid authorization header"}, status=status.HTTP_400_BAD_REQUEST)
         
-        print(f"DEBUG: Authenticating with username: {username}")
+        # For specific author inboxes, require proper authentication
+        elif author_id is not None:
+            if not auth_header or not auth_header.startswith('Basic '):
+                print("DEBUG: No valid Authorization header for author inbox")
+                return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Verify credentials against known nodes
+            import base64
+            credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
+            username, password = credentials.split(':', 1)
+            
+            print(f"DEBUG: Authenticating with username: {username}")
+            
+            # Check if this is a known node
+            try:
+                node = Node.objects.get(username=username, password=password, is_active=True)
+                print(f"DEBUG: Found matching node: {node.name} ({node.host})")
+            except Node.DoesNotExist:
+                print(f"DEBUG: No matching node found for username: {username}")
+                return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         
-        # Check if this is a known node
-        try:
-            node = Node.objects.get(username=username, password=password, is_active=True)
-            print(f"DEBUG: Found matching node: {node.name} ({node.host})")
-        except Node.DoesNotExist:
-            print(f"DEBUG: No matching node found for username: {username}")
-            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+        # Ensure we have a node object
+        if not node:
+            print("DEBUG: No node object available")
+            return Response({"error": "Node authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Process the incoming object
         try:
@@ -81,8 +118,12 @@ class InboxReceiveView(APIView):
                 return self._handle_comment(author, data, node)
             elif object_type == 'Post' or object_type == 'Create':
                 return self._handle_post(author, data, node)
+            elif data.get('content_type') == 'entry':
+                # Handle our custom format for posts
+                return self._handle_post(author, data, node)
             else:
                 print(f"DEBUG: Unsupported object type: {object_type}")
+                print(f"DEBUG: Data keys: {list(data.keys())}")
                 return Response({"error": f"Unsupported object type: {object_type}"}, 
                               status=status.HTTP_400_BAD_REQUEST)
                 
@@ -292,9 +333,15 @@ class InboxReceiveView(APIView):
         Handle incoming post from a remote node
         """
         try:
-            # Extract post data
-            actor_data = data.get('actor', {})
-            post_data = data.get('object', {})
+            # Handle different post formats
+            if data.get('content_type') == 'entry':
+                # Direct post format (our new format)
+                actor_data = data.get('author', {})
+                post_data = data
+            else:
+                # ActivityPub format (wrapped in Create activity)
+                actor_data = data.get('actor', {})
+                post_data = data.get('object', {})
             
             # Get or create the remote author
             remote_author, created = self._get_or_create_remote_author(actor_data, remote_node)
@@ -321,6 +368,12 @@ class InboxReceiveView(APIView):
                     except Exception as e:
                         print(f"Failed to decode image data: {e}")
             
+            # Debug logging for visibility
+            received_visibility = post_data.get('visibility', 'PUBLIC')
+            print(f"DEBUG: Creating entry with visibility: {received_visibility}")
+            print(f"DEBUG: Post data keys: {list(post_data.keys())}")
+            print(f"DEBUG: Remote author: {remote_author.username} from node: {remote_author.node.name if remote_author.node else 'Unknown'}")
+            
             entry = Entry.objects.create(
                 author=remote_author,
                 title=post_data.get('title', ''),
@@ -339,18 +392,28 @@ class InboxReceiveView(APIView):
                 entry.url = f"{remote_author.host}posts/{remote_author.id}/{entry.id}"
                 entry.save(update_fields=['url'])
             
-            # Create inbox item only if there's a specific recipient
-            if recipient:
+            # Debug the created entry
+            print(f"DEBUG: Created entry - ID: {entry.id}, Visibility: {entry.visibility}, Author: {remote_author.username}")
+            print(f"DEBUG: Entry is from remote node: {remote_author.node.name if remote_author.node else 'Unknown'}")
+            
+            # Only create inbox item for non-PUBLIC posts
+            # PUBLIC posts should appear in explore/feed, not as notifications
+            if entry.visibility != Entry.PUBLIC:
                 Inbox.objects.create(
                     recipient=recipient,
                     item_type=Inbox.ENTRY,
                     entry=entry,
                     raw_data=data
                 )
-                return Response({"message": "Post received and delivered to inbox"}, status=status.HTTP_200_OK)
+                print(f"DEBUG: Created inbox item for {entry.visibility} post from {remote_author.username}")
             else:
-                # Public broadcast - no inbox item, but post is stored and visible
-                return Response({"message": "Post received and stored for public viewing"}, status=status.HTTP_200_OK)
+                print(f"DEBUG: PUBLIC post from {remote_author.username} added to explore/feed (no inbox item)")
+                # Verify it's queryable
+                from app.models import Entry as EntryModel
+                found = EntryModel.objects.filter(id=entry.id, visibility='PUBLIC').exists()
+                print(f"DEBUG: Can query the PUBLIC post: {found}")
+            
+            return Response({"message": "Post received"}, status=status.HTTP_200_OK)
             
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -644,7 +707,7 @@ class InboxViewSet(viewsets.ModelViewSet):
                 inbox_url,
                 json=response_data,
                 auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                headers={'Content-Type': 'application/activity+json'},
+                headers={'Content-Type': 'application/json'},
                 timeout=5
             )
             

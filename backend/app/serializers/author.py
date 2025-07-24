@@ -20,6 +20,8 @@ class AuthorSerializer(serializers.ModelSerializer):
         help_text="Must match the password field exactly.",
     )
     is_following = serializers.SerializerMethodField()
+    node_id = serializers.SerializerMethodField()
+    is_remote = serializers.SerializerMethodField()
 
     class Meta:
         model = Author
@@ -40,6 +42,8 @@ class AuthorSerializer(serializers.ModelSerializer):
             "location",
             "website",
             "node",
+            "node_id",
+            "is_remote",
             "is_approved",
             "is_active",
             "is_staff",
@@ -119,6 +123,14 @@ class AuthorSerializer(serializers.ModelSerializer):
             follower=request.user, followed=obj, status=Follow.ACCEPTED
         ).exists()
     
+    def get_node_id(self, obj):
+        """Get the node ID for remote authors"""
+        return str(obj.node.id) if obj.node else None
+    
+    def get_is_remote(self, obj):
+        """Check if this is a remote author"""
+        return obj.node is not None
+    
     def to_representation(self, instance):
         """
         Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
@@ -159,6 +171,8 @@ class AuthorSerializer(serializers.ModelSerializer):
             "location": instance.location,
             "website": instance.website,
             "node": data.get("node"),
+            "node_id": data.get("node_id"),
+            "is_remote": data.get("is_remote"),
             "is_approved": instance.is_approved,
             "is_active": instance.is_active,
             "is_staff": instance.is_staff,
@@ -177,6 +191,8 @@ class AuthorListSerializer(serializers.ModelSerializer):
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
     is_following = serializers.SerializerMethodField()
+    node_id = serializers.SerializerMethodField()
+    is_remote = serializers.SerializerMethodField()
 
     class Meta:
         model = Author
@@ -199,6 +215,8 @@ class AuthorListSerializer(serializers.ModelSerializer):
             "followers_count",
             "following_count",
             "is_following",
+            "node_id",
+            "is_remote",
         ]
         read_only_fields = ["type", "id", "url", "host", "web", "created_at"]
 
@@ -225,6 +243,14 @@ class AuthorListSerializer(serializers.ModelSerializer):
         return Follow.objects.filter(
             follower=request.user, followed=obj, status=Follow.ACCEPTED
         ).exists()
+    
+    def get_node_id(self, obj):
+        """Get the node ID for remote authors"""
+        return str(obj.node.id) if obj.node else None
+    
+    def get_is_remote(self, obj):
+        """Check if this is a remote author"""
+        return obj.node is not None
     
     def to_representation(self, instance):
         """
@@ -258,6 +284,8 @@ class AuthorListSerializer(serializers.ModelSerializer):
             "followers_count": data.get("followers_count"),
             "following_count": data.get("following_count"),
             "is_following": data.get("is_following"),
+            "node_id": data.get("node_id"),
+            "is_remote": data.get("is_remote"),
         }
         
         return result

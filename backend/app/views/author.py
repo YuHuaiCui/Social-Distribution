@@ -292,7 +292,40 @@ class AuthorViewSet(viewsets.ModelViewSet):
     )
     def follow(self, request, pk=None):
         """Follow or unfollow an author"""
-        author_to_follow = self.get_object()
+        try:
+            # Try to get the author normally
+            author_to_follow = self.get_object()
+        except Http404:
+            # If author not found locally, check if this is a remote author we need to create
+            # The pk might be a UUID or a full URL for remote authors
+            from app.models import Node
+            import requests
+            from requests.auth import HTTPBasicAuth
+            
+            # Check if pk looks like a UUID
+            try:
+                import uuid
+                uuid.UUID(str(pk))
+                # It's a UUID, but author doesn't exist locally
+                # This might be a remote author from explore page
+                # Check if we have any context about which node this author is from
+                
+                # Get the referrer to see if user came from explore page
+                referrer = request.headers.get('Referer', '')
+                
+                # For now, we'll need to handle this differently
+                # The frontend should pass node information when following remote authors
+                return Response(
+                    {"error": "Remote author not found locally. Please try again from the explore page."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            except ValueError:
+                # Not a valid UUID
+                return Response(
+                    {"error": "Invalid author ID format"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        
         current_user = request.user
 
         if request.method == "POST":
@@ -645,6 +678,200 @@ class AuthorViewSet(viewsets.ModelViewSet):
             "type": "followers", 
             "followers": serializer.data
         })
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="follow-remote"
+    )
+    def follow_remote(self, request):
+        """
+        Follow a remote author by creating/fetching their local record first.
+        
+        Expected data:
+        {
+            "author_id": "uuid-of-remote-author",
+            "author_url": "full-url-of-remote-author", 
+            "node_id": "uuid-of-node"
+        }
+        """
+        author_id = request.data.get('author_id')
+        author_url = request.data.get('author_url')
+        node_id = request.data.get('node_id')
+        
+        if not author_id or not author_url or not node_id:
+            return Response(
+                {"error": "author_id, author_url, and node_id are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get the node
+        from app.models import Node
+        try:
+            node = Node.objects.get(id=node_id, is_active=True)
+        except Node.DoesNotExist:
+            return Response(
+                {"error": "Node not found or inactive"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if author already exists locally
+        try:
+            remote_author = Author.objects.get(id=author_id)
+        except Author.DoesNotExist:
+            # Fetch author data from remote node
+            import requests
+            from requests.auth import HTTPBasicAuth
+            
+            try:
+                response = requests.get(
+                    f"{node.host.rstrip('/')}/api/authors/{author_id}/",
+                    auth=HTTPBasicAuth(node.username, node.password),
+                    timeout=5
+                )
+                
+                if response.status_code != 200:
+                    return Response(
+                        {"error": f"Failed to fetch author from remote node: {response.status_code}"},
+                        status=status.HTTP_502_BAD_GATEWAY
+                    )
+                
+                author_data = response.json()
+                
+                # Create local author record
+                remote_author = Author.objects.create(
+                    id=author_id,
+                    url=author_url,
+                    username=author_data.get('username', ''),
+                    display_name=author_data.get('displayName', ''),
+                    github_username=author_data.get('github', ''),
+                    profile_image=author_data.get('profileImage', ''),
+                    bio=author_data.get('bio', ''),
+                    location=author_data.get('location', ''),
+                    website=author_data.get('website', ''),
+                    host=author_data.get('host', node.host),
+                    web=author_data.get('page', ''),
+                    node=node,
+                    is_approved=True,  # Remote authors are auto-approved
+                    is_active=True
+                )
+                
+            except requests.RequestException as e:
+                return Response(
+                    {"error": f"Failed to connect to remote node: {str(e)}"},
+                    status=status.HTTP_502_BAD_GATEWAY
+                )
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to create remote author: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        
+        # Now follow the remote author
+        current_user = request.user
+        
+        # Check if trying to follow self
+        if current_user.url == remote_author.url:
+            return Response(
+                {"error": "Cannot follow yourself"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Check if follow request already exists
+        existing_follow = Follow.objects.filter(
+            follower=current_user, followed=remote_author
+        ).first()
+        
+        if existing_follow:
+            if existing_follow.status == Follow.ACCEPTED:
+                return Response(
+                    {"error": "Already following this user"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            elif existing_follow.status == Follow.PENDING:
+                return Response(
+                    {"error": "Follow request already pending"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            elif existing_follow.status == Follow.REJECTED:
+                existing_follow.delete()
+        
+        # Create follow request
+        follow = Follow.objects.create(
+            follower=current_user, followed=remote_author, status=Follow.PENDING
+        )
+        
+        # Create inbox item for the followed user
+        from app.models.inbox import Inbox
+        
+        Inbox.objects.create(
+            recipient=follow.followed,
+            item_type=Inbox.FOLLOW,
+            follow=follow,
+            raw_data={
+                "type": "Follow",
+                "actor": {
+                    "id": follow.follower.url,
+                    "display_name": follow.follower.display_name,
+                    "username": follow.follower.username,
+                    "profile_image": (
+                        follow.follower.profile_image
+                        if follow.follower.profile_image
+                        else None
+                    ),
+                },
+                "object": follow.followed.url,
+                "status": follow.status,
+            },
+        )
+        
+        # Send follow request to remote node
+        if remote_author.node:
+            self._send_follow_to_remote(follow, remote_author, node)
+        
+        serializer = FollowSerializer(follow)
+        return Response(
+            {"success": True, "follow": serializer.data},
+            status=status.HTTP_201_CREATED,
+        )
+    
+    def _send_follow_to_remote(self, follow, remote_author, node):
+        """Send follow request to remote node"""
+        import requests
+        from requests.auth import HTTPBasicAuth
+        
+        try:
+            # Prepare follow request data
+            follow_data = {
+                "type": "Follow",
+                "actor": {
+                    "id": follow.follower.url,
+                    "url": follow.follower.url,
+                    "host": follow.follower.host,
+                    "displayName": follow.follower.display_name,
+                    "username": follow.follower.username,
+                    "profileImage": follow.follower.profile_image,
+                },
+                "object": remote_author.url,
+            }
+            
+            # Send to remote author's inbox
+            inbox_url = f"{node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
+            
+            response = requests.post(
+                inbox_url,
+                json=follow_data,
+                auth=HTTPBasicAuth(node.username, node.password),
+                headers={'Content-Type': 'application/json'},
+                timeout=5
+            )
+            
+            if response.status_code not in [200, 201, 202]:
+                print(f"Failed to send follow request to remote node: {response.status_code}")
+                print(f"Response: {response.text}")
+        except Exception as e:
+            print(f"Error sending follow request to remote node: {str(e)}")
 
     @action(detail=True, methods=['get', 'put', 'delete'], url_path='followers/(?P<foreign_author_fqid>.+)')
     def follower_detail(self, request, pk=None, foreign_author_fqid=None):

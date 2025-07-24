@@ -149,7 +149,43 @@ class EntryViewSet(viewsets.ModelViewSet):
             return visible_entries.filter(author=target_author).order_by("-created_at")
 
         # General feed (not profile) - show all entries visible to the user
-        return Entry.objects.visible_to_author(user_author).order_by("-created_at")
+        queryset = Entry.objects.visible_to_author(user_author).order_by("-created_at")
+        
+        # Debug logging for explore/recent and home page
+        if self.request.path.endswith('/entries/'):
+            from app.models import Author
+            
+            # Count posts by visibility and origin
+            total_posts = queryset.count()
+            public_posts = queryset.filter(visibility=Entry.PUBLIC).count()
+            remote_public_count = queryset.filter(
+                visibility=Entry.PUBLIC, 
+                author__node__isnull=False
+            ).count()
+            local_public_count = queryset.filter(
+                visibility=Entry.PUBLIC, 
+                author__node__isnull=True
+            ).count()
+            
+            print(f"\nDEBUG EntryViewSet.get_queryset for path: {self.request.path}")
+            print(f"DEBUG: Total entries in queryset: {total_posts}")
+            print(f"DEBUG: Total PUBLIC posts: {public_posts}")
+            print(f"DEBUG: Local PUBLIC posts: {local_public_count}, Remote PUBLIC posts: {remote_public_count}")
+            
+            # Check if any remote posts exist at all
+            total_remote_posts = Entry.objects.filter(author__node__isnull=False).count()
+            total_remote_public = Entry.objects.filter(author__node__isnull=False, visibility=Entry.PUBLIC).count()
+            print(f"DEBUG: Total remote posts in DB: {total_remote_posts}, Total remote PUBLIC in DB: {total_remote_public}")
+            
+            # Log first few remote PUBLIC posts if any
+            remote_public_posts = queryset.filter(
+                visibility=Entry.PUBLIC, 
+                author__node__isnull=False
+            )[:3]
+            for post in remote_public_posts:
+                print(f"DEBUG: Remote PUBLIC post - ID: {post.id}, Title: {post.title}, Author: {post.author.username} from {post.author.node.name if post.author.node else 'Unknown node'}, Created: {post.created_at}")
+        
+        return queryset
 
     def perform_create(self, serializer):
         """
@@ -179,7 +215,7 @@ class EntryViewSet(viewsets.ModelViewSet):
     def _send_to_remote_nodes(self, entry):
         """
         Send an entry to remote nodes based on visibility rules.
-        PUBLIC: Send to all remote followers
+        PUBLIC: Broadcast to all connected nodes for discovery
         FRIENDS: Send only to remote friends
         """
         try:
@@ -189,55 +225,13 @@ class EntryViewSet(viewsets.ModelViewSet):
             
             # Get recipients based on visibility
             if entry.visibility == Entry.PUBLIC:
-                # Broadcast PUBLIC posts to ALL active nodes for discovery
+                # For PUBLIC posts, broadcast to ALL connected nodes
+                # This ensures all users on connected nodes can discover the post
                 active_nodes = Node.objects.filter(is_active=True)
                 
                 for node in active_nodes:
-                    try:
-                        # Send to the node's public inbox
-                        inbox_url = f"{node.host.rstrip('/')}/api/inbox/"
-                        
-                        # Prepare the post data
-                        post_object = {
-                            "type": "Post", 
-                            "id": entry.url,
-                            "title": entry.title,
-                            "content": entry.content,
-                            "contentType": entry.content_type,
-                            "visibility": entry.visibility,
-                            "published": entry.created_at.isoformat(),
-                            "author": entry.author.url
-                        }
-                        
-                        # Include image if present
-                        if entry.content_type in ['image/png', 'image/jpeg'] and entry.image_data:
-                            import base64
-                            image_base64 = base64.b64encode(entry.image_data).decode('utf-8')
-                            post_object["image"] = f"data:{entry.content_type};base64,{image_base64}"
-                        
-                        post_data = {
-                            "@context": "https://www.w3.org/ns/activitystreams",
-                            "type": "Create",
-                            "actor": entry.author.url,
-                            "object": post_object
-                        }
-                        
-                        response = requests.post(
-                            inbox_url,
-                            json=post_data,
-                            auth=HTTPBasicAuth(node.username, node.password),
-                            headers={'Content-Type': 'application/activity+json'},
-                            timeout=5
-                        )
-                        
-                        if response.status_code not in [200, 201, 202]:
-                            print(f"Failed to broadcast to {inbox_url}: {response.status_code}")
-                            
-                    except Exception as e:
-                        print(f"Error broadcasting to node {node.host}: {str(e)}")
-                        continue
-                        
-                return  # Public posts are broadcast, no need for targeted delivery
+                    self._broadcast_to_node(entry, node)
+                    
             elif entry.visibility == Entry.FRIENDS:
                 # Get only remote friends
                 friendships = Friendship.objects.filter(
@@ -256,66 +250,156 @@ class EntryViewSet(viewsets.ModelViewSet):
                     status=Follow.ACCEPTED,
                     follower__node__isnull=False  # Only remote authors
                 ).select_related('follower', 'follower__node')
-            else:
-                return  # Don't send UNLISTED or PRIVATE posts
-            
-            for follow in remote_followers:
-                remote_author = follow.follower
-                remote_node = remote_author.node
                 
-                if not remote_node or not remote_node.is_active:
-                    continue
-                
-                # Prepare the post data for ActivityPub
-                post_object = {
-                    "type": "Post",
-                    "id": entry.url,
-                    "title": entry.title,
-                    "content": entry.content,
-                    "contentType": entry.content_type,
-                    "visibility": entry.visibility,
-                    "published": entry.created_at.isoformat(),
-                    "author": entry.author.url
-                }
-                
-                # Include image if present
-                if entry.content_type in ['image/png', 'image/jpeg'] and entry.image_data:
-                    import base64
-                    image_base64 = base64.b64encode(entry.image_data).decode('utf-8')
-                    post_object["image"] = f"data:{entry.content_type};base64,{image_base64}"
-                
-                post_data = {
-                    "@context": "https://www.w3.org/ns/activitystreams",
-                    "type": "Create",
-                    "actor": entry.author.url,
-                    "object": post_object
-                }
-                
-                # Send to remote node's inbox
-                try:
-                    # Extract author ID from the URL properly
-                    author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
-                    inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
+                # Send to remote friends
+                for follow in remote_followers:
+                    remote_author = follow.follower
+                    remote_node = remote_author.node
                     
-                    response = requests.post(
-                        inbox_url,
-                        json=post_data,
-                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                        headers={'Content-Type': 'application/activity+json'},
-                        timeout=5
-                    )
+                    if not remote_node or not remote_node.is_active:
+                        continue
                     
-                    if response.status_code in [200, 201, 202]:
-                        InboxDelivery.objects.get_or_create(entry=entry, recipient=remote_author, success=True)
-                    else:
-                        print(f"Failed to send post to {inbox_url}: {response.status_code}")
-
-                        
-                except Exception as e:
-                    print(f"Error sending post to remote node {remote_node.host}: {str(e)}")
+                    self._send_post_to_author(entry, remote_author, remote_node)
                     
         except Exception as e:
             print(f"Error in _send_to_remote_nodes: {str(e)}")
+
+    def _broadcast_to_node(self, entry, node):
+        """
+        Broadcast a PUBLIC post to a remote node.
+        Sends the post directly to the general inbox endpoint for PUBLIC content discovery.
+        """
+        try:
+            import requests
+            from requests.auth import HTTPBasicAuth
+            
+            print(f"Broadcasting PUBLIC post '{entry.title}' to node: {node.name} ({node.host})")
+            
+            # For PUBLIC posts, send directly to the general inbox
+            general_inbox_url = f"{node.host.rstrip('/')}/api/federation/inbox/"
+            
+            # Use the helper method to prepare post data
+            post_data = self._prepare_post_data(entry)
+            
+            print(f"Sending PUBLIC post to general inbox: {general_inbox_url}")
+            print(f"Authenticating as username: {node.username}")
+            
+            response = requests.post(
+                general_inbox_url,
+                json=post_data,
+                auth=HTTPBasicAuth(node.username, node.password),
+                headers={'Content-Type': 'application/json'},
+                timeout=10
+            )
+            
+            if response.status_code in [200, 201, 202]:
+                print(f"Successfully sent PUBLIC post to {node.name} general inbox")
+            else:
+                print(f"Failed to send to {node.name} general inbox: {response.status_code}")
+                print(f"Response: {response.text[:500]}")
+                
+                # If general inbox fails, try to send to any known authors from this node
+                self._broadcast_to_known_authors(entry, node)
+                
+        except Exception as e:
+            print(f"Error broadcasting to node {node.name}: {str(e)}")
+            # Fall back to sending to known authors from this node
+            self._broadcast_to_known_authors(entry, node)
+    
+    def _broadcast_to_known_authors(self, entry, node):
+        """
+        Fallback method to broadcast to known authors from a node.
+        Used when we can't fetch the full author list from the remote node.
+        """
+        # Find any active author from this node to receive the broadcast
+        remote_authors = Author.objects.filter(node=node, is_active=True)
+        
+        if remote_authors.exists():
+            for remote_author in remote_authors:
+                self._send_post_to_author(entry, remote_author, node)
+        else:
+            print(f"Warning: No known authors from node {node.name} - post will be discovered when authors interact")
+    
+    def _prepare_post_data(self, entry):
+        """
+        Prepare post data in the format expected by remote nodes
+        """
+        post_data = {
+            "content_type": "entry",
+            "type": "Post",
+            "id": entry.url,
+            "title": entry.title,
+            "content": entry.content,
+            "contentType": entry.content_type,
+            "visibility": entry.visibility,
+            "published": entry.created_at.isoformat(),
+            "author": {
+                "id": entry.author.url,
+                "url": entry.author.url,
+                "host": entry.author.host,
+                "displayName": entry.author.display_name,
+                "username": entry.author.username,
+                "github": entry.author.github_username if entry.author.github_username else "",
+                "profileImage": entry.author.profile_image if entry.author.profile_image else "",
+                "bio": entry.author.bio if entry.author.bio else "",
+                "location": entry.author.location if entry.author.location else "",
+                "website": entry.author.website if entry.author.website else "",
+                "page": entry.author.web if entry.author.web else ""
+            },
+            "description": entry.description if entry.description else "",
+            "source": entry.source if entry.source else entry.url,
+            "origin": entry.origin if entry.origin else entry.url
+        }
+        
+        # Include image if present
+        if entry.content_type in ['image/png', 'image/jpeg'] and entry.image_data:
+            import base64
+            image_base64 = base64.b64encode(entry.image_data).decode('utf-8')
+            post_data["image"] = f"data:{entry.content_type};base64,{image_base64}"
+        
+        return post_data
+    
+    def _send_post_to_author(self, entry, remote_author, remote_node):
+        """
+        Send a post to a specific remote author's inbox
+        """
+        from requests.auth import HTTPBasicAuth
+        import requests
+        
+        # Use the helper method to prepare post data
+        post_data = self._prepare_post_data(entry)
+        
+        # Send to remote node's inbox
+        try:
+            # Build the inbox URL from the author's URL
+            if remote_author.url:
+                # Extract author ID from URL like "http://nodeaaaa/authors/greg" 
+                url_parts = remote_author.url.rstrip('/').split('/')
+                author_id = url_parts[-1]
+            else:
+                # Fallback to UUID
+                author_id = str(remote_author.id)
+            
+            # Construct inbox URL using the node's host, not the author's host
+            # (author's host might be localhost from their local development)
+            host = remote_node.host.rstrip('/')
+            inbox_url = f"{host}/api/authors/{author_id}/inbox/"
+            
+            response = requests.post(
+                inbox_url,
+                json=post_data,
+                auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                headers={'Content-Type': 'application/json'},
+                timeout=5
+            )
+            
+            if response.status_code in [200, 201, 202]:
+                InboxDelivery.objects.get_or_create(entry=entry, recipient=remote_author, success=True)
+            else:
+                print(f"Failed to send post to {inbox_url}: {response.status_code} - {response.text[:200]}")
+                
+        except Exception as e:
+            print(f"Error sending post to remote author {remote_author.username}: {str(e)}")
 
     def get_permissions(self):
         """
@@ -803,7 +887,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                         inbox_url,
                         json=update_data,
                         auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                        headers={'Content-Type': 'application/activity+json'},
+                        headers={'Content-Type': 'application/json'},
                         timeout=5
                     )
                     
@@ -858,7 +942,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                         inbox_url,
                         json=delete_data,
                         auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                        headers={'Content-Type': 'application/activity+json'},
+                        headers={'Content-Type': 'application/json'},
                         timeout=5
                     )
                     
@@ -874,7 +958,27 @@ class EntryViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for entry updates with logging"""
         logger.debug(f"Updating entry - User: {request.user}, Data: {request.data}")
-        return super().partial_update(request, *args, **kwargs)
+        
+        # Get the entry before update
+        entry = self.get_object()
+        old_visibility = entry.visibility
+        
+        response = super().partial_update(request, *args, **kwargs)
+        
+        # If update was successful, check if we need to send to remote nodes
+        if response.status_code == 200:
+            entry.refresh_from_db()
+            
+            # Send to remote nodes if visibility allows
+            if entry.visibility in [Entry.PUBLIC, Entry.FRIENDS]:
+                if old_visibility == entry.visibility:
+                    # Visibility didn't change, send update
+                    self._send_update_to_remote_nodes(entry)
+                else:
+                    # Visibility changed, send as new post
+                    self._send_to_remote_nodes(entry)
+        
+        return response
 
     def retrieve_by_fqid(self, request, entry_fqid=None):
         """
