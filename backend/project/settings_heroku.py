@@ -17,8 +17,8 @@ ALLOWED_HOSTS = [
 
 # CORS settings for production
 CORS_ALLOWED_ORIGINS = [
-    "https://project-black-ej-53285e19ae0a.herokuapp.com/",
-    "http://project-black-ej-53285e19ae0a.herokuapp.com/",
+    "https://project-black-ej-53285e19ae0a.herokuapp.com",
+    "http://project-black-ej-53285e19ae0a.herokuapp.com",
 
 ]
 # Allow the app's own domain
