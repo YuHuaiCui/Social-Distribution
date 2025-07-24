@@ -71,4 +71,3 @@ Thumbs.db
 
 db.sqlite3
 frontend/.env.production
-backend/staticfiles/
