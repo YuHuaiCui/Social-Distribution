@@ -10,6 +10,7 @@ import { api } from '../services/api';
 import AnimatedButton from './ui/AnimatedButton';
 import Input from './ui/Input';
 import Avatar from './Avatar/Avatar';
+import { extractUUID } from '../utils/extractId';
 
 // Debounce utility
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
@@ -52,7 +53,8 @@ const ShareModalComponent: React.FC<ShareModalProps> = ({
   const [sentSuccess, setSentSuccess] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const postUrl = shareUrl || `${window.location.origin}/posts/${post.id}`;
+  const postId = extractUUID(post.id);
+  const postUrl = shareUrl || `${window.location.origin}/posts/${postId}`;
   const shareText = `Check out "${post.title}" by ${
     typeof post.author === 'object' ? post.author.display_name : 'Unknown'
   }`;

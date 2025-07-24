@@ -5,6 +5,9 @@ import os
 import dj_database_url
 from .settings import *
 
+# Override redirect URLs from environment variables
+LOGIN_REDIRECT_URL = os.environ.get('LOGIN_REDIRECT_URL')
+LOGOUT_REDIRECT_URL = os.environ.get('LOGOUT_REDIRECT_URL')
 
 # Security
 DEBUG = False
