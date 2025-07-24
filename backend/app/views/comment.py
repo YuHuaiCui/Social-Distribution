@@ -6,6 +6,45 @@ from app.models.comment import Comment
 from app.models.entry import Entry
 from app.serializers.comment import CommentSerializer
 
+import requests
+from requests.auth import HTTPBasicAuth
+from app.models import Node
+from app.serializers.comment import CommentSerializer
+
+def send_comment_to_remote_inbox(comment):
+    if not comment.entry or not comment.entry.author or comment.entry.author.is_local:
+        return  # Skip local targets
+
+    remote_author = comment.entry.author
+    inbox_url = f"{remote_author.url.rstrip('/')}/inbox/"
+
+    # Get node credentials
+    node = Node.objects.filter(host__icontains=remote_author.host).first()
+    if not node:
+        print(f"[Federation] No node config for {remote_author.host}")
+        return
+
+    payload = {
+        "@context": "https://www.w3.org/ns/activitystreams",
+        "type": "Create",
+        "actor": comment.author.url,
+        "object": CommentSerializer(comment).data,
+    }
+
+    try:
+        response = requests.post(
+            inbox_url,
+            json=payload,
+            auth=HTTPBasicAuth(node.username, node.password),
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+        )
+        print(f"[Federation] Comment sent to {inbox_url}: {response.status_code}")
+    except Exception as e:
+        print(f"[Federation] Error sending comment: {e}")
+
+
+
 
 class CommentListCreateView(generics.ListCreateAPIView):
     """
@@ -93,7 +132,9 @@ class CommentListCreateView(generics.ListCreateAPIView):
         # Pass the author's URL (not the User object) since the FK uses to_field="url"
         # request.user IS the Author instance (Author extends AbstractUser)
         author_url = self.request.user.url
-        serializer.save(author_id=author_url, entry_id=entry.url)
+        comment =serializer.save(author_id=author_url, entry_id=entry.url)
+
+        send_comment_to_remote_inbox(comment)
 
 class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """

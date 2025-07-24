@@ -12,7 +12,7 @@ from app.permissions import IsAuthorSelfOrReadOnly
 import uuid
 import os
 import logging
-from app.models import Like
+from app.models import Like,InboxDelivery, SavedEntry
 from django.db.models import Count, F
 from django.utils import timezone
 from datetime import timedelta
@@ -262,8 +262,11 @@ class EntryViewSet(viewsets.ModelViewSet):
                         timeout=5
                     )
                     
-                    if response.status_code not in [200, 201, 202]:
+                    if response.status_code in [200, 201, 202]:
+                        InboxDelivery.objects.get_or_create(entry=entry, recipient=remote_author, success=True)
+                    else:
                         print(f"Failed to send post to {inbox_url}: {response.status_code}")
+
                         
                 except Exception as e:
                     print(f"Error sending post to remote node {remote_node.host}: {str(e)}")
