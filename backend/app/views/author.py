@@ -504,6 +504,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         except Author.DoesNotExist:
             return Response({"message": "Author profile not found"}, status=404)
 
+    # bah
     def update(self, request, *args, **kwargs):
         """Handle PUT/PATCH requests for author updates"""
         # Get the object to update and check permissions
