@@ -1,6 +1,6 @@
 import type { Follow, FollowRequest } from '../../types/follow/index';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const followService = {
     // Get all pending follow requests for the current user
