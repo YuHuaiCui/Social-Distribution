@@ -163,4 +163,7 @@ urlpatterns = [
     
     # ActivityPub inbox endpoint for receiving objects from remote nodes
     path('authors/<uuid:author_id>/inbox/', InboxReceiveView.as_view(), name='inbox-receive'),
+    
+    # Public inbox endpoint for receiving broadcasts from remote nodes
+    path('inbox/', InboxReceiveView.as_view(), name='public-inbox-receive'),
 ]

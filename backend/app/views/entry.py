@@ -189,12 +189,55 @@ class EntryViewSet(viewsets.ModelViewSet):
             
             # Get recipients based on visibility
             if entry.visibility == Entry.PUBLIC:
-                # Get all remote followers
-                remote_followers = Follow.objects.filter(
-                    followed=entry.author,
-                    status=Follow.ACCEPTED,
-                    follower__node__isnull=False  # Only remote authors
-                ).select_related('follower', 'follower__node')
+                # Broadcast PUBLIC posts to ALL active nodes for discovery
+                active_nodes = Node.objects.filter(is_active=True)
+                
+                for node in active_nodes:
+                    try:
+                        # Send to the node's public inbox
+                        inbox_url = f"{node.host.rstrip('/')}/api/inbox/"
+                        
+                        # Prepare the post data
+                        post_object = {
+                            "type": "Post", 
+                            "id": entry.url,
+                            "title": entry.title,
+                            "content": entry.content,
+                            "contentType": entry.content_type,
+                            "visibility": entry.visibility,
+                            "published": entry.created_at.isoformat(),
+                            "author": entry.author.url
+                        }
+                        
+                        # Include image if present
+                        if entry.content_type in ['image/png', 'image/jpeg'] and entry.image_data:
+                            import base64
+                            image_base64 = base64.b64encode(entry.image_data).decode('utf-8')
+                            post_object["image"] = f"data:{entry.content_type};base64,{image_base64}"
+                        
+                        post_data = {
+                            "@context": "https://www.w3.org/ns/activitystreams",
+                            "type": "Create",
+                            "actor": entry.author.url,
+                            "object": post_object
+                        }
+                        
+                        response = requests.post(
+                            inbox_url,
+                            json=post_data,
+                            auth=HTTPBasicAuth(node.username, node.password),
+                            headers={'Content-Type': 'application/activity+json'},
+                            timeout=5
+                        )
+                        
+                        if response.status_code not in [200, 201, 202]:
+                            print(f"Failed to broadcast to {inbox_url}: {response.status_code}")
+                            
+                    except Exception as e:
+                        print(f"Error broadcasting to node {node.host}: {str(e)}")
+                        continue
+                        
+                return  # Public posts are broadcast, no need for targeted delivery
             elif entry.visibility == Entry.FRIENDS:
                 # Get only remote friends
                 friendships = Friendship.objects.filter(

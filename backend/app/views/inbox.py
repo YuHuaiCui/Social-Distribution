@@ -27,19 +27,23 @@ class InboxReceiveView(APIView):
     parser_classes = [JSONParser]
     permission_classes = []  # Will handle auth manually
     
-    def post(self, request, author_id):
+    def post(self, request, author_id=None):
         """
-        Receive an ActivityPub object in an author's inbox
+        Receive an ActivityPub object in an author's inbox or public inbox
         """
-        print(f"DEBUG: Received inbox request for author {author_id}")
+        print(f"DEBUG: Received inbox request for author {author_id}" if author_id else "DEBUG: Received public inbox request")
         print(f"DEBUG: Request data: {request.data}")
         
-        # Extract the author from the URL
-        try:
-            author = Author.objects.get(id=author_id)
-        except Author.DoesNotExist:
-            print(f"DEBUG: Author {author_id} not found")
-            return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
+        # If author_id is provided, get the specific author
+        if author_id:
+            try:
+                author = Author.objects.get(id=author_id)
+            except Author.DoesNotExist:
+                print(f"DEBUG: Author {author_id} not found")
+                return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Public inbox - no specific author
+            author = None
         
         # Check authentication
         auth_header = request.headers.get('Authorization')
@@ -295,11 +299,27 @@ class InboxReceiveView(APIView):
             # Get or create the remote author
             remote_author, created = self._get_or_create_remote_author(actor_data, remote_node)
             
+            # If this is a public broadcast (no specific recipient), we just store the post
+            # The post will be visible to all local authors based on visibility rules
+            
             # Create the entry
             from app.models import Entry
             
             # Generate a temporary URL first, then update it after creation
             temp_url = post_data.get('id', f"{remote_author.host}posts/{remote_author.id}/temp")
+            
+            # Check if there's image data
+            image_data = None
+            if post_data.get('image') and post_data.get('contentType', '').startswith('image/'):
+                import base64
+                import re
+                image_content = post_data.get('image', '')
+                match = re.match(r"^data:image/\w+;base64,(.+)$", image_content)
+                if match:
+                    try:
+                        image_data = base64.b64decode(match.group(1))
+                    except Exception as e:
+                        print(f"Failed to decode image data: {e}")
             
             entry = Entry.objects.create(
                 author=remote_author,
@@ -310,7 +330,8 @@ class InboxReceiveView(APIView):
                 description=post_data.get('description', ''),
                 url=temp_url,
                 source=post_data.get('source', ''),
-                origin=post_data.get('origin', '')
+                origin=post_data.get('origin', ''),
+                image_data=image_data
             )
             
             # Update the URL with the actual entry ID
@@ -318,15 +339,18 @@ class InboxReceiveView(APIView):
                 entry.url = f"{remote_author.host}posts/{remote_author.id}/{entry.id}"
                 entry.save(update_fields=['url'])
             
-            # Create inbox item
-            Inbox.objects.create(
-                recipient=recipient,
-                item_type=Inbox.ENTRY,
-                entry=entry,
-                raw_data=data
-            )
-            
-            return Response({"message": "Post received"}, status=status.HTTP_200_OK)
+            # Create inbox item only if there's a specific recipient
+            if recipient:
+                Inbox.objects.create(
+                    recipient=recipient,
+                    item_type=Inbox.ENTRY,
+                    entry=entry,
+                    raw_data=data
+                )
+                return Response({"message": "Post received and delivered to inbox"}, status=status.HTTP_200_OK)
+            else:
+                # Public broadcast - no inbox item, but post is stored and visible
+                return Response({"message": "Post received and stored for public viewing"}, status=status.HTTP_200_OK)
             
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
