@@ -166,15 +166,23 @@ class EntrySerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         print("ENTRY UPDATE VALIDATED DATA:", validated_data)
-        for field in ['title', 'description', 'visibility']:
+        for field in ['title', 'description', 'visibility', 'categories']:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
 
+        # Update content_type if provided
+        if 'content_type' in validated_data:
+            instance.content_type = validated_data['content_type']
+            
         content_type = validated_data.get('content_type', instance.content_type)
         content = validated_data.get('content', instance.content)
 
+        # Update content if provided
+        if 'content' in validated_data:
+            instance.content = validated_data['content']
+            
         # Handle base64 image update if content_type is image/*
-        if content_type in ['image/png', 'image/jpeg'] and content.startswith("data:image/"):
+        if content_type in ['image/png', 'image/jpeg'] and content and content.startswith("data:image/"):
             import base64
             import re
 

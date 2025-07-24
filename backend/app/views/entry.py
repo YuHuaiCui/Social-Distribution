@@ -172,25 +172,49 @@ class EntryViewSet(viewsets.ModelViewSet):
         # Save the entry with the user's author
         entry = serializer.save(author=user_author)
         
-        # Send to remote nodes if this is a public post
-        if entry.visibility == Entry.PUBLIC:
+        # Send to remote nodes based on visibility
+        if entry.visibility in [Entry.PUBLIC, Entry.FRIENDS]:
             self._send_to_remote_nodes(entry)
 
     def _send_to_remote_nodes(self, entry):
         """
-        Send a public entry to remote nodes that are following the author.
+        Send an entry to remote nodes based on visibility rules.
+        PUBLIC: Send to all remote followers
+        FRIENDS: Send only to remote friends
         """
         try:
-            from app.models import Follow, Node
+            from app.models import Follow, Node, Friendship
             from requests.auth import HTTPBasicAuth
             import requests
             
-            # Get all remote followers
-            remote_followers = Follow.objects.filter(
-                followed=entry.author,
-                status=Follow.ACCEPTED,
-                follower__node__isnull=False  # Only remote authors
-            ).select_related('follower', 'follower__node')
+            # Get recipients based on visibility
+            if entry.visibility == Entry.PUBLIC:
+                # Get all remote followers
+                remote_followers = Follow.objects.filter(
+                    followed=entry.author,
+                    status=Follow.ACCEPTED,
+                    follower__node__isnull=False  # Only remote authors
+                ).select_related('follower', 'follower__node')
+            elif entry.visibility == Entry.FRIENDS:
+                # Get only remote friends
+                friendships = Friendship.objects.filter(
+                    models.Q(author1=entry.author) | models.Q(author2=entry.author)
+                )
+                friend_ids = []
+                for friendship in friendships:
+                    if friendship.author1 == entry.author:
+                        friend_ids.append(friendship.author2.id)
+                    else:
+                        friend_ids.append(friendship.author1.id)
+                
+                remote_followers = Follow.objects.filter(
+                    followed=entry.author,
+                    follower__id__in=friend_ids,
+                    status=Follow.ACCEPTED,
+                    follower__node__isnull=False  # Only remote authors
+                ).select_related('follower', 'follower__node')
+            else:
+                return  # Don't send UNLISTED or PRIVATE posts
             
             for follow in remote_followers:
                 remote_author = follow.follower
@@ -299,6 +323,9 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         entry = self.get_object()
 
+        # Send delete notification to remote nodes before soft delete
+        self._send_delete_to_remote_nodes(entry)
+        
         # Perform soft delete by changing visibility
         entry.visibility = Entry.DELETED
         entry.save()
@@ -672,6 +699,123 @@ class EntryViewSet(viewsets.ModelViewSet):
                 {"error": "Could not save/unsave entry"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    
+    def _send_update_to_remote_nodes(self, entry):
+        """
+        Send an updated entry to remote nodes that previously received it.
+        """
+        try:
+            from app.models import InboxDelivery
+            from requests.auth import HTTPBasicAuth
+            import requests
+            
+            # Get all successful deliveries for this entry
+            deliveries = InboxDelivery.objects.filter(
+                entry=entry,
+                success=True,
+                recipient__node__isnull=False
+            ).select_related('recipient', 'recipient__node')
+            
+            for delivery in deliveries:
+                remote_author = delivery.recipient
+                remote_node = remote_author.node
+                
+                if not remote_node or not remote_node.is_active:
+                    continue
+                
+                # Prepare the update data
+                update_data = {
+                    "@context": "https://www.w3.org/ns/activitystreams",
+                    "type": "Update",
+                    "actor": entry.author.url,
+                    "object": {
+                        "type": "Post",
+                        "id": entry.url,
+                        "title": entry.title,
+                        "content": entry.content,
+                        "contentType": entry.content_type,
+                        "visibility": entry.visibility,
+                        "published": entry.created_at.isoformat(),
+                        "updated": entry.updated_at.isoformat(),
+                        "author": entry.author.url
+                    }
+                }
+                
+                try:
+                    author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
+                    inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
+                    
+                    response = requests.post(
+                        inbox_url,
+                        json=update_data,
+                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                        headers={'Content-Type': 'application/activity+json'},
+                        timeout=5
+                    )
+                    
+                    if response.status_code not in [200, 201, 202]:
+                        print(f"Failed to send update to {inbox_url}: {response.status_code}")
+                        
+                except Exception as e:
+                    print(f"Error sending update to remote node {remote_node.host}: {str(e)}")
+                    
+        except Exception as e:
+            print(f"Error in _send_update_to_remote_nodes: {str(e)}")
+    
+    def _send_delete_to_remote_nodes(self, entry):
+        """
+        Send a delete notification to remote nodes that previously received the entry.
+        """
+        try:
+            from app.models import InboxDelivery
+            from requests.auth import HTTPBasicAuth
+            import requests
+            
+            # Get all successful deliveries for this entry
+            deliveries = InboxDelivery.objects.filter(
+                entry=entry,
+                success=True,
+                recipient__node__isnull=False
+            ).select_related('recipient', 'recipient__node')
+            
+            for delivery in deliveries:
+                remote_author = delivery.recipient
+                remote_node = remote_author.node
+                
+                if not remote_node or not remote_node.is_active:
+                    continue
+                
+                # Prepare the delete data
+                delete_data = {
+                    "@context": "https://www.w3.org/ns/activitystreams",
+                    "type": "Delete",
+                    "actor": entry.author.url,
+                    "object": {
+                        "type": "Post",
+                        "id": entry.url
+                    }
+                }
+                
+                try:
+                    author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
+                    inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
+                    
+                    response = requests.post(
+                        inbox_url,
+                        json=delete_data,
+                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+                        headers={'Content-Type': 'application/activity+json'},
+                        timeout=5
+                    )
+                    
+                    if response.status_code not in [200, 201, 202]:
+                        print(f"Failed to send delete to {inbox_url}: {response.status_code}")
+                        
+                except Exception as e:
+                    print(f"Error sending delete to remote node {remote_node.host}: {str(e)}")
+                    
+        except Exception as e:
+            print(f"Error in _send_delete_to_remote_nodes: {str(e)}")
 
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for entry updates with logging"""
@@ -852,7 +996,10 @@ class EntryViewSet(viewsets.ModelViewSet):
             
             serializer = self.get_serializer(entry, data=request.data, partial=False)
             if serializer.is_valid():
-                serializer.save()
+                updated_entry = serializer.save()
+                # Send update to remote nodes
+                if updated_entry.visibility in [Entry.PUBLIC, Entry.FRIENDS]:
+                    self._send_update_to_remote_nodes(updated_entry)
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
