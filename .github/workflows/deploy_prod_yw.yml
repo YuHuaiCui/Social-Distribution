@@ -43,6 +43,10 @@ jobs:
             echo "Consider fixing these type issues for better code quality."
           }
 
+          echo "🔧 Removing local .env file to ensure production build..."
+          rm -f .env
+          echo "✅ Local .env file removed"
+
           echo "🔨 Building React app for production..."
           VITE_API_URL="" npx vite build || {
             echo "❌ Build failed!"
@@ -54,6 +58,8 @@ jobs:
 
           echo "📋 Copying build files to Django static directory..."
           cd ..
+          echo "🧹 Cleaning old static files..."
+          rm -rf backend/staticfiles/*
           mkdir -p backend/staticfiles
           cp -r frontend/dist/* backend/staticfiles/
           echo "✅ Frontend build copied to backend"
@@ -65,6 +71,13 @@ jobs:
           echo "📋 Creating .env file for Heroku..."
           echo "DISABLE_COLLECTSTATIC=1" > .env
           echo "✅ .env file created"
+
+      - name: Clear Heroku Build Cache
+        run: |
+          echo "🧹 Clearing Heroku build cache..."
+          heroku plugins:install heroku-builds
+          HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY_YW }} heroku builds:cache:purge -a ${{ secrets.HEROKU_APP_NAME_YW }} || echo "Cache purge failed, continuing..."
+          echo "✅ Build cache cleared"
 
       - name: Set Heroku Config Vars
         run: |
