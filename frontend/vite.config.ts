@@ -37,19 +37,19 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "http://localhost:8000",
+        target: process.env.VITE_API_URL || "https://project-black-ej-53285e19ae0a.herokuapp.com",
         changeOrigin: true,
       },
       "/accounts": {
-        target: process.env.VITE_API_URL || "http://localhost:8000",
+        target: process.env.VITE_API_URL || "https://project-black-ej-53285e19ae0a.herokuapp.com",
         changeOrigin: true,
       },
       "/admin": {
-        target: process.env.VITE_API_URL || "http://localhost:8000",
+        target: process.env.VITE_API_URL || "https://project-black-ej-53285e19ae0a.herokuapp.com",
         changeOrigin: true,
       },
       "/static": {
-        target: process.env.VITE_API_URL || "http://localhost:8000",
+        target: process.env.VITE_API_URL || "https://project-black-ej-53285e19ae0a.herokuapp.com",
         changeOrigin: true,
       },
     },
