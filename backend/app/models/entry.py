@@ -78,6 +78,7 @@ class Entry(models.Model):
     PUBLIC = "PUBLIC"
     UNLISTED = "UNLISTED"
     FRIENDS_ONLY = "FRIENDS"
+    FRIENDS = FRIENDS_ONLY  #
     DELETED = "DELETED"
 
     VISIBILITY_CHOICES = [
