@@ -67,6 +67,17 @@ class NodeAdmin(admin.ModelAdmin):
     list_filter = ["is_active", "created_at"]
     search_fields = ["name", "host"]
     ordering = ["-created_at"]
+    actions = ["activate_nodes", "deactivate_nodes"]
+    
+    def activate_nodes(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"{updated} nodes activated.")
+    activate_nodes.short_description = "Activate selected nodes"
+    
+    def deactivate_nodes(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"{updated} nodes deactivated.")
+    deactivate_nodes.short_description = "Deactivate selected nodes (stop sharing)"
 
 
 @admin.register(Entry)

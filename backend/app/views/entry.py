@@ -224,20 +224,28 @@ class EntryViewSet(viewsets.ModelViewSet):
                     continue
                 
                 # Prepare the post data for ActivityPub
+                post_object = {
+                    "type": "Post",
+                    "id": entry.url,
+                    "title": entry.title,
+                    "content": entry.content,
+                    "contentType": entry.content_type,
+                    "visibility": entry.visibility,
+                    "published": entry.created_at.isoformat(),
+                    "author": entry.author.url
+                }
+                
+                # Include image if present
+                if entry.content_type in ['image/png', 'image/jpeg'] and entry.image_data:
+                    import base64
+                    image_base64 = base64.b64encode(entry.image_data).decode('utf-8')
+                    post_object["image"] = f"data:{entry.content_type};base64,{image_base64}"
+                
                 post_data = {
                     "@context": "https://www.w3.org/ns/activitystreams",
                     "type": "Create",
                     "actor": entry.author.url,
-                    "object": {
-                        "type": "Post",
-                        "id": entry.url,
-                        "title": entry.title,
-                        "content": entry.content,
-                        "contentType": entry.content_type,
-                        "visibility": entry.visibility,
-                        "published": entry.created_at.isoformat(),
-                        "author": entry.author.url
-                    }
+                    "object": post_object
                 }
                 
                 # Send to remote node's inbox

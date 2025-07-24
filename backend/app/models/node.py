@@ -31,3 +31,12 @@ class Node(models.Model):
             str: A human-readable string showing the node name and host URL
         """
         return f"{self.name} ({self.host})"
+    
+    def deactivate(self):
+        """
+        Deactivate this node to stop sharing with it.
+        This is safer than deletion as it preserves history.
+        """
+        self.is_active = False
+        self.save()
+        return self
