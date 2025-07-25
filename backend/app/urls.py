@@ -166,4 +166,6 @@ urlpatterns = [
     
     # General inbox endpoint for receiving PUBLIC broadcasts
     path('federation/inbox/', InboxReceiveView.as_view(), name='general-inbox-receive'),
+    path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="api-entry-likes"),
+    path("api/entries/<path:entry_fqid>/likes/", EntryLikeView.as_view(), name="api-entry-likes-by-fqid"),
 ]

@@ -15,6 +15,7 @@ from app.utils.remote import RemoteActivitySender
 
 def send_like_to_remote_inbox(like):
     # DEPRECATED: Use RemoteActivitySender.send_like instead
+    # TODO: Remove this function
     RemoteActivitySender.send_like(like)
 
 
