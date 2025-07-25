@@ -164,8 +164,10 @@ urlpatterns = [
     # ActivityPub inbox endpoint for receiving objects from remote nodes
     path('authors/<uuid:author_id>/inbox/', InboxReceiveView.as_view(), name='inbox-receive'),
     
-    # General inbox endpoint for receiving PUBLIC broadcasts
-    path('federation/inbox/', InboxReceiveView.as_view(), name='general-inbox-receive'),
+    # API endpoints for likes (moved higher for priority)
     path("api/entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="api-entry-likes"),
     path("api/entries/<path:entry_fqid>/likes/", EntryLikeView.as_view(), name="api-entry-likes-by-fqid"),
+    
+    # General inbox endpoint for receiving PUBLIC broadcasts
+    path('federation/inbox/', InboxReceiveView.as_view(), name='general-inbox-receive'),
 ]

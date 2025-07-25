@@ -89,16 +89,25 @@ class EntryLikeView(APIView):
                 - 200 OK if entry was already liked by this user
                 - 404 Not Found if entry doesn't exist
         """
+        # Debug information
+        print(f"[DEBUG] Like request received for entry_id: {entry_id}")
+        print(f"[DEBUG] User authenticated: {request.user.is_authenticated}")
+        print(f"[DEBUG] User: {request.user}")
+        print(f"[DEBUG] Request method: {request.method}")
+        print(f"[DEBUG] Request path: {request.path}")
+        
         entry = get_object_or_404(Entry, id=entry_id)
         author = request.user
 
         # Check if user has already liked this entry to prevent duplicates
         if Like.objects.filter(author=author, entry=entry).exists():
+            print(f"[DEBUG] User already liked this entry")
             return Response({"detail": "Already liked."}, status=status.HTTP_200_OK)
 
         # Create new like record
         like = Like.objects.create(author=author, entry=entry)
         serializer = LikeSerializer(like)
+        print(f"[DEBUG] Like created successfully: {like.id}")
         RemoteActivitySender.send_like(like)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
