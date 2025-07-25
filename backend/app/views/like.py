@@ -91,11 +91,17 @@ class EntryLikeView(APIView):
                 - 404 Not Found if entry doesn't exist
         """
         # Debug information
-        print(f"[DEBUG] Like request received for entry_id: {entry_id}")
+        print(f"[DEBUG] ===== LIKE POST REQUEST RECEIVED =====")
+        print(f"[DEBUG] Entry ID: {entry_id}")
         print(f"[DEBUG] User authenticated: {request.user.is_authenticated}")
         print(f"[DEBUG] User: {request.user}")
         print(f"[DEBUG] Request method: {request.method}")
         print(f"[DEBUG] Request path: {request.path}")
+        print(f"[DEBUG] Request headers: {dict(request.headers)}")
+        print(f"[DEBUG] Request body: {request.body}")
+        print(f"[DEBUG] User agent: {request.META.get('HTTP_USER_AGENT', 'Unknown')}")
+        print(f"[DEBUG] Remote addr: {request.META.get('REMOTE_ADDR', 'Unknown')}")
+        print(f"[DEBUG] ======================================")
         
         # Try to find the entry by UUID first, then by URL/FQID
         entry = None
@@ -139,12 +145,20 @@ class EntryLikeView(APIView):
         like = Like.objects.create(author=author, entry=entry)
         serializer = LikeSerializer(like)
         print(f"[DEBUG] Like created successfully: {like.id}")
+        print(f"[DEBUG] Like author: {like.author.username} (local: {like.author.is_local})")
+        print(f"[DEBUG] Like entry: {like.entry.title}")
+        print(f"[DEBUG] Entry author: {like.entry.author.username} (local: {like.entry.author.is_local})")
         print(f"[DEBUG] About to call RemoteActivitySender.send_like")
+        
         try:
             RemoteActivitySender.send_like(like)
             print(f"[DEBUG] RemoteActivitySender.send_like completed successfully")
         except Exception as e:
             print(f"[DEBUG] Error in RemoteActivitySender.send_like: {e}")
+            print(f"[DEBUG] Exception type: {type(e)}")
+            import traceback
+            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+        
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, entry_id):
@@ -165,6 +179,18 @@ class EntryLikeView(APIView):
                 - 204 No Content if no like was found (treated as success)
                 - 404 Not Found if entry doesn't exist
         """
+        # Debug information
+        print(f"[DEBUG] ===== LIKE DELETE REQUEST RECEIVED =====")
+        print(f"[DEBUG] Entry ID: {entry_id}")
+        print(f"[DEBUG] User authenticated: {request.user.is_authenticated}")
+        print(f"[DEBUG] User: {request.user}")
+        print(f"[DEBUG] Request method: {request.method}")
+        print(f"[DEBUG] Request path: {request.path}")
+        print(f"[DEBUG] Request headers: {dict(request.headers)}")
+        print(f"[DEBUG] User agent: {request.META.get('HTTP_USER_AGENT', 'Unknown')}")
+        print(f"[DEBUG] Remote addr: {request.META.get('REMOTE_ADDR', 'Unknown')}")
+        print(f"[DEBUG] ======================================")
+        
         author = request.user
         
         # Try to find the entry by UUID first, then by URL/FQID (same logic as post method)
