@@ -56,8 +56,9 @@ class InboxReceiveView(APIView):
                     author = Author.objects.get(id=author_id)
                     print(f"DEBUG: Found author: {author.username} (local: {author.is_local})")
                 except Author.DoesNotExist:
-                    print(f"DEBUG: Author {author_id} not found")
-                    return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
+                    error_msg = f"Author {author_id} not found in local database. Remote node may be using the wrong author ID."
+                    print(f"DEBUG: {error_msg}")
+                    return Response({"error": error_msg}, status=status.HTTP_404_NOT_FOUND)
             
             # Check authentication
             auth_header = request.headers.get('Authorization')
