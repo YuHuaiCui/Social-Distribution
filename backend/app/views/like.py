@@ -108,14 +108,17 @@ class EntryLikeView(APIView):
             
             # If not found by UUID, try to find by URL/FQID (for remote likes)
             try:
+                # Convert entry_id to string for string operations
+                entry_id_str = str(entry_id)
+                
                 # Check if entry_id looks like a URL/FQID
-                if entry_id.startswith('http') or '/' in entry_id:
+                if entry_id_str.startswith('http') or '/' in entry_id_str:
                     # Try to find by URL
-                    entry = Entry.objects.get(url__icontains=entry_id.split('/')[-1])
+                    entry = Entry.objects.get(url__icontains=entry_id_str.split('/')[-1])
                     print(f"[DEBUG] Entry found by URL/FQID: {entry.title}")
                 else:
                     # Try to find by URL that contains this ID
-                    entry = Entry.objects.get(url__icontains=entry_id)
+                    entry = Entry.objects.get(url__icontains=entry_id_str)
                     print(f"[DEBUG] Entry found by URL containing ID: {entry.title}")
             except Entry.DoesNotExist:
                 print(f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database")
