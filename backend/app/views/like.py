@@ -96,7 +96,17 @@ class EntryLikeView(APIView):
         print(f"[DEBUG] Request method: {request.method}")
         print(f"[DEBUG] Request path: {request.path}")
         
-        entry = get_object_or_404(Entry, id=entry_id)
+        # Check if entry exists before get_object_or_404
+        try:
+            entry = Entry.objects.get(id=entry_id)
+            print(f"[DEBUG] Entry found: {entry.title}")
+        except Entry.DoesNotExist:
+            print(f"[DEBUG] Entry with ID {entry_id} does not exist in database")
+            return Response(
+                {"detail": f"Entry with ID {entry_id} not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
         author = request.user
 
         # Check if user has already liked this entry to prevent duplicates
@@ -108,7 +118,12 @@ class EntryLikeView(APIView):
         like = Like.objects.create(author=author, entry=entry)
         serializer = LikeSerializer(like)
         print(f"[DEBUG] Like created successfully: {like.id}")
-        RemoteActivitySender.send_like(like)
+        print(f"[DEBUG] About to call RemoteActivitySender.send_like")
+        try:
+            RemoteActivitySender.send_like(like)
+            print(f"[DEBUG] RemoteActivitySender.send_like completed successfully")
+        except Exception as e:
+            print(f"[DEBUG] Error in RemoteActivitySender.send_like: {e}")
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, entry_id):
