@@ -55,6 +55,7 @@ class EntryLikeView(APIView):
                 # Validate UUID format
                 UUID(entry_id)
                 kwargs["entry_id"] = entry_id
+                
                 # Remove the entry_fqid parameter since view methods expect entry_id
                 del kwargs["entry_fqid"]
             except (ValueError, IndexError):
