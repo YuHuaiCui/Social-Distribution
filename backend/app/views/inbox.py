@@ -33,6 +33,9 @@ class InboxReceiveView(APIView):
         """
         print(f"DEBUG: Received inbox request for author {author_id}" if author_id else "DEBUG: Received public inbox request")
         print(f"DEBUG: Request data: {request.data}")
+        print(f"DEBUG: Request headers: {dict(request.headers)}")
+        print(f"DEBUG: Request method: {request.method}")
+        print(f"DEBUG: Request path: {request.path}")
         
         # If no author_id, this is a general broadcast (for PUBLIC posts)
         if author_id is None:
@@ -226,16 +229,25 @@ class InboxReceiveView(APIView):
         """
         Handle incoming like from a remote node
         """
+        print(f"DEBUG: Processing like activity for recipient: {recipient.username}")
+        print(f"DEBUG: Like data: {data}")
+        print(f"DEBUG: Remote node: {remote_node.name if remote_node else 'None'}")
+        
         try:
             # Extract like data
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
             
+            print(f"DEBUG: Actor data: {actor_data}")
+            print(f"DEBUG: Object data: {object_data}")
+            
             # Get or create the remote author
             remote_author, created = self._get_or_create_remote_author(actor_data, remote_node)
+            print(f"DEBUG: Remote author: {remote_author.username} (created: {created})")
             
             # Determine what was liked (entry or comment)
             object_url = object_data.get('id') if isinstance(object_data, dict) else object_data
+            print(f"DEBUG: Object URL: {object_url}")
             
             # Try to find the liked object
             from app.models import Entry, Comment
@@ -244,13 +256,16 @@ class InboxReceiveView(APIView):
                 # First try to find as entry
                 liked_object = Entry.objects.get(url=object_url)
                 object_type = 'entry'
+                print(f"DEBUG: Found liked entry: {liked_object.title}")
             except Entry.DoesNotExist:
                 try:
                     # Then try to find as comment
                     liked_object = Comment.objects.get(url=object_url)
                     object_type = 'comment'
+                    print(f"DEBUG: Found liked comment: {liked_object.content[:50]}...")
                 except Comment.DoesNotExist:
                     # If object doesn't exist, we can't create the like
+                    print(f"DEBUG: Liked object not found: {object_url}")
                     return Response({"message": "Liked object not found"}, status=status.HTTP_404_NOT_FOUND)
             
             # Create the like
@@ -261,18 +276,21 @@ class InboxReceiveView(APIView):
                 comment=liked_object if object_type == 'comment' else None,
                 defaults={'url': f"{remote_author.host}likes/{remote_author.id}/{liked_object.id}"}
             )
+            print(f"DEBUG: Like created: {like.id} (created: {created})")
             
             # Create inbox item
-            Inbox.objects.create(
+            inbox_item = Inbox.objects.create(
                 recipient=recipient,
                 item_type=Inbox.LIKE,
                 like=like,
                 raw_data=data
             )
+            print(f"DEBUG: Inbox item created: {inbox_item.id}")
             
             return Response({"message": "Like received"}, status=status.HTTP_200_OK)
             
         except Exception as e:
+            print(f"DEBUG: Error processing like: {str(e)}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _handle_comment(self, recipient, data, remote_node):
