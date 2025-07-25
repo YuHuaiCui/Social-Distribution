@@ -16,11 +16,13 @@
 13. [Testing Approach](#testing-approach)
 14. [Build and Deployment](#build-and-deployment)
 15. [Code Conventions](#code-conventions)
-16. [Future Improvements](#future-improvements)
+16. [Federation Features](#federation-features)
+17. [Recent Improvements](#recent-improvements)
+18. [Future Improvements](#future-improvements)
 
 ## Project Overview
 
-The Social Distribution frontend is a modern React-based single-page application that provides a distributed social networking platform. Built with TypeScript and Vite, it offers a rich user interface for creating and sharing posts, following other users, managing friendships, and interacting with content across federated nodes.
+The Social Distribution frontend is a modern React-based single-page application that provides a distributed social networking platform. Built with TypeScript and Vite, it offers a rich user interface for creating and sharing posts, following other users, managing friendships, and interacting with content across federated nodes. The application supports ActivityPub-compatible federation for cross-instance communication.
 
 ### Architecture
 
@@ -31,6 +33,7 @@ The application follows a component-based architecture with:
 - **Context API** for global state management
 - **React Router** for client-side routing
 - **Service-based API layer** for backend communication
+- **Federation support** for cross-instance social networking
 
 ## Tech Stack
 
@@ -98,10 +101,11 @@ frontend/
 - Session management with 24-hour expiry
 - Password reset capability
 - Protected routes for authenticated users
+- GitHub OAuth integration
 
 ### 2. Content Creation
 - Rich text editor with Markdown support
-- Image upload with blob storage (stored directly in database)
+- Image upload with binary database storage
 - Privacy controls (Public, Friends-only, Unlisted)
 - Category tagging
 - Real-time preview for Markdown content
@@ -125,19 +129,29 @@ frontend/
 - Search functionality for users
 - Profile pages with user posts and activity
 - Saved posts collection with easy access
+- Trending posts based on engagement
 
 ### 5. Inbox System
 - Notifications for likes, comments, and follows
 - Friend request management
 - Shared post notifications
 - Mark as read functionality
+- ActivityPub-compatible inbox for federation
 
 ### 6. User Profiles
 - Customizable display name and bio
 - Profile image upload
-- GitHub integration
+- GitHub integration with activity display
 - Location and website fields
 - Activity feed
+- Follower/Following management
+
+### 7. Federation Support
+- Node management interface
+- Remote author discovery and following
+- Cross-instance content sharing
+- ActivityPub-compatible communication
+- Remote post viewing and interaction
 
 ## Component Library
 
@@ -174,17 +188,26 @@ interface ButtonProps {
 - Supports different content types (text, markdown, images)
 - Interactive elements (like, comment, share)
 - Privacy indicators
+- Federation status indicators
 
 #### AuthorCard
 - User profile display
 - Follow/unfollow actions
 - Quick stats (posts, followers, following)
+- Remote author indicators
 
 #### CreatePostModal
 - Modal-based post creation
 - Real-time preview
 - Privacy selection
 - Category management
+- Image upload support
+
+#### NodeManagement
+- Node CRUD operations
+- Authentication status monitoring
+- Remote author discovery
+- Federation configuration
 
 ## State Management
 
@@ -206,11 +229,13 @@ interface AuthContextType {
 - Manages global posts state
 - Handles post CRUD operations
 - Provides optimistic updates
+- Supports federation content
 
 ### CreatePostContext
 - Controls post creation modal state
 - Manages draft state
 - Handles form submission
+- Image upload management
 
 ### ToastContext
 - Centralized toast notification system
@@ -244,12 +269,15 @@ class BaseService {
 4. **FollowService** - Follow relationships
 5. **InboxService** - Notifications
 6. **SocialService** - Likes and comments
+7. **ImageService** - Image upload and management
+8. **NodeService** - Federation and node management
 
 ### API Error Handling
 - Centralized error interceptors
 - Automatic retry logic
 - User-friendly error messages
 - Network status detection
+- Federation error handling
 
 ## Routing and Navigation
 
@@ -265,11 +293,17 @@ class BaseService {
 /posts/:id         - Post detail view
 /settings          - User settings
 /create            - Create new post
+/node-management   - Federation node management
+/saved             - Saved posts
+/liked             - Liked posts
+/follow-requests   - Follow request management
+/docs              - Documentation
 
 // Public routes
 /                  - Login page
 /signup            - Registration
 /forgot-password   - Password reset
+/auth/callback     - OAuth callback
 ```
 
 ### Route Protection
@@ -277,6 +311,7 @@ class BaseService {
 - `Protected` component wraps authenticated routes
 - `PublicOnly` component redirects logged-in users
 - Automatic redirect to login for unauthenticated access
+- Admin-only routes for node management
 
 ## Authentication Flow
 
@@ -392,6 +427,7 @@ VITE_API_URL=http://localhost:8000
 # Feature Flags
 VITE_ENABLE_GITHUB_ACTIVITY=true
 VITE_ENABLE_MARKDOWN_PREVIEW=true
+VITE_ENABLE_FEDERATION=true
 
 # External Services
 VITE_GITHUB_API_URL=https://api.github.com
@@ -419,7 +455,8 @@ tests/
 └── e2e/
     ├── auth.spec.ts
     ├── posts.spec.ts
-    └── social.spec.ts
+    ├── social.spec.ts
+    └── federation.spec.ts
 ```
 
 ## Build and Deployment
@@ -478,27 +515,64 @@ dist/
 - Import order conventions
 - Comments for complex logic
 
+## Federation Features
+
+### Node Management
+- **Node CRUD Operations**: Add, update, delete federated nodes
+- **Authentication Status**: Monitor node connectivity and authentication
+- **Remote Author Discovery**: Browse and follow authors from remote instances
+- **Federation Configuration**: Manage cross-instance communication settings
+
+### Remote Content Integration
+- **Cross-Instance Posts**: View and interact with posts from remote nodes
+- **Remote Author Profiles**: Access profiles and content from federated instances
+- **Federation Indicators**: Visual indicators for remote content and authors
+- **ActivityPub Compliance**: Support for ActivityPub protocol communication
+
+### Federation UI Components
+- **NodeStatusIndicator**: Shows connection status for remote nodes
+- **RemoteAuthorCard**: Specialized display for remote authors
+- **FederationSettings**: Configuration interface for federation preferences
+- **CrossInstanceFeed**: Dedicated feed for content from remote instances
+
+### Federation Workflows
+1. **Node Discovery**: Browse available federated nodes
+2. **Authentication Setup**: Configure credentials for remote nodes
+3. **Content Synchronization**: Automatic content fetching from remote nodes
+4. **Interaction Propagation**: Likes, comments, and follows sent to remote instances
+
 ## Recent Improvements
 
 ### Bug Fixes and Enhancements (January 2025)
 - **Friends Feed**: Fixed to show all posts from friends (users who mutually follow each other)
 - **Image Storage**: Migrated from file-based storage to database blob storage for better reliability
+- **Federation Support**: Added comprehensive node management and remote content integration
 - **UI/UX Improvements**:
   - Fixed tab flickering in navigation
   - Improved empty state containers with proper flex layout
   - Fixed input opacity issues in dark mode
   - Added smooth hover animations without color changes
   - Fixed button separators in PostCard component
+  - Added federation status indicators
 - **Share Functionality**: Implemented Web Share API with clipboard fallback
 - **Report System**: Limited report visibility to admin users only
 - **Performance**: Removed unnecessary console.log statements for production readiness
 - **TypeScript**: Fixed type safety issues with Visibility types
+- **Node Management**: Added comprehensive interface for managing federated nodes
 
 ### Code Quality
 - Cleaned up development console statements
 - Removed unhelpful comments
 - Improved error handling consistency
 - Enhanced TypeScript type definitions
+- Added federation-specific error handling
+
+### New Features
+- **Node Management Page**: Complete CRUD interface for federated nodes
+- **Remote Author Discovery**: Browse and follow authors from remote instances
+- **Cross-Instance Content**: View and interact with posts from federated nodes
+- **Federation Status Monitoring**: Real-time status of remote node connections
+- **ActivityPub Integration**: Support for ActivityPub protocol communication
 
 ## Future Improvements
 
@@ -508,6 +582,7 @@ dist/
 - [ ] Optimize bundle size with dynamic imports
 - [ ] Implement image lazy loading
 - [ ] Add request caching layer
+- [ ] Optimize federation content loading
 
 ### Feature Additions
 - [ ] Real-time notifications with WebSockets
@@ -517,6 +592,9 @@ dist/
 - [ ] Advanced search filters
 - [ ] User blocking functionality
 - [ ] Content moderation tools
+- [ ] Enhanced federation features
+- [ ] Cross-instance direct messaging
+- [ ] Federation analytics and monitoring
 
 ### Technical Debt
 - [ ] Migrate deprecated API service
@@ -525,6 +603,7 @@ dist/
 - [ ] Add performance monitoring
 - [ ] Improve accessibility (ARIA)
 - [ ] Add internationalization (i18n)
+- [ ] Enhance federation error handling
 
 ### Developer Experience
 - [ ] Add Storybook for component documentation
@@ -532,6 +611,7 @@ dist/
 - [ ] Add commit hooks for code quality
 - [ ] Create component generator scripts
 - [ ] Improve TypeScript types coverage
+- [ ] Add federation development tools
 
 ### Infrastructure
 - [ ] Set up CI/CD pipeline
@@ -539,6 +619,15 @@ dist/
 - [ ] Implement feature flags system
 - [ ] Add analytics integration
 - [ ] Set up error tracking (Sentry)
+- [ ] Federation monitoring and alerting
+
+### Federation Enhancements
+- [ ] Advanced node discovery protocols
+- [ ] Improved cross-instance content synchronization
+- [ ] Enhanced ActivityPub compliance
+- [ ] Federation performance optimization
+- [ ] Cross-instance user blocking
+- [ ] Federation content moderation tools
 
 ---
 
