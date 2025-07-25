@@ -1,0 +1,532 @@
+"""
+Remote Node Communication Utilities
+
+This module provides utilities for communicating with remote federated nodes,
+including authentication, request handling, and activity federation.
+"""
+
+import requests
+from requests.auth import HTTPBasicAuth
+import json
+import logging
+from urllib.parse import urljoin, urlparse
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from app.models import Node, Author
+
+logger = logging.getLogger(__name__)
+
+class RemoteNodeError(Exception):
+    """Exception raised for remote node communication errors"""
+    pass
+
+class RemoteNodeAuth:
+    """Handle authentication with remote nodes"""
+    
+    @staticmethod
+    def get_auth_for_node(node):
+        """Get HTTPBasicAuth for a node"""
+        if not node or not node.username or not node.password:
+            raise RemoteNodeError(f"Invalid authentication credentials for node {node}")
+        return HTTPBasicAuth(node.username, node.password)
+    
+    @staticmethod
+    def authenticate_incoming_request(request):
+        """Authenticate incoming request from remote node"""
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        
+        if not auth_header.startswith('Basic '):
+            return None
+            
+        try:
+            import base64
+            encoded_credentials = auth_header.split(' ')[1]
+            decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+            username, password = decoded_credentials.split(':', 1)
+            
+            # Find matching node
+            node = Node.objects.filter(
+                username=username,
+                password=password,
+                is_active=True
+            ).first()
+            
+            return node
+        except Exception as e:
+            logger.warning(f"Failed to authenticate incoming request: {e}")
+            return None
+
+class RemoteNodeClient:
+    """Client for making requests to remote nodes"""
+    
+    def __init__(self, node):
+        self.node = node
+        self.auth = RemoteNodeAuth.get_auth_for_node(node)
+        self.base_url = node.host.rstrip('/')
+        self.session = requests.Session()
+        self.session.auth = self.auth
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'User-Agent': f'SocialDistribution/{settings.SITE_URL}',
+        })
+    
+    def get(self, path, **kwargs):
+        """Make GET request to remote node"""
+        url = urljoin(self.base_url, path.lstrip('/'))
+        try:
+            response = self.session.get(url, timeout=30, **kwargs)
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            logger.error(f"GET request failed to {url}: {e}")
+            raise RemoteNodeError(f"Failed to GET {url}: {e}")
+    
+    def post(self, path, data=None, **kwargs):
+        """Make POST request to remote node"""
+        url = urljoin(self.base_url, path.lstrip('/'))
+        try:
+            if data:
+                kwargs['json'] = data
+            response = self.session.post(url, timeout=30, **kwargs)
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            logger.error(f"POST request failed to {url}: {e}")
+            raise RemoteNodeError(f"Failed to POST {url}: {e}")
+    
+    def put(self, path, data=None, **kwargs):
+        """Make PUT request to remote node"""
+        url = urljoin(self.base_url, path.lstrip('/'))
+        try:
+            if data:
+                kwargs['json'] = data
+            response = self.session.put(url, timeout=30, **kwargs)
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            logger.error(f"PUT request failed to {url}: {e}")
+            raise RemoteNodeError(f"Failed to PUT {url}: {e}")
+    
+    def delete(self, path, **kwargs):
+        """Make DELETE request to remote node"""
+        url = urljoin(self.base_url, path.lstrip('/'))
+        try:
+            response = self.session.delete(url, timeout=30, **kwargs)
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            logger.error(f"DELETE request failed to {url}: {e}")
+            raise RemoteNodeError(f"Failed to DELETE {url}: {e}")
+
+class RemoteObjectFetcher:
+    """Fetch and cache remote objects"""
+    
+    @staticmethod
+    def fetch_author_by_url(author_url):
+        """Fetch author data from remote node by URL"""
+        try:
+            parsed = urlparse(author_url)
+            
+            # Find the node that hosts this author
+            node = Node.objects.filter(
+                host__icontains=parsed.netloc,
+                is_active=True
+            ).first()
+            
+            if not node:
+                # Try to find by full host URL
+                host_url = f"{parsed.scheme}://{parsed.netloc}"
+                node = Node.objects.filter(
+                    host=host_url,
+                    is_active=True
+                ).first()
+            
+            if not node:
+                logger.warning(f"No node found for author URL: {author_url}")
+                return None
+            
+            client = RemoteNodeClient(node)
+            
+            # Extract author ID from URL
+            path_parts = parsed.path.strip('/').split('/')
+            if 'authors' in path_parts:
+                author_index = path_parts.index('authors')
+                if author_index + 1 < len(path_parts):
+                    author_id = path_parts[author_index + 1]
+                    
+                    # Try to fetch author data
+                    try:
+                        response = client.get(f'/api/authors/{author_id}/')
+                        return response.json()
+                    except RemoteNodeError:
+                        # Try alternative path
+                        response = client.get(f'/authors/{author_id}/')
+                        return response.json()
+            
+            return None
+        except Exception as e:
+            logger.error(f"Failed to fetch author {author_url}: {e}")
+            return None
+    
+    @staticmethod
+    def fetch_entry_by_url(entry_url):
+        """Fetch entry data from remote node by URL"""
+        try:
+            parsed = urlparse(entry_url)
+            
+            # Find the node that hosts this entry
+            node = Node.objects.filter(
+                host__icontains=parsed.netloc,
+                is_active=True
+            ).first()
+            
+            if not node:
+                host_url = f"{parsed.scheme}://{parsed.netloc}"
+                node = Node.objects.filter(
+                    host=host_url,
+                    is_active=True
+                ).first()
+            
+            if not node:
+                logger.warning(f"No node found for entry URL: {entry_url}")
+                return None
+            
+            client = RemoteNodeClient(node)
+            
+            # Try to fetch entry data directly by URL path
+            response = client.get(parsed.path)
+            return response.json()
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch entry {entry_url}: {e}")
+            return None
+
+class RemoteActivitySender:
+    """Send activities to remote nodes"""
+    
+    @staticmethod
+    def send_follow_request(follower, followed):
+        """Send follow request to remote node"""
+        if not followed.node:
+            return False
+            
+        try:
+            client = RemoteNodeClient(followed.node)
+            
+            follow_data = {
+                "type": "follow",
+                "summary": f"{follower.display_name} wants to follow {followed.display_name}",
+                "actor": {
+                    "type": "author",
+                    "id": follower.url,
+                    "host": f"{settings.SITE_URL}/api/",
+                    "displayName": follower.display_name,
+                    "github": f"https://github.com/{follower.github_username}" if follower.github_username else None,
+                    "profileImage": follower.profile_image,
+                    "web": f"{settings.SITE_URL}/authors/{follower.id}"
+                },
+                "object": {
+                    "type": "author", 
+                    "id": followed.url,
+                    "host": followed.host,
+                    "displayName": followed.display_name,
+                    "github": f"https://github.com/{followed.github_username}" if followed.github_username else None,
+                    "profileImage": followed.profile_image,
+                    "web": followed.web
+                }
+            }
+            
+            # Send to remote author's inbox
+            response = client.post(f'/api/authors/{followed.id}/inbox/', follow_data)
+            logger.info(f"Follow request sent to {followed.url}: {response.status_code}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to send follow request to {followed.url}: {e}")
+            return False
+    
+    @staticmethod
+    def send_follow_response(follow, response_type):
+        """Send follow response (accept/reject) to remote node"""
+        if not follow.follower.node:
+            return False
+            
+        try:
+            client = RemoteNodeClient(follow.follower.node)
+            
+            response_data = {
+                "type": response_type,  # "accept" or "reject"
+                "summary": f"{follow.followed.display_name} {response_type}ed follow request from {follow.follower.display_name}",
+                "actor": {
+                    "type": "author",
+                    "id": follow.followed.url,
+                    "host": f"{settings.SITE_URL}/api/",
+                    "displayName": follow.followed.display_name,
+                    "github": f"https://github.com/{follow.followed.github_username}" if follow.followed.github_username else None,
+                    "profileImage": follow.followed.profile_image,
+                    "web": f"{settings.SITE_URL}/authors/{follow.followed.id}"
+                },
+                "object": {
+                    "type": "follow",
+                    "actor": {
+                        "type": "author",
+                        "id": follow.follower.url,
+                        "host": follow.follower.host,
+                        "displayName": follow.follower.display_name,
+                        "github": f"https://github.com/{follow.follower.github_username}" if follow.follower.github_username else None,
+                        "profileImage": follow.follower.profile_image,
+                        "web": follow.follower.web
+                    },
+                    "object": {
+                        "type": "author",
+                        "id": follow.followed.url,
+                        "host": f"{settings.SITE_URL}/api/",
+                        "displayName": follow.followed.display_name,
+                        "github": f"https://github.com/{follow.followed.github_username}" if follow.followed.github_username else None,
+                        "profileImage": follow.followed.profile_image,
+                        "web": f"{settings.SITE_URL}/authors/{follow.followed.id}"
+                    }
+                }
+            }
+            
+            # Send to remote follower's inbox
+            response = client.post(f'/api/authors/{follow.follower.id}/inbox/', response_data)
+            logger.info(f"Follow {response_type} sent to {follow.follower.url}: {response.status_code}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to send follow {response_type} to {follow.follower.url}: {e}")
+            return False
+    
+    @staticmethod
+    def send_like(like):
+        """Send like to remote node"""
+        # Determine the target object and its author
+        if like.entry:
+            target_object = like.entry
+            target_author = like.entry.author
+        elif like.comment:
+            target_object = like.comment
+            target_author = like.comment.author
+        else:
+            return False
+        
+        if not target_author.node:
+            return False
+            
+        try:
+            client = RemoteNodeClient(target_author.node)
+            
+            like_data = {
+                "type": "like",
+                "author": {
+                    "type": "author",
+                    "id": like.author.url,
+                    "host": f"{settings.SITE_URL}/api/",
+                    "displayName": like.author.display_name,
+                    "github": f"https://github.com/{like.author.github_username}" if like.author.github_username else None,
+                    "profileImage": like.author.profile_image,
+                    "web": f"{settings.SITE_URL}/authors/{like.author.id}"
+                },
+                "published": like.created_at.isoformat(),
+                "id": like.url,
+                "object": target_object.url
+            }
+            
+            # Send to target author's inbox
+            response = client.post(f'/api/authors/{target_author.id}/inbox/', like_data)
+            logger.info(f"Like sent to {target_author.url}: {response.status_code}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to send like to {target_author.url}: {e}")
+            return False
+    
+    @staticmethod
+    def send_comment(comment):
+        """Send comment to remote node"""
+        if not comment.entry.author.node:
+            return False
+            
+        try:
+            client = RemoteNodeClient(comment.entry.author.node)
+            
+            comment_data = {
+                "type": "comment",
+                "author": {
+                    "type": "author",
+                    "id": comment.author.url,
+                    "host": f"{settings.SITE_URL}/api/",
+                    "displayName": comment.author.display_name,
+                    "github": f"https://github.com/{comment.author.github_username}" if comment.author.github_username else None,
+                    "profileImage": comment.author.profile_image,
+                    "web": f"{settings.SITE_URL}/authors/{comment.author.id}"
+                },
+                "comment": comment.content,
+                "contentType": comment.content_type,
+                "published": comment.created_at.isoformat(),
+                "id": comment.url,
+                "entry": comment.entry.url,
+                "web": f"{settings.SITE_URL}/authors/{comment.entry.author.id}/entries/{comment.entry.id}",
+                "likes": {
+                    "type": "likes",
+                    "id": f"{comment.url}/likes",
+                    "web": f"{settings.SITE_URL}/authors/{comment.entry.author.id}/entries/{comment.entry.id}",
+                    "page_number": 1,
+                    "size": 50,
+                    "count": 0,
+                    "src": []
+                }
+            }
+            
+            # Send to entry author's inbox
+            response = client.post(f'/api/authors/{comment.entry.author.id}/inbox/', comment_data)
+            logger.info(f"Comment sent to {comment.entry.author.url}: {response.status_code}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to send comment to {comment.entry.author.url}: {e}")
+            return False
+    
+    @staticmethod
+    def send_entry(entry):
+        """Send entry to remote nodes based on visibility"""
+        if entry.visibility == 'PUBLIC':
+            # Send to all connected nodes
+            active_nodes = Node.objects.filter(is_active=True)
+            for node in active_nodes:
+                RemoteActivitySender._send_entry_to_node(entry, node)
+        elif entry.visibility == 'FRIENDS':
+            # Send only to remote friends
+            from app.models import Friendship, Follow
+            from django.db import models
+            
+            friendships = Friendship.objects.filter(
+                models.Q(author1=entry.author) | models.Q(author2=entry.author)
+            )
+            
+            friend_ids = []
+            for friendship in friendships:
+                if friendship.author1 == entry.author:
+                    friend_ids.append(friendship.author2.id)
+                else:
+                    friend_ids.append(friendship.author1.id)
+            
+            remote_friends = Author.objects.filter(
+                id__in=friend_ids,
+                node__isnull=False,
+                node__is_active=True
+            ).select_related('node')
+            
+            for friend in remote_friends:
+                RemoteActivitySender._send_entry_to_author(entry, friend)
+    
+    @staticmethod
+    def _send_entry_to_node(entry, node):
+        """Send entry to a specific node's general inbox"""
+        try:
+            client = RemoteNodeClient(node)
+            
+            entry_data = RemoteActivitySender._prepare_entry_data(entry)
+            
+            # Send to general federation inbox
+            response = client.post('/api/federation/inbox/', entry_data)
+            logger.info(f"Entry sent to node {node.host}: {response.status_code}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send entry to node {node.host}: {e}")
+    
+    @staticmethod
+    def _send_entry_to_author(entry, author):
+        """Send entry to a specific remote author's inbox"""
+        try:
+            client = RemoteNodeClient(author.node)
+            
+            entry_data = RemoteActivitySender._prepare_entry_data(entry)
+            
+            # Send to specific author's inbox
+            response = client.post(f'/api/authors/{author.id}/inbox/', entry_data)
+            logger.info(f"Entry sent to author {author.url}: {response.status_code}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send entry to author {author.url}: {e}")
+    
+    @staticmethod
+    def _prepare_entry_data(entry):
+        """Prepare entry data for remote sending"""
+        from app.serializers.author import AuthorSerializer
+        
+        return {
+            "type": "entry",
+            "title": entry.title,
+            "id": entry.url,
+            "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+            "description": entry.description or "",
+            "contentType": entry.content_type,
+            "content": entry.content,
+            "author": {
+                "type": "author",
+                "id": entry.author.url,
+                "host": f"{settings.SITE_URL}/api/",
+                "displayName": entry.author.display_name,
+                "github": f"https://github.com/{entry.author.github_username}" if entry.author.github_username else None,
+                "profileImage": entry.author.profile_image,
+                "web": f"{settings.SITE_URL}/authors/{entry.author.id}"
+            },
+            "comments": {
+                "type": "comments",
+                "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+                "id": f"{entry.url}/comments",
+                "page_number": 1,
+                "size": 5,
+                "count": entry.comments.count(),
+                "src": []
+            },
+            "likes": {
+                "type": "likes",
+                "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+                "id": f"{entry.url}/likes",
+                "page_number": 1,
+                "size": 50,
+                "count": entry.likes.count(),
+                "src": []
+            },
+            "published": entry.created_at.isoformat(),
+            "visibility": entry.visibility
+        }
+
+def get_or_create_remote_author(author_data, source_node):
+    """Get or create a remote author from activity data"""
+    from app.models import Author
+    
+    try:
+        author_url = author_data.get('id') or author_data.get('url')
+        if not author_url:
+            return None
+        
+        # Try to find existing author
+        author = Author.objects.filter(url=author_url).first()
+        if author:
+            return author
+        
+        # Create new remote author
+        author = Author.objects.create(
+            url=author_url,
+            username=author_data.get('displayName', '').replace(' ', '_').lower() or f"remote_{hash(author_url) % 10000}",
+            email=f"remote_{hash(author_url) % 10000}@{source_node.host}",
+            display_name=author_data.get('displayName', ''),
+            github_username=author_data.get('github', '').split('/')[-1] if author_data.get('github') else '',
+            profile_image=author_data.get('profileImage', ''),
+            host=author_data.get('host', ''),
+            web=author_data.get('web', ''),
+            node=source_node,
+            is_approved=True,  # Remote authors are auto-approved
+            password='!'  # Invalid password for remote authors
+        )
+        
+        logger.info(f"Created remote author: {author.url}")
+        return author
+        
+    except Exception as e:
+        logger.error(f"Failed to create remote author: {e}")
+        return None 

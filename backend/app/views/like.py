@@ -10,43 +10,12 @@ from requests.auth import HTTPBasicAuth
 from app.models import Node
 from app.serializers.like import LikeSerializer
 import requests
+from app.utils.remote import RemoteActivitySender
 
 
 def send_like_to_remote_inbox(like):
-    # Get the author of the liked object (entry or comment)
-    target = like.entry or like.comment
-    if not target or not target.author or target.author.is_local:
-        return
-
-    remote_author = target.author
-    inbox_url = f"{remote_author.url.rstrip('/')}/inbox/"
-
-    # Get node credentials
-    node = Node.objects.filter(host__icontains=remote_author.host).first()
-    if not node:
-        print(f"[Federation] No node credentials found for {remote_author.host}")
-        return
-
-    payload = {
-        "@context": "https://www.w3.org/ns/activitystreams",
-        "type": "Like",
-        "author": LikeSerializer(like).data["author"],  # full author object
-        "object": like.entry.url if like.entry else like.comment.url,
-        "id": like.url,
-        "published": like.created_at.isoformat(),
-    }
-
-    try:
-        response = requests.post(
-            inbox_url,
-            json=payload,
-            auth=HTTPBasicAuth(node.username, node.password),
-            headers={"Content-Type": "application/json"},
-            timeout=5,
-        )
-        print(f"[Federation] Like sent to {inbox_url}: {response.status_code}")
-    except Exception as e:
-        print(f"[Federation] Error sending like to {inbox_url}: {str(e)}")
+    # DEPRECATED: Use RemoteActivitySender.send_like instead
+    RemoteActivitySender.send_like(like)
 
 
 class EntryLikeView(APIView):
@@ -129,7 +98,7 @@ class EntryLikeView(APIView):
         # Create new like record
         like = Like.objects.create(author=author, entry=entry)
         serializer = LikeSerializer(like)
-        send_like_to_remote_inbox(like)
+        RemoteActivitySender.send_like(like)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, entry_id):
@@ -286,7 +255,7 @@ class CommentLikeView(APIView):
         # Create new like record
         like = Like.objects.create(author=author, comment=comment)
         serializer = LikeSerializer(like)
-        send_like_to_remote_inbox(like)
+        RemoteActivitySender.send_like(like)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, comment_id=None, **kwargs):
