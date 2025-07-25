@@ -18,6 +18,7 @@
    - [Inbox Endpoints](#inbox-endpoints)
    - [Image Upload Endpoints](#image-upload-endpoints)
    - [GitHub Integration Endpoints](#github-integration-endpoints)
+   - [Node Management Endpoints](#node-management-endpoints)
 9. [CORS Configuration](#cors-configuration)
 10. [Database Schema](#database-schema)
 11. [API Versioning](#api-versioning)
@@ -27,18 +28,20 @@
 
 ## API Overview
 
-The Social Distribution Backend API is a RESTful API built with Django and Django REST Framework. It provides endpoints for a social media platform that supports user authentication, posting content, following users, commenting, liking posts, and managing notifications through an inbox system.
+The Social Distribution Backend API is a RESTful API built with Django and Django REST Framework. It provides endpoints for a federated social media platform that supports user authentication, posting content, following users, commenting, liking posts, and managing notifications through an inbox system. The API is designed to be compatible with ActivityPub for federation with other social media platforms.
 
 ### Key Features
 - Session-based authentication with CSRF protection
-- RESTful resource endpoints
+- RESTful resource endpoints with CMPUT 404 compliance
 - JSON request/response format
 - Pagination support for list endpoints
 - Comprehensive error handling
 - CORS support for frontend integration
-- Image upload capabilities
+- Image upload capabilities with binary storage
 - Real-time notifications via inbox system
 - GitHub integration for profile validation and activity tracking
+- Federation support for cross-instance communication
+- Node management for remote instance connections
 
 ## Tech Stack
 
@@ -46,8 +49,9 @@ The Social Distribution Backend API is a RESTful API built with Django and Djang
 - **API Framework**: Django REST Framework
 - **Database**: SQLite (development), PostgreSQL (production)
 - **Authentication**: Django built-in authentication with session management
-- **File Storage**: Local file storage (development), Cloud storage (production)
+- **File Storage**: Binary data storage in database (images)
 - **Python Version**: 3.8+
+- **Federation**: ActivityPub-compatible endpoints
 
 ### Key Dependencies
 ```
@@ -57,6 +61,7 @@ django-cors-headers==4.3.1
 django-allauth==0.57.0
 Pillow==10.2.0
 python-dotenv==1.0.0
+drf-spectacular==0.27.0
 ```
 
 ## Authentication
@@ -74,19 +79,25 @@ python-dotenv==1.0.0
 
 ### Authentication Flow
 
-1. **Login**
+1. **Signup**
+   ```
+   POST /api/auth/signup/
+   ```
+   Creates a new user account and automatically logs them in
+
+2. **Login**
    ```
    POST /api/auth/login/
    ```
-   Creates a session and returns user data
+   Authenticates user credentials and creates a session
 
-2. **Check Authentication Status**
+3. **Check Authentication Status**
    ```
    GET /api/auth/status/
    ```
    Returns current authentication status and user info
 
-3. **Logout**
+4. **Logout**
    ```
    POST /accounts/logout/
    ```
@@ -165,7 +176,7 @@ Default pagination settings:
 #### 1. User Registration
 **POST** `/api/auth/signup/`
 
-Creates a new user account.
+Creates a new user account and automatically logs them in.
 
 **Request Body:**
 ```json
@@ -291,9 +302,6 @@ Gets or updates the current authenticated user's profile.
   "profile_image": "http://example.com/image.jpg"
 }
 ```
-
-**For profile image uploads use multipart/form-data:**
-- `profile_image_file`: The image file to upload
 
 **Response (200 OK):**
 Returns the updated user object.
@@ -432,14 +440,17 @@ Gets all followers of an author.
 
 **Response (200 OK):**
 ```json
-[
-  {
-    "id": "follower-uuid",
-    "username": "follower1",
-    "display_name": "Follower One",
-    "profile_image": null
-  }
-]
+{
+  "type": "followers",
+  "followers": [
+    {
+      "id": "follower-uuid",
+      "username": "follower1",
+      "display_name": "Follower One",
+      "profile_image": null
+    }
+  ]
+}
 ```
 
 #### 9. Get Author's Following
@@ -447,10 +458,26 @@ Gets all followers of an author.
 
 Gets all authors that this author is following.
 
+**Response (200 OK):**
+```json
+{
+  "type": "following",
+  "following": [...]
+}
+```
+
 #### 10. Get Author's Friends
 **GET** `/api/authors/{id}/friends/`
 
 Gets all friends (mutual follows) of an author.
+
+**Response (200 OK):**
+```json
+{
+  "type": "friends",
+  "friends": [...]
+}
+```
 
 #### 11. Follow/Unfollow Author
 **POST/DELETE** `/api/authors/{id}/follow/`
@@ -475,6 +502,17 @@ Follow or unfollow an author.
 
 Gets entries by a specific author.
 
+**Response (200 OK):**
+```json
+{
+  "type": "entries",
+  "page_number": 1,
+  "size": 10,
+  "count": 10,
+  "src": [...]
+}
+```
+
 #### 13. Create Entry for Author
 **POST** `/api/authors/{id}/entries/`
 
@@ -483,12 +521,21 @@ Creates a new entry for the author (author must be current user).
 #### 14. Post to Author's Inbox
 **POST** `/api/authors/{id}/inbox/`
 
-Posts an item to an author's inbox.
+Posts an item to an author's inbox (ActivityPub compliance).
 
-#### 15. Get/Update Current User Profile
-**GET/PATCH** `/api/authors/me/`
+#### 15. Follow Remote Author
+**POST** `/api/authors/follow-remote/`
 
-Alternative endpoint for current user profile management.
+Follow a remote author by creating/fetching their local record first.
+
+**Request Body:**
+```json
+{
+  "author_id": "uuid-of-remote-author",
+  "author_url": "full-url-of-remote-author",
+  "node_id": "uuid-of-node"
+}
+```
 
 ### Entry (Post) Endpoints
 
@@ -499,7 +546,7 @@ Lists entries visible to the authenticated user.
 
 **Query Parameters:**
 - `author`: Filter by author UUID
-- `visibility`: Filter by visibility (public, unlisted, friends)
+- `visibility`: Filter by visibility (PUBLIC, UNLISTED, FRIENDS)
 - `search`: Search in title and content
 - `page`: Page number
 
@@ -521,12 +568,13 @@ Lists entries visible to the authenticated user.
       "title": "My First Post",
       "content": "This is the content of my post",
       "content_type": "text/plain",
-      "visibility": "public",
+      "visibility": "PUBLIC",
       "created_at": "2025-01-15T12:00:00Z",
       "updated_at": "2025-01-15T12:00:00Z",
-      "like_count": 5,
-      "comment_count": 3,
-      "is_liked": false
+      "likes_count": 5,
+      "comments_count": 3,
+      "is_liked": false,
+      "is_saved": false
     }
   ]
 }
@@ -543,7 +591,7 @@ Creates a new entry/post. For image posts, use multipart/form-data to upload ima
   "title": "My New Post",
   "content": "This is the content of my new post",
   "content_type": "text/markdown",
-  "visibility": "public",
+  "visibility": "PUBLIC",
   "categories": ["technology", "programming"]
 }
 ```
@@ -552,7 +600,7 @@ Creates a new entry/post. For image posts, use multipart/form-data to upload ima
 - `title`: Post title
 - `content`: Caption for the image (optional)
 - `content_type`: "image/png" or "image/jpeg"
-- `visibility`: One of: public, unlisted, friends
+- `visibility`: One of: PUBLIC, UNLISTED, FRIENDS
 - `categories`: JSON stringified array of category tags
 - `image`: The image file to upload
 
@@ -560,12 +608,12 @@ Creates a new entry/post. For image posts, use multipart/form-data to upload ima
 - `title`: Post title
 - `content`: Post content (or caption for images)
 - `content_type`: One of: text/plain, text/markdown, image/png, image/jpeg
-- `visibility`: One of: public, unlisted, friends
+- `visibility`: One of: PUBLIC, UNLISTED, FRIENDS
 
-**Note:** Images are stored as binary data (blobs) in the database. The API returns base64-encoded data URLs for images in the `image_data` field.
+**Note:** Images are stored as binary data (blobs) in the database. The API returns base64-encoded data URLs for images in the `image` field.
 
 **Response (201 Created):**
-Returns the created entry object with the `image_data` field containing a data URL for image posts.
+Returns the created entry object with the `image` field containing a data URL for image posts.
 
 #### 3. Get Specific Entry
 **GET** `/api/entries/{id}/`
@@ -582,14 +630,14 @@ Updates an entry (author only).
 {
   "title": "Updated Title",
   "content": "Updated content",
-  "visibility": "friends"
+  "visibility": "FRIENDS"
 }
 ```
 
 #### 5. Delete Entry
 **DELETE** `/api/entries/{id}/`
 
-Soft deletes an entry (sets visibility to "deleted").
+Soft deletes an entry (sets visibility to "DELETED").
 
 #### 6. Get Liked Entries
 **GET** `/api/entries/liked/`
@@ -630,6 +678,55 @@ Save or unsave an entry.
   "detail": "Entry unsaved successfully"
 }
 ```
+
+#### 10. Get Trending Entries
+**GET** `/api/entries/trending/`
+
+Gets trending entries based on like count and recent activity.
+
+**Response (200 OK):**
+Returns paginated list of trending entries.
+
+#### 11. Get Categories
+**GET** `/api/entries/categories/`
+
+Gets all categories used in entries.
+
+**Response (200 OK):**
+```json
+[
+  {
+    "name": "technology",
+    "count": 25
+  },
+  {
+    "name": "programming",
+    "count": 15
+  }
+]
+```
+
+#### 12. CMPUT 404 Compliant Endpoints
+
+##### Get Entry by Author and Entry ID
+**GET** `/api/authors/{author_id}/entries/{entry_id}/`
+
+Gets a specific entry by author and entry ID.
+
+##### Update Entry by Author and Entry ID
+**PUT** `/api/authors/{author_id}/entries/{entry_id}/`
+
+Updates an entry by author and entry ID.
+
+##### Delete Entry by Author and Entry ID
+**DELETE** `/api/authors/{author_id}/entries/{entry_id}/`
+
+Deletes an entry by author and entry ID.
+
+##### Get Entry by FQID
+**GET** `/api/entries/{entry_fqid}/`
+
+Gets an entry by its fully qualified ID (FQID).
 
 ### Comment Endpoints
 
@@ -690,6 +787,23 @@ Updates a comment (author only).
 **DELETE** `/api/entries/{entry_id}/comments/{comment_id}/`
 
 Deletes a comment (author only).
+
+#### 6. CMPUT 404 Compliant Endpoints
+
+##### Get Comments by Author and Entry
+**GET** `/api/authors/{author_id}/entries/{entry_id}/comments/`
+
+Gets comments for a specific entry by author.
+
+##### Get Comment by FQID
+**GET** `/api/entries/{entry_fqid}/comments/`
+
+Gets comments for an entry by FQID.
+
+##### Get Author's Comments
+**GET** `/api/authors/{author_id}/commented/`
+
+Gets all comments by a specific author.
 
 ### Like Endpoints
 
@@ -777,6 +891,23 @@ Unlikes a comment.
 }
 ```
 
+#### 7. CMPUT 404 Compliant Endpoints
+
+##### Get Entry Likes by FQID
+**GET** `/api/entries/{entry_fqid}/likes/`
+
+Gets likes for an entry by FQID.
+
+##### Get Author's Liked Entries
+**GET** `/api/authors/{author_id}/liked/`
+
+Gets all entries liked by a specific author.
+
+##### Get Author's Liked Entries by FQID
+**GET** `/api/authors/{author_fqid}/liked/`
+
+Gets all entries liked by a specific author using FQID.
+
 ### Follow Endpoints
 
 #### 1. Send Follow Request
@@ -794,11 +925,7 @@ Sends a follow request to another author.
 **Response (201 Created):**
 ```json
 {
-  "id": "follow-uuid",
-  "follower": "http://localhost:8000/api/authors/follower-uuid",
-  "followed": "http://localhost:8000/api/authors/followed-uuid",
-  "status": "pending",
-  "created_at": "2025-01-15T15:00:00Z"
+  "message": "Follow request sent successfully"
 }
 ```
 
@@ -811,11 +938,17 @@ Lists incoming follow requests for the authenticated user.
 ```json
 [
   {
-    "id": "follow-uuid",
-    "follower": {
+    "type": "follow",
+    "summary": "John wants to follow Jane",
+    "actor": {
       "id": "follower-uuid",
-      "username": "follower",
-      "display_name": "Follower Name"
+      "username": "john",
+      "display_name": "John Doe"
+    },
+    "object": {
+      "id": "followed-uuid",
+      "username": "jane",
+      "display_name": "Jane Smith"
     },
     "status": "pending",
     "created_at": "2025-01-15T15:00:00Z"
@@ -828,20 +961,17 @@ Lists incoming follow requests for the authenticated user.
 
 Gets pending follow requests for the current user with pagination.
 
-**Query Parameters:**
-- `page`: Page number
-- `page_size`: Items per page
-
 **Response (200 OK):**
 ```json
-{
-  "results": [...],
-  "count": 25,
-  "page": 1,
-  "page_size": 20,
-  "has_next": true,
-  "has_previous": false
-}
+[
+  {
+    "type": "follow",
+    "summary": "John wants to follow Jane",
+    "actor": {...},
+    "object": {...},
+    "status": "pending"
+  }
+]
 ```
 
 #### 4. Accept Follow Request
@@ -852,7 +982,7 @@ Accepts a follow request.
 **Response (200 OK):**
 ```json
 {
-  "status": "accepted"
+  "message": "Follow request accepted"
 }
 ```
 
@@ -864,7 +994,7 @@ Rejects a follow request.
 **Response (200 OK):**
 ```json
 {
-  "status": "rejected"
+  "message": "Follow request rejected"
 }
 ```
 
@@ -873,22 +1003,28 @@ Rejects a follow request.
 
 Unfollows an author (deletes the follow relationship).
 
+**Response (200 OK):**
+```json
+{
+  "message": "Follow relationship deleted"
+}
+```
+
 #### 7. Check Follow Status
 **GET** `/api/follows/status/`
 
 Checks follow status between two authors.
 
 **Query Parameters:**
-- `follower`: Follower's author URL
-- `followed`: Followed author's URL
+- `follower_url`: Follower's author URL
+- `followed_url`: Followed author's URL
 
 **Response (200 OK):**
 ```json
 {
-  "is_following": true,
-  "is_followed_by": false,
-  "is_friends": false,
-  "follow_status": "accepted"
+  "follower": "http://localhost:8000/api/authors/follower-uuid",
+  "followed": "http://localhost:8000/api/authors/followed-uuid",
+  "status": "accepted"
 }
 ```
 
@@ -991,7 +1127,7 @@ Gets count of unread notifications.
 **Response (200 OK):**
 ```json
 {
-  "count": 5
+  "unread_count": 5
 }
 ```
 
@@ -1003,7 +1139,6 @@ Accepts a follow request directly from inbox.
 **Response (200 OK):**
 ```json
 {
-  "status": "accepted",
   "message": "Follow request accepted"
 }
 ```
@@ -1016,7 +1151,6 @@ Rejects a follow request directly from inbox.
 **Response (200 OK):**
 ```json
 {
-  "status": "rejected",
   "message": "Follow request rejected"
 }
 ```
@@ -1063,6 +1197,16 @@ formData.append('image', file);
 
 **Error Responses:**
 - `400 Bad Request`: Invalid file type or size
+
+#### 2. Upload Entry Image
+**POST** `/api/authors/{author_id}/entries/{entry_id}/image/`
+
+Uploads an image for a specific entry.
+
+#### 3. Upload Entry Image by FQID
+**POST** `/api/entries/{entry_fqid}/image/`
+
+Uploads an image for an entry using FQID.
 
 ### GitHub Integration Endpoints
 
@@ -1140,6 +1284,98 @@ Fetches GitHub activity data for a user including recent commits, pull requests,
 - Rate limiting is handled automatically
 - Authentication is optional (public endpoint)
 
+### Node Management Endpoints
+
+#### 1. Get All Nodes
+**GET** `/api/nodes/`
+
+Gets a list of all nodes with their authentication status.
+
+**Response (200 OK):**
+```json
+{
+  "nodes": [
+    {
+      "id": "node-uuid",
+      "name": "Node A",
+      "host": "http://nodea.com/api/",
+      "username": "nodea_user",
+      "is_authenticated": true,
+      "is_active": true
+    }
+  ]
+}
+```
+
+#### 2. Add Node
+**POST** `/api/nodes/add/`
+
+Adds a new node to the system.
+
+**Request Body:**
+```json
+{
+  "name": "New Node",
+  "host": "http://newnode.com/api/",
+  "username": "newnode_user",
+  "password": "newnode_password",
+  "isAuth": true
+}
+```
+
+#### 3. Update Node
+**POST** `/api/nodes/update/`
+
+Updates an existing node's information.
+
+**Request Body:**
+```json
+{
+  "id": "node-uuid",
+  "name": "Updated Node",
+  "host": "http://updatednode.com/api/",
+  "username": "updated_user",
+  "password": "updated_password",
+  "isAuth": true
+}
+```
+
+#### 4. Delete Node
+**POST** `/api/nodes/remove/`
+
+Removes a node from the system.
+
+**Request Body:**
+```json
+{
+  "id": "node-uuid"
+}
+```
+
+#### 5. Get Remote Followees
+**GET** `/api/remote/followee/{local_serial}/{remote_fqid}/`
+
+Gets remote followee information for federation.
+
+#### 6. Get Remote Authors
+**GET** `/api/remote/authors/`
+
+Gets recommended remote authors from connected nodes.
+
+**Response (200 OK):**
+```json
+{
+  "recommended_authors": [
+    {
+      "id": "remote-author-uuid",
+      "username": "remote_user",
+      "display_name": "Remote User",
+      "host": "http://remotenode.com/api/"
+    }
+  ]
+}
+```
+
 ## CORS Configuration
 
 The API is configured to accept requests from specific origins:
@@ -1171,37 +1407,51 @@ CORS_ALLOWED_HEADERS = [
 
 #### Author (User)
 - Extends Django's AbstractUser
-- Fields: id (UUID), username, email, display_name, profile_image, bio, github_username, location, website, is_approved, is_active
+- Fields: id (UUID), url, username, email, display_name, profile_image, bio, github_username, location, website, is_approved, is_active, type, host, web, node (ForeignKey to Node)
 - Relationships: entries, comments, likes, followers, following
+- Supports both local and remote authors for federation
 
 #### Entry (Post)
-- Fields: id (UUID), url, title, content, content_type, visibility, image_data, created_at, updated_at
+- Fields: id (UUID), url, title, description, content, content_type, categories (JSONField), visibility, source, origin, type, web, published, image_data (BinaryField), created_at, updated_at
 - Relationships: author, comments, likes
+- Supports multiple content types: text/plain, text/markdown, image/png, image/jpeg
+- Visibility levels: PUBLIC, UNLISTED, FRIENDS, DELETED
 
 #### Comment
-- Fields: id (UUID), content, content_type, created_at, updated_at
+- Fields: id (UUID), url, content, content_type, created_at, updated_at
 - Relationships: author, entry
+- Supports text/plain and text/markdown content types
 
 #### Like
 - Fields: id (UUID), created_at
 - Relationships: author, entry, comment
+- Generic relationship to both entries and comments
 
 #### Follow
-- Fields: id (UUID), status (pending/accepted/rejected), created_at
+- Fields: id (UUID), status (pending/accepted/rejected), created_at, updated_at
 - Relationships: follower (Author), followed (Author)
+- Supports follow request workflow
 
 #### Inbox
-- Fields: id (UUID), item_type, is_read, created_at, raw_data
+- Fields: id (UUID), item_type, is_read, created_at, raw_data (JSONField)
 - Relationships: recipient (Author), follow, like, comment, entry
+- Stores notifications and federation messages
 
 #### Friendship
 - Represents mutual follow relationships
 - Fields: id, created_at
 - Relationships: author1, author2
+- Automatically maintained by signals
 
-#### UploadedImage
-- Fields: id (UUID), image, uploaded_at
-- Relationships: owner (Author)
+#### Node
+- Represents remote federated instances
+- Fields: id (UUID), name, host, username, password, is_active
+- Used for federation and remote author management
+
+#### SavedEntry
+- Tracks user bookmarks
+- Fields: id (UUID), created_at
+- Relationships: author, entry
 
 ## API Versioning
 
@@ -1242,7 +1492,7 @@ curl -X POST http://localhost:8000/api/auth/login/ \
 curl -X POST http://localhost:8000/api/entries/ \
   -H "Content-Type: application/json" \
   -H "X-CSRFToken: <csrf-token>" \
-  -d '{"title": "Test Post", "content": "Test content", "content_type": "text/plain", "visibility": "public"}' \
+  -d '{"title": "Test Post", "content": "Test content", "content_type": "text/plain", "visibility": "PUBLIC"}' \
   --cookie cookies.txt
 ```
 
@@ -1269,7 +1519,7 @@ response = session.post('http://localhost:8000/api/entries/',
         'title': 'Test Post',
         'content': 'Test content',
         'content_type': 'text/plain',
-        'visibility': 'public'
+        'visibility': 'PUBLIC'
     }
 )
 ```
@@ -1316,3 +1566,9 @@ Set these in production:
 - Configure application performance monitoring
 - Set up uptime monitoring
 - Configure log aggregation
+
+### Federation Considerations
+- Configure node management for remote instances
+- Set up proper authentication for cross-instance communication
+- Implement ActivityPub compliance for interoperability
+- Monitor federation performance and reliability
