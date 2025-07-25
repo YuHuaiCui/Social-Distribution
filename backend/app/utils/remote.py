@@ -301,21 +301,34 @@ class RemoteActivitySender:
     @staticmethod
     def send_like(like):
         """Send like to remote node"""
+        print(f"[DEBUG] RemoteActivitySender.send_like called")
+        print(f"[DEBUG] Like author: {like.author.username} (local: {like.author.is_local})")
+        
         # Determine the target object and its author
         if like.entry:
             target_object = like.entry
             target_author = like.entry.author
+            print(f"[DEBUG] Target is entry: {target_object.title}")
         elif like.comment:
             target_object = like.comment
             target_author = like.comment.author
+            print(f"[DEBUG] Target is comment: {target_object.content[:50]}...")
         else:
+            print(f"[DEBUG] No target object found")
             return False
         
+        print(f"[DEBUG] Target author: {target_author.username} (local: {target_author.is_local})")
+        print(f"[DEBUG] Target author ID: {target_author.id}")
+        print(f"[DEBUG] Target author URL: {target_author.url}")
+        print(f"[DEBUG] Target author node: {target_author.node.name if target_author.node else 'None'}")
+        
         if not target_author.node:
+            print(f"[DEBUG] Target author has no node, skipping")
             return False
             
         try:
             client = RemoteNodeClient(target_author.node)
+            print(f"[DEBUG] Created client for node: {target_author.node.name}")
             
             like_data = {
                 "type": "like",
@@ -333,13 +346,18 @@ class RemoteActivitySender:
                 "object": target_object.url
             }
             
+            print(f"[DEBUG] Like data prepared: {like_data}")
+            print(f"[DEBUG] Sending to: /api/authors/{target_author.id}/inbox/")
+            
             # Send to target author's inbox
             response = client.post(f'/api/authors/{target_author.id}/inbox/', like_data)
             logger.info(f"Like sent to {target_author.url}: {response.status_code}")
+            print(f"[DEBUG] Response status: {response.status_code}")
             return True
             
         except Exception as e:
             logger.error(f"Failed to send like to {target_author.url}: {e}")
+            print(f"[DEBUG] Exception: {e}")
             return False
     
     @staticmethod
