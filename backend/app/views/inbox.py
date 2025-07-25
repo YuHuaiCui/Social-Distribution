@@ -31,101 +31,111 @@ class InboxReceiveView(APIView):
         """
         Receive an ActivityPub object in an author's inbox or general broadcast
         """
-        print(f"DEBUG: Received inbox request for author {author_id}" if author_id else "DEBUG: Received public inbox request")
-        print(f"DEBUG: Request data: {request.data}")
-        print(f"DEBUG: Request headers: {dict(request.headers)}")
-        print(f"DEBUG: Request method: {request.method}")
-        print(f"DEBUG: Request path: {request.path}")
-        
-        # If no author_id, this is a general broadcast (for PUBLIC posts)
-        if author_id is None:
-            # For general broadcasts, we'll use a system user or the first local user
-            # This is typically for PUBLIC posts that should appear in explore/feed
-            print("DEBUG: General inbox broadcast received")
-            # Get the first active local author as a placeholder recipient
-            author = Author.objects.filter(node__isnull=True, is_active=True).first()
-            if not author:
-                print("DEBUG: No local authors found for general broadcast")
-                return Response({"error": "No local authors available"}, status=status.HTTP_404_NOT_FOUND)
-        else:
-            # Extract the author from the URL
-            try:
-                author = Author.objects.get(id=author_id)
-            except Author.DoesNotExist:
-                print(f"DEBUG: Author {author_id} not found")
-                return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Check authentication
-        auth_header = request.headers.get('Authorization')
-        node = None
-        
-        # For general inbox (PUBLIC posts), allow any valid node credentials
-        if author_id is None and auth_header and auth_header.startswith('Basic '):
-            try:
-                import base64
-                credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
-                username, password = credentials.split(':', 1)
-                
-                print(f"DEBUG: General inbox auth - username: {username}")
-                
-                # For general inbox, accept any active node's credentials
-                # This allows nodes to send PUBLIC posts without being specifically configured
-                node = Node.objects.filter(is_active=True).first()
-                if node:
-                    print(f"DEBUG: Accepting PUBLIC post from any node (using {node.name} as placeholder)")
-                else:
-                    print("DEBUG: No active nodes configured")
-                    return Response({"error": "No active nodes configured"}, status=status.HTTP_401_UNAUTHORIZED)
-            except Exception as e:
-                print(f"DEBUG: Auth parsing error: {e}")
-                return Response({"error": "Invalid authorization header"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # For specific author inboxes, require proper authentication
-        elif author_id is not None:
-            if not auth_header or not auth_header.startswith('Basic '):
-                print("DEBUG: No valid Authorization header for author inbox")
-                return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-            
-            # Verify credentials against known nodes
-            import base64
-            credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
-            username, password = credentials.split(':', 1)
-            
-            print(f"DEBUG: Authenticating with username: {username}")
-            print(f"DEBUG: Checking against configured nodes...")
-            
-            # List all configured nodes for debugging
-            all_nodes = Node.objects.all()
-            print(f"DEBUG: Total nodes configured: {all_nodes.count()}")
-            for node in all_nodes:
-                print(f"DEBUG: Node - Name: {node.name}, Host: {node.host}, Username: {node.username}, Active: {node.is_active}")
-            
-            # Check if this is a known node
-            try:
-                node = Node.objects.get(username=username, password=password, is_active=True)
-                print(f"DEBUG: Found matching node: {node.name} ({node.host})")
-            except Node.DoesNotExist:
-                print(f"DEBUG: No matching node found for username: {username}")
-                print(f"DEBUG: Checking if username exists but password doesn't match...")
-                try:
-                    node_with_username = Node.objects.get(username=username, is_active=True)
-                    print(f"DEBUG: Found node with username but password doesn't match: {node_with_username.name}")
-                except Node.DoesNotExist:
-                    print(f"DEBUG: No node found with username: {username}")
-                
-                return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Ensure we have a node object
-        if not node:
-            print("DEBUG: No node object available")
-            return Response({"error": "Node authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Process the incoming object
         try:
+            print(f"DEBUG: ===== INBOX POST REQUEST START =====")
+            print(f"DEBUG: Received inbox request for author {author_id}" if author_id else "DEBUG: Received public inbox request")
+            print(f"DEBUG: Request data: {request.data}")
+            print(f"DEBUG: Request headers: {dict(request.headers)}")
+            print(f"DEBUG: Request method: {request.method}")
+            print(f"DEBUG: Request path: {request.path}")
+            print(f"DEBUG: Request META: {dict(request.META)}")
+            
+            # If no author_id, this is a general broadcast (for PUBLIC posts)
+            if author_id is None:
+                # For general broadcasts, we'll use a system user or the first local user
+                # This is typically for PUBLIC posts that should appear in explore/feed
+                print("DEBUG: General inbox broadcast received")
+                # Get the first active local author as a placeholder recipient
+                author = Author.objects.filter(node__isnull=True, is_active=True).first()
+                if not author:
+                    print("DEBUG: No local authors found for general broadcast")
+                    return Response({"error": "No local authors available"}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                # Extract the author from the URL
+                try:
+                    author = Author.objects.get(id=author_id)
+                    print(f"DEBUG: Found author: {author.username} (local: {author.is_local})")
+                except Author.DoesNotExist:
+                    print(f"DEBUG: Author {author_id} not found")
+                    return Response({"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check authentication
+            auth_header = request.headers.get('Authorization')
+            node = None
+            
+            # For general inbox (PUBLIC posts), allow any valid node credentials
+            if author_id is None and auth_header and auth_header.startswith('Basic '):
+                try:
+                    import base64
+                    credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
+                    username, password = credentials.split(':', 1)
+                    
+                    print(f"DEBUG: General inbox auth - username: {username}")
+                    
+                    # For general inbox, accept any active node's credentials
+                    # This allows nodes to send PUBLIC posts without being specifically configured
+                    node = Node.objects.filter(is_active=True).first()
+                    if node:
+                        print(f"DEBUG: Accepting PUBLIC post from any node (using {node.name} as placeholder)")
+                    else:
+                        print("DEBUG: No active nodes configured")
+                        return Response({"error": "No active nodes configured"}, status=status.HTTP_401_UNAUTHORIZED)
+                except Exception as e:
+                    print(f"DEBUG: Auth parsing error: {e}")
+                    return Response({"error": "Invalid authorization header"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # For specific author inboxes, require proper authentication
+            elif author_id is not None:
+                if not auth_header or not auth_header.startswith('Basic '):
+                    print("DEBUG: No valid Authorization header for author inbox")
+                    return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+                
+                # Verify credentials against known nodes
+                try:
+                    import base64
+                    credentials = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
+                    username, password = credentials.split(':', 1)
+                    
+                    print(f"DEBUG: Authenticating with username: {username}")
+                    print(f"DEBUG: Checking against configured nodes...")
+                    
+                    # List all configured nodes for debugging
+                    all_nodes = Node.objects.all()
+                    print(f"DEBUG: Total nodes configured: {all_nodes.count()}")
+                    for node_obj in all_nodes:
+                        print(f"DEBUG: Node - Name: {node_obj.name}, Host: {node_obj.host}, Username: {node_obj.username}, Active: {node_obj.is_active}")
+                    
+                    # Check if this is a known node
+                    try:
+                        node = Node.objects.get(username=username, password=password, is_active=True)
+                        print(f"DEBUG: Found matching node: {node.name} ({node.host})")
+                    except Node.DoesNotExist:
+                        print(f"DEBUG: No matching node found for username: {username}")
+                        print(f"DEBUG: Checking if username exists but password doesn't match...")
+                        try:
+                            node_with_username = Node.objects.get(username=username, is_active=True)
+                            print(f"DEBUG: Found node with username but password doesn't match: {node_with_username.name}")
+                        except Node.DoesNotExist:
+                            print(f"DEBUG: No node found with username: {username}")
+                        
+                        return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+                except Exception as e:
+                    print(f"DEBUG: Error during authentication: {e}")
+                    import traceback
+                    print(f"DEBUG: Auth error traceback: {traceback.format_exc()}")
+                    return Response({"error": "Authentication error"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Ensure we have a node object
+            if not node:
+                print("DEBUG: No node object available")
+                return Response({"error": "Node authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Process the incoming object
             data = request.data
             object_type = data.get('type', '')
             
             print(f"DEBUG: Processing object type: {object_type}")
+            print(f"DEBUG: Data keys: {list(data.keys())}")
             
             if object_type == 'Follow':
                 return self._handle_follow_request(author, data, node)
@@ -145,7 +155,12 @@ class InboxReceiveView(APIView):
                               status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:
-            print(f"DEBUG: Error processing object: {str(e)}")
+            import traceback
+            print(f"DEBUG: ===== UNHANDLED ERROR IN INBOX POST =====")
+            print(f"DEBUG: Error type: {type(e)}")
+            print(f"DEBUG: Error message: {str(e)}")
+            print(f"DEBUG: Full traceback: {traceback.format_exc()}")
+            print(f"DEBUG: ==========================================")
             return Response({"error": f"Failed to process object: {str(e)}"}, 
                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
