@@ -156,7 +156,7 @@ class EntryLikeView(APIView):
 
         Args:
             request: The HTTP request from the authenticated user
-            entry_id: UUID of the entry to be unliked
+            entry_id: UUID or FQID of the entry to be unliked
 
         Returns:
             Response:
@@ -165,14 +165,46 @@ class EntryLikeView(APIView):
                 - 404 Not Found if entry doesn't exist
         """
         author = request.user
-        entry = get_object_or_404(Entry, id=entry_id)
+        
+        # Try to find the entry by UUID first, then by URL/FQID (same logic as post method)
+        entry = None
+        
+        # First, try to find by UUID (for local likes)
+        try:
+            entry = Entry.objects.get(id=entry_id)
+            print(f"[DEBUG] Entry found by UUID for unlike: {entry.title}")
+        except Entry.DoesNotExist:
+            print(f"[DEBUG] Entry not found by UUID for unlike, trying by URL/FQID")
+            
+            # If not found by UUID, try to find by URL/FQID (for remote likes)
+            try:
+                # Convert entry_id to string for string operations
+                entry_id_str = str(entry_id)
+                
+                # Check if entry_id looks like a URL/FQID
+                if entry_id_str.startswith('http') or '/' in entry_id_str:
+                    # Try to find by URL
+                    entry = Entry.objects.get(url__icontains=entry_id_str.split('/')[-1])
+                    print(f"[DEBUG] Entry found by URL/FQID for unlike: {entry.title}")
+                else:
+                    # Try to find by URL that contains this ID
+                    entry = Entry.objects.get(url__icontains=entry_id_str)
+                    print(f"[DEBUG] Entry found by URL containing ID for unlike: {entry.title}")
+            except Entry.DoesNotExist:
+                print(f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database for unlike")
+                return Response(
+                    {"detail": f"Entry with ID {entry_id} not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
         # Find and delete the like if it exists
         like = Like.objects.filter(author=author, entry=entry).first()
         if like:
             like.delete()
+            print(f"[DEBUG] Like deleted successfully: {like.id}")
             return Response({"detail": "Unliked."}, status=status.HTTP_200_OK)
         # If no like found, return success for idempotent behavior
+        print(f"[DEBUG] No like found to delete")
         return Response(
             {"detail": "Like not found, treated as success."},
             status=status.HTTP_204_NO_CONTENT,
@@ -184,7 +216,37 @@ class EntryLikeView(APIView):
         """
         # If we have an entry_id, return like stats for that entry
         if entry_id:
-            entry = get_object_or_404(Entry, id=entry_id)
+            # Try to find the entry by UUID first, then by URL/FQID (same logic as post/delete methods)
+            entry = None
+            
+            # First, try to find by UUID (for local likes)
+            try:
+                entry = Entry.objects.get(id=entry_id)
+                print(f"[DEBUG] Entry found by UUID for GET: {entry.title}")
+            except Entry.DoesNotExist:
+                print(f"[DEBUG] Entry not found by UUID for GET, trying by URL/FQID")
+                
+                # If not found by UUID, try to find by URL/FQID (for remote likes)
+                try:
+                    # Convert entry_id to string for string operations
+                    entry_id_str = str(entry_id)
+                    
+                    # Check if entry_id looks like a URL/FQID
+                    if entry_id_str.startswith('http') or '/' in entry_id_str:
+                        # Try to find by URL
+                        entry = Entry.objects.get(url__icontains=entry_id_str.split('/')[-1])
+                        print(f"[DEBUG] Entry found by URL/FQID for GET: {entry.title}")
+                    else:
+                        # Try to find by URL that contains this ID
+                        entry = Entry.objects.get(url__icontains=entry_id_str)
+                        print(f"[DEBUG] Entry found by URL containing ID for GET: {entry.title}")
+                except Entry.DoesNotExist:
+                    print(f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database for GET")
+                    return Response(
+                        {"detail": f"Entry with ID {entry_id} not found"}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
             like_count = Like.objects.filter(entry=entry).count()
 
             # Check if current user has liked this entry

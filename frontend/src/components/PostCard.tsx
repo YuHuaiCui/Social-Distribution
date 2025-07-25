@@ -107,6 +107,13 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       setLiked(isLiked || post.is_liked || false);
     }
 
+    // Set up periodic refresh for like status (every 30 seconds)
+    const refreshInterval = setInterval(() => {
+      if (post.id) {
+        debouncedFetchLikeData(post.id);
+      }
+    }, 30000); // 30 seconds
+
     // Listen for post updates from other components
     const handlePostUpdate = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -116,11 +123,21 @@ const PostCardComponent: React.FC<PostCardProps> = ({
       }
     };
 
+    // Listen for window focus to refresh like status when user returns to tab
+    const handleWindowFocus = () => {
+      if (post.id) {
+        debouncedFetchLikeData(post.id);
+      }
+    };
+
     window.addEventListener("post-update", handlePostUpdate, { passive: true });
+    window.addEventListener("focus", handleWindowFocus, { passive: true });
 
     // Cleanup function
     return () => {
       window.removeEventListener("post-update", handlePostUpdate);
+      window.removeEventListener("focus", handleWindowFocus);
+      clearInterval(refreshInterval);
     };
   }, [
     post.id,
