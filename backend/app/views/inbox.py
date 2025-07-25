@@ -56,7 +56,18 @@ class InboxReceiveView(APIView):
                     author = Author.objects.get(id=author_id)
                     print(f"DEBUG: Found author: {author.username} (local: {author.is_local})")
                 except Author.DoesNotExist:
-                    error_msg = f"Author {author_id} not found in local database. Remote node may be using the wrong author ID."
+                    # Try to find the author by other means (URL, username, etc.)
+                    print(f"DEBUG: Author {author_id} not found, attempting to find by other means")
+                    
+                    # List all local authors for debugging
+                    local_authors = Author.objects.filter(node__isnull=True, is_active=True)
+                    print(f"DEBUG: Available local authors:")
+                    for local_author in local_authors:
+                        print(f"DEBUG: - {local_author.username} (ID: {local_author.id}, URL: {local_author.url})")
+                    
+                    # Check if this might be a remote author ID that we should handle differently
+                    # For now, return a more informative error
+                    error_msg = f"Author {author_id} not found in local database. Remote node may be using the wrong author ID. Available local authors: {[a.username for a in local_authors]}"
                     print(f"DEBUG: {error_msg}")
                     return Response({"error": error_msg}, status=status.HTTP_404_NOT_FOUND)
             
