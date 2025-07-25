@@ -81,7 +81,7 @@ class EntryLikeView(APIView):
 
         Args:
             request: The HTTP request from the authenticated user
-            entry_id: UUID of the entry to be liked
+            entry_id: UUID or FQID of the entry to be liked
 
         Returns:
             Response:
@@ -96,16 +96,33 @@ class EntryLikeView(APIView):
         print(f"[DEBUG] Request method: {request.method}")
         print(f"[DEBUG] Request path: {request.path}")
         
-        # Check if entry exists before get_object_or_404
+        # Try to find the entry by UUID first, then by URL/FQID
+        entry = None
+        
+        # First, try to find by UUID (for local likes)
         try:
             entry = Entry.objects.get(id=entry_id)
-            print(f"[DEBUG] Entry found: {entry.title}")
+            print(f"[DEBUG] Entry found by UUID: {entry.title}")
         except Entry.DoesNotExist:
-            print(f"[DEBUG] Entry with ID {entry_id} does not exist in database")
-            return Response(
-                {"detail": f"Entry with ID {entry_id} not found"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+            print(f"[DEBUG] Entry not found by UUID, trying by URL/FQID")
+            
+            # If not found by UUID, try to find by URL/FQID (for remote likes)
+            try:
+                # Check if entry_id looks like a URL/FQID
+                if entry_id.startswith('http') or '/' in entry_id:
+                    # Try to find by URL
+                    entry = Entry.objects.get(url__icontains=entry_id.split('/')[-1])
+                    print(f"[DEBUG] Entry found by URL/FQID: {entry.title}")
+                else:
+                    # Try to find by URL that contains this ID
+                    entry = Entry.objects.get(url__icontains=entry_id)
+                    print(f"[DEBUG] Entry found by URL containing ID: {entry.title}")
+            except Entry.DoesNotExist:
+                print(f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database")
+                return Response(
+                    {"detail": f"Entry with ID {entry_id} not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
         
         author = request.user
 
