@@ -92,6 +92,13 @@ class InboxReceiveView(APIView):
             username, password = credentials.split(':', 1)
             
             print(f"DEBUG: Authenticating with username: {username}")
+            print(f"DEBUG: Checking against configured nodes...")
+            
+            # List all configured nodes for debugging
+            all_nodes = Node.objects.all()
+            print(f"DEBUG: Total nodes configured: {all_nodes.count()}")
+            for node in all_nodes:
+                print(f"DEBUG: Node - Name: {node.name}, Host: {node.host}, Username: {node.username}, Active: {node.is_active}")
             
             # Check if this is a known node
             try:
@@ -99,6 +106,13 @@ class InboxReceiveView(APIView):
                 print(f"DEBUG: Found matching node: {node.name} ({node.host})")
             except Node.DoesNotExist:
                 print(f"DEBUG: No matching node found for username: {username}")
+                print(f"DEBUG: Checking if username exists but password doesn't match...")
+                try:
+                    node_with_username = Node.objects.get(username=username, is_active=True)
+                    print(f"DEBUG: Found node with username but password doesn't match: {node_with_username.name}")
+                except Node.DoesNotExist:
+                    print(f"DEBUG: No node found with username: {username}")
+                
                 return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Ensure we have a node object
