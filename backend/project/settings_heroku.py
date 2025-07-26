@@ -1,22 +1,23 @@
 """
 Heroku production settings
 """
+
 import os
 import dj_database_url
 from .settings import *
 
 # Override redirect URLs from environment variables
-LOGIN_REDIRECT_URL = os.environ.get('LOGIN_REDIRECT_URL')
-LOGOUT_REDIRECT_URL = os.environ.get('LOGOUT_REDIRECT_URL')
+LOGIN_REDIRECT_URL = os.environ.get("LOGIN_REDIRECT_URL")
+LOGOUT_REDIRECT_URL = os.environ.get("LOGOUT_REDIRECT_URL")
 
 # Security
 DEBUG = False
 ALLOWED_HOSTS = [
-    '.herokuapp.com',
-    'project-black-ej-53285e19ae0a.herokuapp.com',
-    'cmp404-black-prod-melrita-66c4dd1f85d5.herokuapp.com',
-    's25-black-yangwang-4d3e16ddc539.herokuapp.com',
-    os.environ.get('HEROKU_APP_NAME', '') + '.herokuapp.com',
+    ".herokuapp.com",
+    "project-black-ej-53285e19ae0a.herokuapp.com",
+    "cmp404-black-prod-melrita-66c4dd1f85d5.herokuapp.com",
+    "s25-black-yangwang-4d3e16ddc539.herokuapp.com",
+    os.environ.get("HEROKU_APP_NAME", "") + ".herokuapp.com",
 ]
 
 # CORS settings for production
@@ -26,38 +27,42 @@ CORS_ALLOWED_ORIGINS = [
     "https://project-black-ej-53285e19ae0a.herokuapp.com",
     "http://project-black-ej-53285e19ae0a.herokuapp.com",
     "https://s25-black-yangwang-4d3e16ddc539.herokuapp.com",
-    "http://s25-black-yangwang-4d3e16ddc539.herokuapp.com"
+    "http://s25-black-yangwang-4d3e16ddc539.herokuapp.com",
 ]
 
 # Allow the app's own domain
-if os.environ.get('HEROKU_APP_NAME'):
-    CORS_ALLOWED_ORIGINS.extend([
-        f"https://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com",
-        f"http://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com",
-    ])
+if os.environ.get("HEROKU_APP_NAME"):
+    CORS_ALLOWED_ORIGINS.extend(
+        [
+            f"https://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com",
+            f"http://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com",
+        ]
+    )
+
+# Override SITE_URL for production - use HTTPS with Heroku app name
+if os.environ.get("HEROKU_APP_NAME"):
+    SITE_URL = f"https://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com"
+elif not os.environ.get("SITE_URL"):
+    # Default production URL if no environment variable is set
+    SITE_URL = "https://project-black-ej-53285e19ae0a.herokuapp.com"
 
 # Database
-DATABASES = {
-    'default': dj_database_url.config(
-        conn_max_age=600,
-        ssl_require=True
-    )
-}
+DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
 
 # Static files
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Whitenoise for static files
-MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Serve index.html for React app
 WHITENOISE_INDEX_FILE = True
-WHITENOISE_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+WHITENOISE_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Add template directory for serving index.html
-TEMPLATES[0]['DIRS'].append(os.path.join(BASE_DIR, 'staticfiles'))
+TEMPLATES[0]["DIRS"].append(os.path.join(BASE_DIR, "staticfiles"))
 
 # Security settings for production
 SECURE_SSL_REDIRECT = True
@@ -65,25 +70,27 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = "DENY"
 
 # Logging
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
     },
 }
 
 # Production CSP Configuration (more restrictive)
-CSP_DEFAULT_SRC = ["'self'",]
+CSP_DEFAULT_SRC = [
+    "'self'",
+]
 CSP_SCRIPT_SRC = [
     "'self'",
     "https://github.githubassets.com",
@@ -114,10 +121,18 @@ CSP_FRAME_SRC = [
     "'self'",
     "https://github.com",
 ]
-CSP_MEDIA_SRC = ["'self'",]
-CSP_OBJECT_SRC = ["'none'",]
-CSP_BASE_URI = ["'self'",]
-CSP_FORM_ACTION = ["'self'",]
+CSP_MEDIA_SRC = [
+    "'self'",
+]
+CSP_OBJECT_SRC = [
+    "'none'",
+]
+CSP_BASE_URI = [
+    "'self'",
+]
+CSP_FORM_ACTION = [
+    "'self'",
+]
 
 # Use nonces in production instead of unsafe-inline
 CSP_INCLUDE_NONCE_IN = ["script-src"]

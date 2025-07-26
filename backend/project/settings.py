@@ -258,8 +258,8 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX": "/api/",
 }
 
-# Site URL for generating author URLs
-SITE_URL = "http://localhost:8000"
+# Site URL for generating author URLs - configurable via environment
+SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
