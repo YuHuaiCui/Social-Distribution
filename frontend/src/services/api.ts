@@ -501,19 +501,44 @@ class ApiService {
     });
   }
   async getAuthorEntries(authorId: string): Promise<Entry[]> {
-    // Extract ID from URL if full URL is passed
+    // Check if this looks like a remote author URL
+    if (authorId.includes("http") || (authorId.includes("/") && authorId.split("/").length > 2)) {
+      // For remote authors, we need to get their local cached data first to find their entries
+      // Since we can't directly fetch entries from remote nodes in this implementation
+      try {
+        // Get the remote author first to check if they exist locally
+        const author = await this.getAuthor(authorId);
+        if (author && author.node) {
+          // This is a remote author - we can't fetch their entries directly
+          // Return empty array for now since remote entries fetching isn't implemented
+          console.warn("Remote author entries fetching not yet implemented");
+          return [];
+        }
+      } catch (error) {
+        console.warn("Could not fetch remote author for entries lookup:", error);
+        return [];
+      }
+    }
+    
+    // Extract ID from URL if full URL is passed (for local authors)
     const id = authorId.includes("/")
       ? authorId.split("/").filter(Boolean).pop()
       : authorId;
-    const response = await this.request<{
-      type: "entries";
-      page_number: number;
-      size: number;
-      count: number;
-      src: Entry[];
-    }>(`/api/authors/${id}/entries/`);
-    // Return the entries from the CMPUT 404 compliant format
-    return response.src;
+      
+    try {
+      const response = await this.request<{
+        type: "entries";
+        page_number: number;
+        size: number;
+        count: number;
+        src: Entry[];
+      }>(`/api/authors/${id}/entries/`);
+      // Return the entries from the CMPUT 404 compliant format
+      return response.src;
+    } catch (error) {
+      console.warn("Failed to fetch author entries:", error);
+      return [];
+    }
   }
 
   async clearInbox(): Promise<void> {

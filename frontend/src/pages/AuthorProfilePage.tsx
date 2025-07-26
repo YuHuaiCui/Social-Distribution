@@ -43,14 +43,23 @@ const AuthorProfilePage: React.FC = () => {
       if (!id) return;
 
       try {
-        const [authorData, postData] = await Promise.all([
-          api.getAuthor(id), // fetch author
-          api.getAuthorEntries(id), // fetch entries (needs to be implemented)
-        ]);
+        // Fetch author data first
+        const authorData = await api.getAuthor(id);
         setAuthor(authorData);
-        setEntries(postData);
+        
+        // Try to fetch entries separately - don't fail if this doesn't work
+        try {
+          const postData = await api.getAuthorEntries(id);
+          setEntries(postData);
+        } catch (entriesErr) {
+          console.warn("Error loading author entries:", entriesErr);
+          // Set empty entries array if entries can't be loaded
+          setEntries([]);
+        }
       } catch (err) {
-        console.error("Error loading profile or posts:", err);
+        console.error("Error loading author profile:", err);
+        // Only set author to null if author fetch specifically fails
+        setAuthor(null);
       } finally {
         setLoading(false);
       }
