@@ -37,6 +37,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "192.168.1.72",  # pc
     "192.168.1.75",  # laptop
+    "172.24.134.109",  # current IP address
 ]
 
 
@@ -106,6 +107,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://project-black-ej-53285e19ae0a.herokuapp.com",
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
+    "http://172.24.134.109:5173",  # current IP address
 ]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
 CSRF_COOKIE_NAME = "csrftoken"
@@ -193,6 +195,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
+    "http://172.24.134.109:5173",  # current IP address
 ]
 
 CORS_ALLOW_CREDENTIALS = True
