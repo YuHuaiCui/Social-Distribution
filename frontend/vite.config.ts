@@ -32,6 +32,8 @@ export default defineConfig({
     drop: ["console", "debugger"],
   },
   server: {
+    host: true,  // exposes Vite to LAN
+    port: 5173,   // or whatever port you're using
     hmr: {
       overlay: false,
     },
