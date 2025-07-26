@@ -125,21 +125,16 @@ class RemoteObjectFetcher:
     def fetch_author_by_url(author_url):
         """Fetch author data from remote node by URL"""
         try:
-            parsed = urlparse(author_url)
+            # Use FederationService for better localhost handling
+            from app.utils.federation import FederationService
             
-            # Find the node that hosts this author
-            node = Node.objects.filter(
-                host__icontains=parsed.netloc,
-                is_active=True
-            ).first()
+            # Skip localhost URLs in development mode
+            if FederationService.is_localhost_url(author_url) and settings.DEBUG:
+                logger.info(f"Skipping localhost author fetch: {author_url}")
+                return None
             
-            if not node:
-                # Try to find by full host URL
-                host_url = f"{parsed.scheme}://{parsed.netloc}"
-                node = Node.objects.filter(
-                    host=host_url,
-                    is_active=True
-                ).first()
+            # Get the appropriate node for this URL
+            node = FederationService.get_node_for_url(author_url)
             
             if not node:
                 logger.warning(f"No node found for author URL: {author_url}")
@@ -148,6 +143,7 @@ class RemoteObjectFetcher:
             client = RemoteNodeClient(node)
             
             # Extract author ID from URL
+            parsed = urlparse(author_url)
             path_parts = parsed.path.strip('/').split('/')
             if 'authors' in path_parts:
                 author_index = path_parts.index('authors')
@@ -172,20 +168,16 @@ class RemoteObjectFetcher:
     def fetch_entry_by_url(entry_url):
         """Fetch entry data from remote node by URL"""
         try:
-            parsed = urlparse(entry_url)
+            # Use FederationService for better localhost handling
+            from app.utils.federation import FederationService
             
-            # Find the node that hosts this entry
-            node = Node.objects.filter(
-                host__icontains=parsed.netloc,
-                is_active=True
-            ).first()
+            # Skip localhost URLs in development mode
+            if FederationService.is_localhost_url(entry_url) and settings.DEBUG:
+                logger.info(f"Skipping localhost entry fetch: {entry_url}")
+                return None
             
-            if not node:
-                host_url = f"{parsed.scheme}://{parsed.netloc}"
-                node = Node.objects.filter(
-                    host=host_url,
-                    is_active=True
-                ).first()
+            # Get the appropriate node for this URL
+            node = FederationService.get_node_for_url(entry_url)
             
             if not node:
                 logger.warning(f"No node found for entry URL: {entry_url}")
@@ -194,6 +186,7 @@ class RemoteObjectFetcher:
             client = RemoteNodeClient(node)
             
             # Try to fetch entry data directly by URL path
+            parsed = urlparse(entry_url)
             response = client.get(parsed.path)
             return response.json()
             

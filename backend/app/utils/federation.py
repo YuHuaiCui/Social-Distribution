@@ -13,6 +13,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
+from urllib.parse import urlparse
 
 from app.models import Node, Author, Entry, Comment, Like, Follow, Inbox, InboxDelivery
 from app.utils.remote import RemoteNodeClient, RemoteNodeError, RemoteObjectFetcher, RemoteActivitySender
@@ -33,6 +34,94 @@ class FederationService:
     """
     
     @staticmethod
+    def is_localhost_url(url: str) -> bool:
+        """
+        Check if a URL is a localhost URL.
+        
+        Args:
+            url: The URL to check
+            
+        Returns:
+            bool: True if the URL is localhost, False otherwise
+        """
+        if not url:
+            return False
+        
+        try:
+            parsed = urlparse(url)
+            netloc = parsed.netloc.lower()
+            return netloc in ['localhost', '127.0.0.1', '::1'] or netloc.startswith('localhost:') or netloc.startswith('127.0.0.1:')
+        except Exception:
+            return False
+    
+    @staticmethod
+    def is_same_domain(url1: str, url2: str) -> bool:
+        """
+        Check if two URLs belong to the same domain.
+        
+        Args:
+            url1: First URL
+            url2: Second URL
+            
+        Returns:
+            bool: True if URLs belong to the same domain
+        """
+        try:
+            parsed1 = urlparse(url1)
+            parsed2 = urlparse(url2)
+            return parsed1.netloc.lower() == parsed2.netloc.lower()
+        except Exception:
+            return False
+    
+    @staticmethod
+    def get_node_for_url(url: str) -> Optional[Node]:
+        """
+        Get the appropriate node for a given URL.
+        
+        Args:
+            url: The URL to find a node for
+            
+        Returns:
+            Node or None: The matching node, or None if not found
+        """
+        if not url:
+            return None
+        
+        try:
+            parsed = urlparse(url)
+            host_url = f"{parsed.scheme}://{parsed.netloc}"
+            
+            # First try exact match
+            node = Node.objects.filter(host=host_url, is_active=True).first()
+            if node:
+                return node
+            
+            # Try partial match for localhost
+            if FederationService.is_localhost_url(url):
+                # For localhost, check if we have any localhost nodes
+                localhost_nodes = Node.objects.filter(
+                    host__icontains='localhost',
+                    is_active=True
+                )
+                if localhost_nodes.exists():
+                    return localhost_nodes.first()
+                
+                # If no localhost node configured, return None (treat as local)
+                return None
+            
+            # Try partial match for other domains
+            node = Node.objects.filter(
+                host__icontains=parsed.netloc,
+                is_active=True
+            ).first()
+            
+            return node
+            
+        except Exception as e:
+            logger.error(f"Error getting node for URL {url}: {e}")
+            return None
+    
+    @staticmethod
     def fetch_remote_authors(node: Node, limit: int = 50) -> List[Dict[str, Any]]:
         """
         Fetch authors from a remote node.
@@ -45,6 +134,11 @@ class FederationService:
             List of author data dictionaries
         """
         try:
+            # Skip if this is a localhost node and we're in development
+            if FederationService.is_localhost_url(node.host) and settings.DEBUG:
+                logger.info(f"Skipping localhost node {node.name} in development mode")
+                return []
+            
             client = RemoteNodeClient(node)
             response = client.get(f'/api/authors/?size={limit}')
             data = response.json()
@@ -74,6 +168,11 @@ class FederationService:
             List of entry data dictionaries
         """
         try:
+            # Skip if this is a localhost node and we're in development mode
+            if FederationService.is_localhost_url(node.host) and settings.DEBUG:
+                logger.info(f"Skipping localhost node {node.name} in development mode")
+                return []
+            
             client = RemoteNodeClient(node)
             response = client.get(f'/api/entries/?size={limit}')
             data = response.json()
@@ -102,54 +201,80 @@ class FederationService:
         Returns:
             Tuple of (created_count, updated_count)
         """
-        remote_authors = FederationService.fetch_remote_authors(node, limit)
-        created_count = 0
-        updated_count = 0
+        # Skip localhost nodes in development
+        if FederationService.is_localhost_url(node.host) and settings.DEBUG:
+            logger.info(f"Skipping localhost node {node.name} in development mode")
+            return 0, 0
         
-        for author_data in remote_authors:
-            try:
-                author_url = author_data.get('id') or author_data.get('url')
-                if not author_url:
+        try:
+            authors_data = FederationService.fetch_remote_authors(node, limit)
+            created_count = 0
+            updated_count = 0
+            
+            for author_data in authors_data:
+                try:
+                    with transaction.atomic():
+                        # Extract author ID from URL
+                        author_url = author_data.get('url', author_data.get('id', ''))
+                        if not author_url:
+                            continue
+                        
+                        # Parse author ID from URL
+                        parsed = urlparse(author_url)
+                        path_parts = parsed.path.strip('/').split('/')
+                        if 'authors' in path_parts:
+                            author_index = path_parts.index('authors')
+                            if author_index + 1 < len(path_parts):
+                                author_id = path_parts[author_index + 1]
+                            else:
+                                continue
+                        else:
+                            continue
+                        
+                        # Check if author already exists
+                        author, created = Author.objects.get_or_create(
+                            id=author_id,
+                            defaults={
+                                'url': author_url,
+                                'username': author_data.get('username', ''),
+                                'display_name': author_data.get('displayName', author_data.get('display_name', '')),
+                                'github_username': author_data.get('github', ''),
+                                'profile_image': author_data.get('profileImage', author_data.get('profile_image', '')),
+                                'bio': author_data.get('bio', ''),
+                                'location': author_data.get('location', ''),
+                                'website': author_data.get('website', ''),
+                                'host': author_data.get('host', node.host),
+                                'web': author_data.get('web', author_data.get('page', '')),
+                                'node': node,
+                                'is_approved': True,  # Remote authors are auto-approved
+                                'is_active': True
+                            }
+                        )
+                        
+                        if created:
+                            created_count += 1
+                        else:
+                            # Update existing author
+                            author.username = author_data.get('username', author.username)
+                            author.display_name = author_data.get('displayName', author_data.get('display_name', author.display_name))
+                            author.github_username = author_data.get('github', author.github_username)
+                            author.profile_image = author_data.get('profileImage', author_data.get('profile_image', author.profile_image))
+                            author.bio = author_data.get('bio', author.bio)
+                            author.location = author_data.get('location', author.location)
+                            author.website = author_data.get('website', author.website)
+                            author.save()
+                            updated_count += 1
+                            
+                except Exception as e:
+                    logger.error(f"Error syncing author {author_data.get('username', 'unknown')}: {e}")
                     continue
-                
-                # Try to find existing author
-                author, created = Author.objects.get_or_create(
-                    url=author_url,
-                    defaults={
-                        'username': author_data.get('username', ''),
-                        'display_name': author_data.get('displayName', ''),
-                        'github_username': author_data.get('github', ''),
-                        'profile_image': author_data.get('profileImage', ''),
-                        'bio': author_data.get('bio', ''),
-                        'location': author_data.get('location', ''),
-                        'website': author_data.get('website', ''),
-                        'host': author_data.get('host', node.host),
-                        'web': author_data.get('page', ''),
-                        'node': node,
-                        'is_approved': True,
-                        'is_active': True
-                    }
-                )
-                
-                if created:
-                    created_count += 1
-                else:
-                    # Update existing author with latest data
-                    author.display_name = author_data.get('displayName', author.display_name)
-                    author.github_username = author_data.get('github', author.github_username)
-                    author.profile_image = author_data.get('profileImage', author.profile_image)
-                    author.bio = author_data.get('bio', author.bio)
-                    author.location = author_data.get('location', author.location)
-                    author.website = author_data.get('website', author.website)
-                    author.save()
-                    updated_count += 1
-                    
-            except Exception as e:
-                logger.error(f"Failed to sync author {author_data.get('id', 'unknown')}: {e}")
-                continue
-        
-        logger.info(f"Synced {created_count} new and {updated_count} updated authors from {node.name}")
-        return created_count, updated_count
+            
+            logger.info(f"Synced {created_count} new and {updated_count} updated authors from {node.name}")
+            return created_count, updated_count
+            
+        except Exception as e:
+            logger.error(f"Failed to sync authors from {node.name}: {e}")
+            return 0, 0
     
     @staticmethod
     def sync_remote_entries(node: Node, limit: int = 50) -> Tuple[int, int]:
@@ -163,72 +288,109 @@ class FederationService:
         Returns:
             Tuple of (created_count, updated_count)
         """
-        remote_entries = FederationService.fetch_remote_entries(node, limit)
-        created_count = 0
-        updated_count = 0
+        # Skip localhost nodes in development
+        if FederationService.is_localhost_url(node.host) and settings.DEBUG:
+            logger.info(f"Skipping localhost node {node.name} in development mode")
+            return 0, 0
         
-        for entry_data in remote_entries:
-            try:
-                entry_url = entry_data.get('id') or entry_data.get('url')
-                if not entry_url:
+        try:
+            remote_entries = FederationService.fetch_remote_entries(node, limit)
+            created_count = 0
+            updated_count = 0
+            
+            for entry_data in remote_entries:
+                try:
+                    with transaction.atomic():
+                        entry_url = entry_data.get('id') or entry_data.get('url')
+                        if not entry_url:
+                            continue
+                        
+                        # Parse entry ID from URL
+                        parsed = urlparse(entry_url)
+                        path_parts = parsed.path.strip('/').split('/')
+                        if 'entries' in path_parts:
+                            entry_index = path_parts.index('entries')
+                            if entry_index + 1 < len(path_parts):
+                                entry_id = path_parts[entry_index + 1]
+                            else:
+                                continue
+                        else:
+                            continue
+                        
+                        # Get or create the author
+                        author_data = entry_data.get('author', {})
+                        if not author_data:
+                            continue
+                        
+                        author_url = author_data.get('id') or author_data.get('url')
+                        if not author_url:
+                            continue
+                        
+                        # Parse author ID from URL
+                        author_parsed = urlparse(author_url)
+                        author_path_parts = author_parsed.path.strip('/').split('/')
+                        if 'authors' in author_path_parts:
+                            author_index = author_path_parts.index('authors')
+                            if author_index + 1 < len(author_path_parts):
+                                author_id = author_path_parts[author_index + 1]
+                            else:
+                                continue
+                        else:
+                            continue
+                        
+                        author, _ = Author.objects.get_or_create(
+                            id=author_id,
+                            defaults={
+                                'url': author_url,
+                                'username': author_data.get('username', ''),
+                                'display_name': author_data.get('displayName', author_data.get('display_name', '')),
+                                'github_username': author_data.get('github', ''),
+                                'profile_image': author_data.get('profileImage', author_data.get('profile_image', '')),
+                                'host': author_data.get('host', node.host),
+                                'node': node,
+                                'is_approved': True,
+                                'is_active': True
+                            }
+                        )
+                        
+                        # Try to find existing entry
+                        entry, created = Entry.objects.get_or_create(
+                            id=entry_id,
+                            defaults={
+                                'url': entry_url,
+                                'author': author,
+                                'title': entry_data.get('title', ''),
+                                'content': entry_data.get('content', ''),
+                                'content_type': entry_data.get('contentType', 'text/plain'),
+                                'visibility': entry_data.get('visibility', 'PUBLIC'),
+                                'description': entry_data.get('description', ''),
+                                'source': entry_data.get('source', ''),
+                                'origin': entry_data.get('origin', ''),
+                            }
+                        )
+                        
+                        if created:
+                            created_count += 1
+                        else:
+                            # Update existing entry with latest data
+                            entry.title = entry_data.get('title', entry.title)
+                            entry.content = entry_data.get('content', entry.content)
+                            entry.content_type = entry_data.get('contentType', entry.content_type)
+                            entry.visibility = entry_data.get('visibility', entry.visibility)
+                            entry.description = entry_data.get('description', entry.description)
+                            entry.save()
+                            updated_count += 1
+                            
+                except Exception as e:
+                    logger.error(f"Error syncing entry {entry_data.get('title', 'unknown')}: {e}")
                     continue
-                
-                # Get or create the author
-                author_data = entry_data.get('author', {})
-                if not author_data:
-                    continue
-                
-                author_url = author_data.get('id') or author_data.get('url')
-                if not author_url:
-                    continue
-                
-                author, _ = Author.objects.get_or_create(
-                    url=author_url,
-                    defaults={
-                        'username': author_data.get('username', ''),
-                        'display_name': author_data.get('displayName', ''),
-                        'github_username': author_data.get('github', ''),
-                        'profile_image': author_data.get('profileImage', ''),
-                        'host': author_data.get('host', node.host),
-                        'node': node,
-                        'is_approved': True,
-                        'is_active': True
-                    }
-                )
-                
-                # Try to find existing entry
-                entry, created = Entry.objects.get_or_create(
-                    url=entry_url,
-                    defaults={
-                        'author': author,
-                        'title': entry_data.get('title', ''),
-                        'content': entry_data.get('content', ''),
-                        'content_type': entry_data.get('contentType', 'text/plain'),
-                        'visibility': entry_data.get('visibility', 'PUBLIC'),
-                        'description': entry_data.get('description', ''),
-                        'source': entry_data.get('source', ''),
-                        'origin': entry_data.get('origin', ''),
-                    }
-                )
-                
-                if created:
-                    created_count += 1
-                else:
-                    # Update existing entry with latest data
-                    entry.title = entry_data.get('title', entry.title)
-                    entry.content = entry_data.get('content', entry.content)
-                    entry.content_type = entry_data.get('contentType', entry.content_type)
-                    entry.visibility = entry_data.get('visibility', entry.visibility)
-                    entry.description = entry_data.get('description', entry.description)
-                    entry.save()
-                    updated_count += 1
-                    
-            except Exception as e:
-                logger.error(f"Failed to sync entry {entry_data.get('id', 'unknown')}: {e}")
-                continue
-        
-        logger.info(f"Synced {created_count} new and {updated_count} updated entries from {node.name}")
-        return created_count, updated_count
+            
+            logger.info(f"Synced {created_count} new and {updated_count} updated entries from {node.name}")
+            return created_count, updated_count
+            
+        except Exception as e:
+            logger.error(f"Failed to sync entries from {node.name}: {e}")
+            return 0, 0
     
     @staticmethod
     def sync_all_nodes() -> Dict[str, Dict[str, int]]:
@@ -273,9 +435,15 @@ class FederationService:
         results = {}
         
         if entry.visibility == Entry.PUBLIC:
-            # Send to all connected nodes
+            # Send to all connected nodes (excluding localhost in development)
             active_nodes = Node.objects.filter(is_active=True)
             for node in active_nodes:
+                # Skip localhost nodes in development mode
+                if FederationService.is_localhost_url(node.host) and settings.DEBUG:
+                    logger.info(f"Skipping localhost node {node.name} in development mode")
+                    results[node.name] = True  # Mark as successful to avoid errors
+                    continue
+                
                 try:
                     FederationService._post_entry_to_node(entry, node)
                     results[node.name] = True
@@ -286,6 +454,8 @@ class FederationService:
         elif entry.visibility == Entry.FRIENDS_ONLY:
             # Send only to remote friends
             from django.db import models
+            from app.models import Friendship
+            
             friendships = Friendship.objects.filter(
                 models.Q(author1=entry.author) | models.Q(author2=entry.author)
             )
@@ -304,6 +474,12 @@ class FederationService:
             ).select_related('node')
             
             for friend in remote_friends:
+                # Skip localhost friends in development mode
+                if FederationService.is_localhost_url(friend.host) and settings.DEBUG:
+                    logger.info(f"Skipping localhost friend {friend.username} in development mode")
+                    results[friend.node.name] = True  # Mark as successful to avoid errors
+                    continue
+                
                 try:
                     FederationService._post_entry_to_author(entry, friend)
                     results[friend.node.name] = True
@@ -316,6 +492,11 @@ class FederationService:
     @staticmethod
     def _post_entry_to_node(entry: Entry, node: Node):
         """Post entry to a specific node's general inbox."""
+        # Skip localhost nodes in development mode
+        if FederationService.is_localhost_url(node.host) and settings.DEBUG:
+            logger.info(f"Skipping localhost node {node.name} in development mode")
+            return
+        
         try:
             client = RemoteNodeClient(node)
             entry_data = FederationService._prepare_entry_data(entry)
@@ -331,6 +512,11 @@ class FederationService:
     @staticmethod
     def _post_entry_to_author(entry: Entry, author: Author):
         """Post entry to a specific remote author's inbox."""
+        # Skip localhost authors in development mode
+        if FederationService.is_localhost_url(author.host) and settings.DEBUG:
+            logger.info(f"Skipping localhost author {author.username} in development mode")
+            return
+        
         try:
             client = RemoteNodeClient(author.node)
             entry_data = FederationService._prepare_entry_data(entry)
@@ -732,7 +918,6 @@ class FederationService:
     @staticmethod
     def _find_liked_object(object_url: str) -> Optional[Entry | Comment]:
         """Find the liked object (Entry or Comment) by URL."""
-        from urllib.parse import urlparse
         
         # Try to find as entry first
         try:
