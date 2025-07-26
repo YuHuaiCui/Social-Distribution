@@ -55,7 +55,49 @@ export class AuthorService extends BaseApiService {
     const authorId = id.includes("/")
       ? id.split("/").filter(Boolean).pop()
       : id;
-    return this.request<Author>(`/api/authors/${authorId}/`);
+
+    try {
+      // First, try to get the author using the standard endpoint
+      const author = await this.request<Author>(`/api/authors/${authorId}/`);
+      
+      // If the author has a node property (is remote), fetch fresh data from remote
+      if (author.node) {
+        try {
+          const encodedUrl = encodeURIComponent(author.url || author.id);
+          const remoteAuthor = await this.request<Author>(`/api/authors/by-url/${encodedUrl}/`);
+          return remoteAuthor;
+        } catch (remoteError) {
+          console.warn("Failed to fetch fresh remote author data, using cached data:", remoteError);
+          // Fall back to cached local data
+          return author;
+        }
+      }
+      
+      return author;
+    } catch (error) {
+      // If local lookup failed, try to find if this might be a remote author
+      // by checking if we have any cached remote authors with this ID
+      try {
+        const allAuthors = await this.getAuthors({ type: 'remote' });
+        const remoteAuthor = allAuthors.results.find(a => {
+          const extractedId = a.id.includes("/") 
+            ? a.id.split("/").filter(Boolean).pop() 
+            : a.id;
+          return extractedId === authorId;
+        });
+        
+        if (remoteAuthor) {
+          // Found a remote author with this ID, fetch fresh data
+          const encodedUrl = encodeURIComponent(remoteAuthor.url || remoteAuthor.id);
+          return this.request<Author>(`/api/authors/by-url/${encodedUrl}/`);
+        }
+      } catch (remoteError) {
+        console.warn("Failed to find or fetch remote author:", remoteError);
+      }
+      
+      // If all else fails, throw the original error
+      throw error;
+    }
   }
 
   /**
