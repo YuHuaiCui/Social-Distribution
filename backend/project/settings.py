@@ -35,8 +35,6 @@ ALLOWED_HOSTS = [
     "testserver",
     "localhost",
     "127.0.0.1",
-    "http://192.168.1.75:5173",  # laptop
-    "http://192.168.1.72:5173",  # pc
     "192.168.1.72",  # pc
     "192.168.1.75",  # laptop
 ]
@@ -106,6 +104,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://project-black-ej-53285e19ae0a.herokuapp.com",
+    "http://192.168.1.75:5173",  # laptop
+    "http://192.168.1.72:5173",  # pc
 ]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
 CSRF_COOKIE_NAME = "csrftoken"
@@ -121,8 +121,11 @@ SOCIALACCOUNT_PROVIDERS = {
 
 ROOT_URLCONF = "project.urls"
 
-LOGIN_REDIRECT_URL = "http://localhost:5173/home"
-LOGOUT_REDIRECT_URL = "http://localhost:5173/"
+# Dynamic frontend URL based on environment
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+LOGIN_REDIRECT_URL = f"{FRONTEND_URL}/home"
+LOGOUT_REDIRECT_URL = f"{FRONTEND_URL}/"
 
 TEMPLATES = [
     {
@@ -190,7 +193,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
-    "http://192.168.1.72",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
