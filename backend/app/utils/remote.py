@@ -128,9 +128,9 @@ class RemoteObjectFetcher:
             # Use FederationService for better localhost handling
             from app.utils.federation import FederationService
             
-            # Skip localhost URLs in development mode
-            if FederationService.is_localhost_url(author_url) and settings.DEBUG:
-                logger.info(f"Skipping localhost author fetch: {author_url}")
+            # Skip if this is the same localhost instance (self-federation)
+            if FederationService.is_same_localhost_instance(author_url):
+                logger.info(f"Skipping self-federation for author: {author_url}")
                 return None
             
             # Get the appropriate node for this URL
@@ -171,9 +171,9 @@ class RemoteObjectFetcher:
             # Use FederationService for better localhost handling
             from app.utils.federation import FederationService
             
-            # Skip localhost URLs in development mode
-            if FederationService.is_localhost_url(entry_url) and settings.DEBUG:
-                logger.info(f"Skipping localhost entry fetch: {entry_url}")
+            # Skip if this is the same localhost instance (self-federation)
+            if FederationService.is_same_localhost_instance(entry_url):
+                logger.info(f"Skipping self-federation for entry: {entry_url}")
                 return None
             
             # Get the appropriate node for this URL

@@ -55,6 +55,34 @@ class FederationService:
             return False
     
     @staticmethod
+    def is_same_localhost_instance(url: str) -> bool:
+        """
+        Check if a URL belongs to the same localhost instance as the current server.
+        This is used to prevent self-federation while allowing federation with other localhost instances.
+        
+        Args:
+            url: The URL to check
+            
+        Returns:
+            bool: True if the URL belongs to the same localhost instance
+        """
+        if not url or not settings.DEBUG:
+            return False
+        
+        try:
+            parsed = urlparse(url)
+            current_parsed = urlparse(settings.SITE_URL)
+            
+            # If both are localhost, check if they're the same port
+            if (FederationService.is_localhost_url(url) and 
+                FederationService.is_localhost_url(settings.SITE_URL)):
+                return parsed.netloc == current_parsed.netloc
+            
+            return False
+        except Exception:
+            return False
+    
+    @staticmethod
     def is_same_domain(url1: str, url2: str) -> bool:
         """
         Check if two URLs belong to the same domain.
@@ -134,9 +162,9 @@ class FederationService:
             List of author data dictionaries
         """
         try:
-            # Skip if this is a localhost node and we're in development
-            if FederationService.is_localhost_url(node.host) and settings.DEBUG:
-                logger.info(f"Skipping localhost node {node.name} in development mode")
+            # Skip if this is the same localhost instance (self-federation)
+            if FederationService.is_same_localhost_instance(node.host):
+                logger.info(f"Skipping self-federation with node {node.name}")
                 return []
             
             client = RemoteNodeClient(node)
@@ -168,9 +196,9 @@ class FederationService:
             List of entry data dictionaries
         """
         try:
-            # Skip if this is a localhost node and we're in development mode
-            if FederationService.is_localhost_url(node.host) and settings.DEBUG:
-                logger.info(f"Skipping localhost node {node.name} in development mode")
+            # Skip if this is the same localhost instance (self-federation)
+            if FederationService.is_same_localhost_instance(node.host):
+                logger.info(f"Skipping self-federation with node {node.name}")
                 return []
             
             client = RemoteNodeClient(node)
@@ -201,9 +229,9 @@ class FederationService:
         Returns:
             Tuple of (created_count, updated_count)
         """
-        # Skip localhost nodes in development
-        if FederationService.is_localhost_url(node.host) and settings.DEBUG:
-            logger.info(f"Skipping localhost node {node.name} in development mode")
+        # Skip if this is the same localhost instance (self-federation)
+        if FederationService.is_same_localhost_instance(node.host):
+            logger.info(f"Skipping self-federation with node {node.name}")
             return 0, 0
         
         try:
@@ -288,9 +316,9 @@ class FederationService:
         Returns:
             Tuple of (created_count, updated_count)
         """
-        # Skip localhost nodes in development
-        if FederationService.is_localhost_url(node.host) and settings.DEBUG:
-            logger.info(f"Skipping localhost node {node.name} in development mode")
+        # Skip if this is the same localhost instance (self-federation)
+        if FederationService.is_same_localhost_instance(node.host):
+            logger.info(f"Skipping self-federation with node {node.name}")
             return 0, 0
         
         try:
@@ -438,9 +466,9 @@ class FederationService:
             # Send to all connected nodes (excluding localhost in development)
             active_nodes = Node.objects.filter(is_active=True)
             for node in active_nodes:
-                # Skip localhost nodes in development mode
-                if FederationService.is_localhost_url(node.host) and settings.DEBUG:
-                    logger.info(f"Skipping localhost node {node.name} in development mode")
+                # Skip if this is the same localhost instance (self-federation)
+                if FederationService.is_same_localhost_instance(node.host):
+                    logger.info(f"Skipping self-federation with node {node.name}")
                     results[node.name] = True  # Mark as successful to avoid errors
                     continue
                 
@@ -474,9 +502,9 @@ class FederationService:
             ).select_related('node')
             
             for friend in remote_friends:
-                # Skip localhost friends in development mode
-                if FederationService.is_localhost_url(friend.host) and settings.DEBUG:
-                    logger.info(f"Skipping localhost friend {friend.username} in development mode")
+                # Skip if this is the same localhost instance (self-federation)
+                if FederationService.is_same_localhost_instance(friend.host):
+                    logger.info(f"Skipping self-federation with friend {friend.username}")
                     results[friend.node.name] = True  # Mark as successful to avoid errors
                     continue
                 
@@ -492,9 +520,9 @@ class FederationService:
     @staticmethod
     def _post_entry_to_node(entry: Entry, node: Node):
         """Post entry to a specific node's general inbox."""
-        # Skip localhost nodes in development mode
-        if FederationService.is_localhost_url(node.host) and settings.DEBUG:
-            logger.info(f"Skipping localhost node {node.name} in development mode")
+        # Skip if this is the same localhost instance (self-federation)
+        if FederationService.is_same_localhost_instance(node.host):
+            logger.info(f"Skipping self-federation with node {node.name}")
             return
         
         try:
@@ -512,9 +540,9 @@ class FederationService:
     @staticmethod
     def _post_entry_to_author(entry: Entry, author: Author):
         """Post entry to a specific remote author's inbox."""
-        # Skip localhost authors in development mode
-        if FederationService.is_localhost_url(author.host) and settings.DEBUG:
-            logger.info(f"Skipping localhost author {author.username} in development mode")
+        # Skip if this is the same localhost instance (self-federation)
+        if FederationService.is_same_localhost_instance(author.host):
+            logger.info(f"Skipping self-federation with author {author.username}")
             return
         
         try:
