@@ -247,10 +247,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         serializer = AuthorListSerializer(
             followers, many=True, context={"request": request}
         )
-        return Response({
-            "type": "followers",
-            "followers": serializer.data
-        })
+        return Response({"type": "followers", "followers": serializer.data})
 
     @action(detail=True, methods=["get"])
     def following(self, request, pk=None):
@@ -264,10 +261,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         serializer = AuthorSerializer(
             following, many=True, context={"request": request}
         )
-        return Response({
-            "type": "following",
-            "following": serializer.data
-        })
+        return Response({"type": "following", "following": serializer.data})
 
     @action(detail=True, methods=["get"])
     def friends(self, request, pk=None):
@@ -280,10 +274,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         serializer = AuthorListSerializer(
             friends, many=True, context={"request": request}
         )
-        return Response({
-            "type": "friends",
-            "friends": serializer.data
-        })
+        return Response({"type": "friends", "friends": serializer.data})
 
     @action(
         detail=True,
@@ -301,22 +292,25 @@ class AuthorViewSet(viewsets.ModelViewSet):
             from app.models import Node
             import requests
             from requests.auth import HTTPBasicAuth
-            
+
             # Check if pk looks like a UUID
             try:
                 import uuid
+
                 uuid.UUID(str(pk))
                 # It's a UUID, but author doesn't exist locally
                 # This might be a remote author from explore page
                 # Check if we have any context about which node this author is from
-                
+
                 # Get the referrer to see if user came from explore page
-                referrer = request.headers.get('Referer', '')
-                
+                referrer = request.headers.get("Referer", "")
+
                 # For now, we'll need to handle this differently
                 # The frontend should pass node information when following remote authors
                 return Response(
-                    {"error": "Remote author not found locally. Please try again from the explore page."},
+                    {
+                        "error": "Remote author not found locally. Please try again from the explore page."
+                    },
                     status=status.HTTP_404_NOT_FOUND,
                 )
             except ValueError:
@@ -325,7 +319,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     {"error": "Invalid author ID format"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        
+
         current_user = request.user
 
         if request.method == "POST":
@@ -366,9 +360,14 @@ class AuthorViewSet(viewsets.ModelViewSet):
             # If following a remote author, send follow request using centralized service
             if not author_to_follow.is_local and author_to_follow.node:
                 from app.utils.federation import FederationService
-                success = FederationService.send_follow_request(current_user, author_to_follow)
+
+                success = FederationService.send_follow_request(
+                    current_user, author_to_follow
+                )
                 if not success:
-                    print(f"Warning: Failed to send follow request to {author_to_follow.username}")
+                    print(
+                        f"Warning: Failed to send follow request to {author_to_follow.username}"
+                    )
                     # Still create the local follow record, but mark it as pending
                     follow.status = Follow.PENDING
                     follow.save()
@@ -456,14 +455,18 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 visible_entries = Entry.objects.visible_to_author(user_author)
                 entries = visible_entries.filter(author=author)
 
-            serializer = EntrySerializer(entries, many=True, context={'request': request})
-            return Response({
-                "type": "entries",
-                "page_number": 1,
-                "size": len(serializer.data),
-                "count": len(serializer.data),
-                "src": serializer.data
-            })
+            serializer = EntrySerializer(
+                entries, many=True, context={"request": request}
+            )
+            return Response(
+                {
+                    "type": "entries",
+                    "page_number": 1,
+                    "size": len(serializer.data),
+                    "count": len(serializer.data),
+                    "src": serializer.data,
+                }
+            )
 
         if request.method == "POST":
             # Ensure only the author can post their own entry
@@ -635,11 +638,11 @@ class AuthorViewSet(viewsets.ModelViewSet):
             )
 
     # CMPUT 404 Compliant API Endpoints
-    
+
     def list(self, request, *args, **kwargs):
         """
         GET [local, remote]: retrieve all profiles on the node (paginated)
-        
+
         Returns authors in the CMPUT 404 compliant format:
         {
             "type": "authors",
@@ -648,33 +651,60 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
-        
+
         if page is not None:
-            serializer = AuthorSerializer(page, many=True, context={'request': request})
+            serializer = AuthorSerializer(page, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
-        
-        serializer = AuthorSerializer(queryset, many=True, context={'request': request})
-        return Response({
-            "type": "authors", 
-            "authors": serializer.data
-        })
+
+        serializer = AuthorSerializer(queryset, many=True, context={"request": request})
+        return Response({"type": "authors", "authors": serializer.data})
 
     def retrieve(self, request, *args, **kwargs):
         """
         GET [local]: retrieve AUTHOR_SERIAL's profile
-        GET [remote]: retrieve AUTHOR_FQID's profile
-        
+        GET [remote]: retrieve AUTHOR_FQID's profile from remote node
+
+        For remote authors (author.node is not null), fetches fresh data
+        from the remote node using federation. Falls back to local cached
+        data if remote fetch fails.
+
         Returns author in the CMPUT 404 compliant format
         """
         instance = self.get_object()
-        serializer = AuthorSerializer(instance, context={'request': request})
+
+        # If this is a remote author, try to fetch fresh data from the remote node
+        if instance.node is not None:
+            from app.utils.remote import RemoteObjectFetcher
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"Fetching remote author data for {instance.username} from {instance.node.host}"
+            )
+
+            # Try to fetch fresh data from the remote node
+            remote_data = RemoteObjectFetcher.fetch_author_by_url(instance.url)
+
+            if remote_data:
+                logger.info(
+                    f"Successfully fetched remote author data for {instance.username}"
+                )
+                return Response(remote_data)
+            else:
+                logger.warning(
+                    f"Failed to fetch remote author data for {instance.username}, falling back to local cache"
+                )
+            # If remote fetch fails, fall through to return local cached data
+
+        # Return local data (either for local authors or as fallback for remote authors)
+        serializer = AuthorSerializer(instance, context={"request": request})
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'], url_path='followers')
+    @action(detail=True, methods=["get"], url_path="followers")
     def followers(self, request, pk=None):
         """
         GET [local, remote]: get a list of authors who are AUTHOR_SERIAL's followers
-        
+
         Returns followers in the CMPUT 404 compliant format:
         {
             "type": "followers",
@@ -683,50 +713,50 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """
         author = self.get_object()
         followers = author.get_followers()
-        serializer = AuthorSerializer(followers, many=True, context={'request': request})
-        
-        return Response({
-            "type": "followers", 
-            "followers": serializer.data
-        })
+        serializer = AuthorSerializer(
+            followers, many=True, context={"request": request}
+        )
+
+        return Response({"type": "followers", "followers": serializer.data})
 
     @action(
         detail=False,
         methods=["post"],
         permission_classes=[permissions.IsAuthenticated],
-        url_path="follow-remote"
+        url_path="follow-remote",
     )
     def follow_remote(self, request):
         """
         Follow a remote author by creating/fetching their local record first.
-        
+
         Expected data:
         {
             "author_id": "uuid-of-remote-author",
-            "author_url": "full-url-of-remote-author", 
+            "author_url": "full-url-of-remote-author",
             "node_id": "uuid-of-node"
         }
         """
-        author_id = request.data.get('author_id')
-        author_url = request.data.get('author_url')
-        node_id = request.data.get('node_id')
-        
+        author_id = request.data.get("author_id")
+        author_url = request.data.get("author_url")
+        node_id = request.data.get("node_id")
+
         if not author_id or not author_url or not node_id:
             return Response(
                 {"error": "author_id, author_url, and node_id are required"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Get the node
         from app.models import Node
+
         try:
             node = Node.objects.get(id=node_id, is_active=True)
         except Node.DoesNotExist:
             return Response(
                 {"error": "Node not found or inactive"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         # Check if author already exists locally
         try:
             remote_author = Author.objects.get(id=author_id)
@@ -734,66 +764,68 @@ class AuthorViewSet(viewsets.ModelViewSet):
             # Fetch author data from remote node
             import requests
             from requests.auth import HTTPBasicAuth
-            
+
             try:
                 response = requests.get(
                     f"{node.host.rstrip('/')}/api/authors/{author_id}/",
                     auth=HTTPBasicAuth(node.username, node.password),
-                    timeout=5
+                    timeout=5,
                 )
-                
+
                 if response.status_code != 200:
                     return Response(
-                        {"error": f"Failed to fetch author from remote node: {response.status_code}"},
-                        status=status.HTTP_502_BAD_GATEWAY
+                        {
+                            "error": f"Failed to fetch author from remote node: {response.status_code}"
+                        },
+                        status=status.HTTP_502_BAD_GATEWAY,
                     )
-                
+
                 author_data = response.json()
-                
+
                 # Create local author record
                 remote_author = Author.objects.create(
                     id=author_id,
                     url=author_url,
-                    username=author_data.get('username', ''),
-                    display_name=author_data.get('displayName', ''),
-                    github_username=author_data.get('github', ''),
-                    profile_image=author_data.get('profileImage', ''),
-                    bio=author_data.get('bio', ''),
-                    location=author_data.get('location', ''),
-                    website=author_data.get('website', ''),
-                    host=author_data.get('host', node.host),
-                    web=author_data.get('page', ''),
+                    username=author_data.get("username", ""),
+                    display_name=author_data.get("displayName", ""),
+                    github_username=author_data.get("github", ""),
+                    profile_image=author_data.get("profileImage", ""),
+                    bio=author_data.get("bio", ""),
+                    location=author_data.get("location", ""),
+                    website=author_data.get("website", ""),
+                    host=author_data.get("host", node.host),
+                    web=author_data.get("page", ""),
                     node=node,
                     is_approved=True,  # Remote authors are auto-approved
-                    is_active=True
+                    is_active=True,
                 )
-                
+
             except requests.RequestException as e:
                 return Response(
                     {"error": f"Failed to connect to remote node: {str(e)}"},
-                    status=status.HTTP_502_BAD_GATEWAY
+                    status=status.HTTP_502_BAD_GATEWAY,
                 )
             except Exception as e:
                 return Response(
                     {"error": f"Failed to create remote author: {str(e)}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
-        
+
         # Now follow the remote author
         current_user = request.user
-        
+
         # Check if trying to follow self
         if current_user.url == remote_author.url:
             return Response(
                 {"error": "Cannot follow yourself"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Check if follow request already exists
         existing_follow = Follow.objects.filter(
             follower=current_user, followed=remote_author
         ).first()
-        
+
         if existing_follow:
             if existing_follow.status == Follow.ACCEPTED:
                 return Response(
@@ -807,15 +839,15 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 )
             elif existing_follow.status == Follow.REJECTED:
                 existing_follow.delete()
-        
+
         # Create follow request
         follow = Follow.objects.create(
             follower=current_user, followed=remote_author, status=Follow.PENDING
         )
-        
+
         # Create inbox item for the followed user
         from app.models.inbox import Inbox
-        
+
         Inbox.objects.create(
             recipient=follow.followed,
             item_type=Inbox.FOLLOW,
@@ -836,22 +868,22 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 "status": follow.status,
             },
         )
-        
+
         # Send follow request to remote node
         if remote_author.node:
             self._send_follow_to_remote(follow, remote_author, node)
-        
+
         serializer = FollowSerializer(follow)
         return Response(
             {"success": True, "follow": serializer.data},
             status=status.HTTP_201_CREATED,
         )
-    
+
     def _send_follow_to_remote(self, follow, remote_author, node):
         """Send follow request to remote node"""
         import requests
         from requests.auth import HTTPBasicAuth
-        
+
         try:
             # Prepare follow request data
             follow_data = {
@@ -866,25 +898,31 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 },
                 "object": remote_author.url,
             }
-            
+
             # Send to remote author's inbox
             inbox_url = f"{node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
-            
+
             response = requests.post(
                 inbox_url,
                 json=follow_data,
                 auth=HTTPBasicAuth(node.username, node.password),
-                headers={'Content-Type': 'application/json'},
-                timeout=5
+                headers={"Content-Type": "application/json"},
+                timeout=5,
             )
-            
+
             if response.status_code not in [200, 201, 202]:
-                print(f"Failed to send follow request to remote node: {response.status_code}")
+                print(
+                    f"Failed to send follow request to remote node: {response.status_code}"
+                )
                 print(f"Response: {response.text}")
         except Exception as e:
             print(f"Error sending follow request to remote node: {str(e)}")
 
-    @action(detail=True, methods=['get', 'put', 'delete'], url_path='followers/(?P<foreign_author_fqid>.+)')
+    @action(
+        detail=True,
+        methods=["get", "put", "delete"],
+        url_path="followers/(?P<foreign_author_fqid>.+)",
+    )
     def follower_detail(self, request, pk=None, foreign_author_fqid=None):
         """
         DELETE [local]: remove FOREIGN_AUTHOR_FQID as a follower of AUTHOR_SERIAL (must be authenticated)
@@ -892,47 +930,44 @@ class AuthorViewSet(viewsets.ModelViewSet):
         GET [local, remote] check if FOREIGN_AUTHOR_FQID is a follower of AUTHOR_SERIAL
         """
         author = self.get_object()
-        
+
         # Decode the URL-encoded FQID
         decoded_fqid = unquote(foreign_author_fqid)
-        
+
         try:
             foreign_author = Author.objects.get(url=decoded_fqid)
         except Author.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        
-        if request.method == 'GET':
+
+        if request.method == "GET":
             # Check if foreign_author is following author
             is_follower = Follow.objects.filter(
-                follower=foreign_author, 
-                followed=author, 
-                status=Follow.ACCEPTED
+                follower=foreign_author, followed=author, status=Follow.ACCEPTED
             ).exists()
-            
+
             if is_follower:
-                serializer = AuthorSerializer(foreign_author, context={'request': request})
+                serializer = AuthorSerializer(
+                    foreign_author, context={"request": request}
+                )
                 return Response(serializer.data)
             else:
                 return Response(status=status.HTTP_404_NOT_FOUND)
-        
-        elif request.method == 'PUT':
+
+        elif request.method == "PUT":
             # Add as follower (approve follow request)
             follow, created = Follow.objects.get_or_create(
                 follower=foreign_author,
                 followed=author,
-                defaults={'status': Follow.ACCEPTED}
+                defaults={"status": Follow.ACCEPTED},
             )
             if not created and follow.status != Follow.ACCEPTED:
                 follow.status = Follow.ACCEPTED
                 follow.save()
-                
-            serializer = AuthorSerializer(foreign_author, context={'request': request})
+
+            serializer = AuthorSerializer(foreign_author, context={"request": request})
             return Response(serializer.data)
-        
-        elif request.method == 'DELETE':
+
+        elif request.method == "DELETE":
             # Remove as follower
-            Follow.objects.filter(
-                follower=foreign_author,
-                followed=author
-            ).delete()
+            Follow.objects.filter(follower=foreign_author, followed=author).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
