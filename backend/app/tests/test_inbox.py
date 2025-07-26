@@ -209,7 +209,7 @@ class InboxTest(TestCase):
         response = self.client.get("/api/inbox/stats/")
 
         self.assertEqual(response.status_code, 200)
-        # API returns actual fields, not pending_follows
         self.assertEqual(response.data["total_items"], 2)
-        self.assertEqual(response.data["unread_items"], 2)
+        self.assertEqual(response.data["unread_count"], 2)
+        self.assertEqual(response.data["pending_follows"], 1)
         self.assertIn("by_type", response.data)

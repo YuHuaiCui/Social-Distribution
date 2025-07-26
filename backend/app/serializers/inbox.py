@@ -120,3 +120,4 @@ class InboxStatsSerializer(serializers.Serializer):
     unread_count = serializers.IntegerField()
     pending_follows = serializers.IntegerField()
     total_items = serializers.IntegerField()
+    by_type = serializers.DictField(required=False)

@@ -3,7 +3,7 @@
  */
 
 // Use relative URLs in production, absolute URLs in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 export interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
@@ -70,20 +70,20 @@ export class BaseApiService {
         // Log detailed error information
         console.error(`API Error: ${response.status} ${response.statusText}`);
         console.error(`URL: ${url}`);
-        console.error(`Method: ${config.method || 'GET'}`);
+        console.error(`Method: ${config.method || "GET"}`);
         console.error(`Headers:`, config.headers);
-        
+
         // For POST requests, also log the body
-        if (config.method === 'POST' && config.body) {
+        if (config.method === "POST" && config.body) {
           console.error(`Request Body:`, config.body);
         }
-        
+
         const error = await response.json().catch(() => ({
           message: `HTTP error! status: ${response.status}`,
         }));
-        
+
         console.error(`Response Error:`, error);
-        
+
         throw new Error(
           error.message ||
             error.detail ||
@@ -137,7 +137,7 @@ export class BaseApiService {
 
     return this.request<T>(endpoint, {
       ...otherOptions,
-       method: options.method || "POST",
+      method: options.method || "POST",
       headers: otherHeaders,
       body: formData,
     });

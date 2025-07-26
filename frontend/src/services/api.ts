@@ -17,9 +17,9 @@ import type {
 } from "../types";
 
 // Use relative URLs in production, absolute URLs in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 console.log("VITE_API_URL =", import.meta.env.VITE_API_URL);
-
+console.log("Using API_BASE_URL =", API_BASE_URL);
 
 /**
  * @deprecated Use individual service classes instead
@@ -160,46 +160,53 @@ class ApiService {
       const authorId = id.includes("/")
         ? id.split("/").filter(Boolean).pop()
         : id;
-      
+
       try {
         // First, try to get the author using the standard endpoint
         const author = await this.request<Author>(`/api/authors/${authorId}/`);
-        
+
         // If the author has a node property (is remote), fetch fresh data from remote
         if (author.node) {
           try {
             const encodedUrl = encodeURIComponent(author.url || author.id);
-            const remoteAuthor = await this.request<Author>(`/api/authors/by-url/${encodedUrl}/`);
+            const remoteAuthor = await this.request<Author>(
+              `/api/authors/by-url/${encodedUrl}/`
+            );
             return remoteAuthor;
           } catch (remoteError) {
-            console.warn("Failed to fetch fresh remote author data, using cached data:", remoteError);
+            console.warn(
+              "Failed to fetch fresh remote author data, using cached data:",
+              remoteError
+            );
             // Fall back to cached local data
             return author;
           }
         }
-        
+
         return author;
       } catch (error) {
         // If local lookup failed, try to find if this might be a remote author
         // by checking if we have any cached remote authors with this ID
         try {
-          const allAuthors = await this.getAuthors({ type: 'remote' });
-          const remoteAuthor = allAuthors.results.find(a => {
-            const extractedId = a.id.includes("/") 
-              ? a.id.split("/").filter(Boolean).pop() 
+          const allAuthors = await this.getAuthors({ type: "remote" });
+          const remoteAuthor = allAuthors.results.find((a) => {
+            const extractedId = a.id.includes("/")
+              ? a.id.split("/").filter(Boolean).pop()
               : a.id;
             return extractedId === authorId;
           });
-          
+
           if (remoteAuthor) {
             // Found a remote author with this ID, fetch fresh data
-            const encodedUrl = encodeURIComponent(remoteAuthor.url || remoteAuthor.id);
+            const encodedUrl = encodeURIComponent(
+              remoteAuthor.url || remoteAuthor.id
+            );
             return this.request<Author>(`/api/authors/by-url/${encodedUrl}/`);
           }
         } catch (remoteError) {
           console.warn("Failed to find or fetch remote author:", remoteError);
         }
-        
+
         // If all else fails, throw the original error
         throw error;
       }
@@ -502,7 +509,10 @@ class ApiService {
   }
   async getAuthorEntries(authorId: string): Promise<Entry[]> {
     // Check if this looks like a remote author URL
-    if (authorId.includes("http") || (authorId.includes("/") && authorId.split("/").length > 2)) {
+    if (
+      authorId.includes("http") ||
+      (authorId.includes("/") && authorId.split("/").length > 2)
+    ) {
       // For remote authors, we need to get their local cached data first to find their entries
       // Since we can't directly fetch entries from remote nodes in this implementation
       try {
@@ -515,16 +525,19 @@ class ApiService {
           return [];
         }
       } catch (error) {
-        console.warn("Could not fetch remote author for entries lookup:", error);
+        console.warn(
+          "Could not fetch remote author for entries lookup:",
+          error
+        );
         return [];
       }
     }
-    
+
     // Extract ID from URL if full URL is passed (for local authors)
     const id = authorId.includes("/")
       ? authorId.split("/").filter(Boolean).pop()
       : authorId;
-      
+
     try {
       const response = await this.request<{
         type: "entries";

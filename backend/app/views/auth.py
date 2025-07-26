@@ -23,6 +23,16 @@ def auth_status(request):
     Returns:
         200 OK: Authentication status and user data (if authenticated)
     """
+    # Safety check for request.user
+    if request.user is None:
+        return Response({"isAuthenticated": False, "error": "User object not available"})
+    
+    # Debug authentication status
+    print(f"DEBUG: Auth status check - User: {request.user}")
+    print(f"DEBUG: User is authenticated: {request.user.is_authenticated}")
+    print(f"DEBUG: Session key: {request.session.session_key}")
+    print(f"DEBUG: Request headers: {dict(request.headers)}")
+    
     if request.user.is_authenticated:
         try:
             # The Author model extends User, so we get the author by user ID
@@ -164,6 +174,13 @@ def login_view(request):
         else:
             # Standard session: 24 hours
             request.session.set_expiry(86400)  # 24 hours in seconds
+
+        # Debug session information
+        print(f"DEBUG: Login successful for user {user.username}")
+        print(f"DEBUG: Session key: {request.session.session_key}")
+        print(f"DEBUG: Session expiry: {request.session.get_expiry_date()}")
+        print(f"DEBUG: User authenticated: {request.user.is_authenticated}")
+        print(f"DEBUG: User ID: {request.user.id}")
 
         # Get the author data to return
         try:

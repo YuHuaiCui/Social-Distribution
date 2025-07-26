@@ -38,7 +38,8 @@ ALLOWED_HOSTS = [
     "192.168.1.72",  # pc
     "192.168.1.75",  # laptop
     "172.24.134.109",  # current IP address
-    '10.0.0.83'
+    "10.0.0.83",  # current IP address
+    "192.168.48.1",  # current frontend IP
 ]
 
 
@@ -64,7 +65,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
-    "csp.middleware.CSPMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -73,6 +73,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "app.middleware.CrossOriginSessionMiddleware",  # Custom middleware for cross-origin cookies
+    # "csp.middleware.CSPMiddleware",  # Temporarily disabled for debugging
 ]
 
 AUTHENTICATION_BACKENDS = [
@@ -93,15 +95,22 @@ SOCIALACCOUNT_AUTO_SIGNUP = True  # Auto-create accounts
 SOCIALACCOUNT_ADAPTER = "app.adapters.CustomSocialAccountAdapter"
 
 # Ensure these session settings are correctly configured
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = "Lax"  # Try 'None' if using HTTPS and cross-origin
+SESSION_COOKIE_SAMESITE = "Lax"  # Use Lax for development, None requires Secure=True
 SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
 SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+# Don't set a specific domain for session cookies in development
+SESSION_COOKIE_DOMAIN = None
+# Ensure session cookies are accessible across subdomains and ports
+SESSION_COOKIE_PATH = "/"
 
 # Make sure CSRF settings work with your frontend
 CSRF_COOKIE_SAMESITE = "Lax"  # Match SESSION_COOKIE_SAMESITE
 CSRF_COOKIE_HTTPONLY = False  # Frontend JS needs to access the CSRF token
 CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
+# Don't set a specific domain for CSRF cookies in development
+CSRF_COOKIE_DOMAIN = None
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -109,6 +118,15 @@ CSRF_TRUSTED_ORIGINS = [
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
     "http://172.24.134.109:5173",  # current IP address
+    "http://192.168.48.1:5173",   # current frontend IP
+    "http://10.0.0.83:5173",      # current backend IP
+    # Add backend origins for CSRF
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://192.168.1.72:8000",  # pc backend
+    "http://192.168.1.75:8000",  # laptop backend
+    "http://172.24.134.109:8000",  # current backend IP
+    "http://10.0.0.83:8000",      # current backend IP
 ]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
 CSRF_COOKIE_NAME = "csrftoken"
@@ -197,10 +215,20 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
     "http://172.24.134.109:5173",  # current IP address
-    "http://192.168.48.1:5173",   # <-- add this line
+    "http://192.168.48.1:5173",   # current frontend IP
+    "http://10.0.0.83:5173",      # current backend IP
+    # Add backend origins for session cookies
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://192.168.1.72:8000",  # pc backend
+    "http://192.168.1.75:8000",  # laptop backend
+    "http://172.24.134.109:8000",  # current backend IP
+    "http://10.0.0.83:8000",      # current backend IP
 ]
+
 CORS_ALLOW_CREDENTIALS = True
 
+# Allow all headers for cross-origin requests
 CORS_ALLOWED_HEADERS = [
     "accept",
     "accept-encoding",
@@ -212,6 +240,16 @@ CORS_ALLOWED_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
 ]
+
+# Additional CORS settings for development
+CORS_EXPOSE_HEADERS = [
+    "content-type",
+    "x-csrftoken",
+    "set-cookie",
+]
+
+# Allow credentials in preflight requests
+CORS_ALLOW_CREDENTIALS = True
 
 
 # Static files (CSS, JavaScript, Images)
