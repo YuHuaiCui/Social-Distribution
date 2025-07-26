@@ -180,8 +180,8 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Your frontend URL
     "http://127.0.0.1:5173",
-    "http://192.168.1.75:5173/",
-    "http://192.168.1.72:5173/",
+    "http://192.168.1.75:5173/",  # laptop
+    "http://192.168.1.72:5173/",  # pc
 ]
 
 CORS_ALLOW_CREDENTIALS = True
