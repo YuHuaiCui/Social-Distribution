@@ -59,6 +59,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         - Enforces visibility rules based on user relationships
         - Allows authors to access their own entries for editing
         - Allows staff to access any entry
+        - Attempts to fetch remote entries when not found locally
 
         Returns:
             Entry: The requested entry if user has permission
@@ -96,9 +97,205 @@ class EntryViewSet(viewsets.ModelViewSet):
                 return obj
 
         except Entry.DoesNotExist:
+            # Entry not found locally, try to fetch from remote nodes
+            logger.info(f"Entry {lookup_value} not found locally, attempting remote fetch")
+            
+            # Try to fetch from remote nodes
+            remote_entry = self._fetch_remote_entry(lookup_value)
+            if remote_entry:
+                logger.info(f"Successfully fetched remote entry {lookup_value}")
+                
+                # Check if the fetched entry is visible to the user
+                if remote_entry in Entry.objects.visible_to_author(user_author):
+                    return remote_entry
+                else:
+                    raise PermissionDenied("You do not have permission to view this post.")
+            
             raise NotFound("Entry not found.")
 
         raise PermissionDenied("You do not have permission to view this post.")
+
+    def _fetch_remote_entry(self, entry_id):
+        """
+        Attempt to fetch an entry from remote nodes when not found locally.
+        
+        Args:
+            entry_id: The UUID of the entry to fetch
+            
+        Returns:
+            Entry: The fetched entry if successful, None otherwise
+        """
+        try:
+            from app.utils.remote import RemoteObjectFetcher, RemoteNodeClient
+            from app.utils.federation import FederationService
+            from app.models import Node
+            
+            # Get all active nodes
+            active_nodes = Node.objects.filter(is_active=True)
+            
+            if not active_nodes.exists():
+                logger.info(f"No active nodes configured for remote entry fetching")
+                return None
+                
+            logger.info(f"Attempting to fetch entry {entry_id} from {active_nodes.count()} active nodes")
+            
+            for node in active_nodes:
+                try:
+                    # Skip if this is the same localhost instance (self-federation)
+                    if FederationService.is_same_localhost_instance(node.host):
+                        logger.debug(f"Skipping self-federation with node {node.name}")
+                        continue
+                    
+                    logger.info(f"Trying to fetch entry {entry_id} from node {node.name} ({node.host})")
+                    
+                    # Try to fetch the entry from this node
+                    client = RemoteNodeClient(node)
+                    
+                    # Try different endpoint patterns
+                    endpoints_to_try = [
+                        f"/api/entries/{entry_id}/",
+                        f"/entries/{entry_id}/",
+                    ]
+                    
+                    for endpoint in endpoints_to_try:
+                        try:
+                            logger.debug(f"Trying endpoint: {endpoint}")
+                            response = client.get(endpoint)
+                            if response.status_code == 200:
+                                entry_data = response.json()
+                                logger.info(f"Successfully fetched entry data from {node.name}")
+                                
+                                # Create the entry locally
+                                entry = self._create_local_entry_from_remote(entry_data, node)
+                                if entry:
+                                    logger.info(f"Successfully created local entry from remote: {entry_id}")
+                                    return entry
+                                else:
+                                    logger.warning(f"Failed to create local entry from remote data")
+                                    
+                        except Exception as e:
+                            logger.debug(f"Failed to fetch from {endpoint} on node {node.name}: {e}")
+                            continue
+                            
+                except Exception as e:
+                    logger.warning(f"Error fetching from node {node.name}: {e}")
+                    continue
+                    
+            logger.info(f"Failed to fetch entry {entry_id} from any remote nodes")
+            
+        except Exception as e:
+            logger.error(f"Error in _fetch_remote_entry: {e}")
+            
+        return None
+
+    def _create_local_entry_from_remote(self, entry_data, node):
+        """
+        Create a local entry from remote entry data.
+        
+        Args:
+            entry_data: The entry data from the remote node
+            node: The remote node
+            
+        Returns:
+            Entry: The created entry if successful, None otherwise
+        """
+        try:
+            from app.models import Author
+            from urllib.parse import urlparse
+            
+            # Extract entry URL and ID
+            entry_url = entry_data.get("id") or entry_data.get("url")
+            if not entry_url:
+                logger.warning("No entry URL found in remote data")
+                return None
+                
+            # Parse entry ID from URL
+            parsed = urlparse(entry_url)
+            path_parts = parsed.path.strip("/").split("/")
+            if "entries" in path_parts:
+                entry_index = path_parts.index("entries")
+                if entry_index + 1 < len(path_parts):
+                    entry_id = path_parts[entry_index + 1]
+                else:
+                    logger.warning("Could not extract entry ID from URL")
+                    return None
+            else:
+                logger.warning("No 'entries' in URL path")
+                return None
+            
+            # Get or create the author
+            author_data = entry_data.get("author", {})
+            if not author_data:
+                logger.warning("No author data in remote entry")
+                return None
+                
+            author_url = author_data.get("id") or author_data.get("url")
+            if not author_url:
+                logger.warning("No author URL in remote data")
+                return None
+                
+            # Parse author ID from URL
+            author_parsed = urlparse(author_url)
+            author_path_parts = author_parsed.path.strip("/").split("/")
+            if "authors" in author_path_parts:
+                author_index = author_path_parts.index("authors")
+                if author_index + 1 < len(author_path_parts):
+                    author_id = author_path_parts[author_index + 1]
+                else:
+                    logger.warning("Could not extract author ID from URL")
+                    return None
+            else:
+                logger.warning("No 'authors' in author URL path")
+                return None
+            
+            # Get or create the remote author
+            author, _ = Author.objects.get_or_create(
+                id=author_id,
+                defaults={
+                    "url": author_url,
+                    "username": author_data.get("username", ""),
+                    "display_name": author_data.get(
+                        "displayName", author_data.get("display_name", "")
+                    ),
+                    "github_username": author_data.get("github", ""),
+                    "profile_image": author_data.get(
+                        "profileImage", author_data.get("profile_image", "")
+                    ),
+                    "host": author_data.get("host", node.host),
+                    "node": node,
+                    "is_approved": True,
+                    "is_active": True,
+                },
+            )
+            
+            # Create the entry
+            entry, created = Entry.objects.get_or_create(
+                id=entry_id,
+                defaults={
+                    "url": entry_url,
+                    "author": author,
+                    "title": entry_data.get("title", ""),
+                    "content": entry_data.get("content", ""),
+                    "content_type": entry_data.get(
+                        "contentType", "text/plain"
+                    ),
+                    "visibility": entry_data.get("visibility", "PUBLIC"),
+                    "description": entry_data.get("description", ""),
+                    "source": entry_data.get("source", ""),
+                    "origin": entry_data.get("origin", ""),
+                },
+            )
+            
+            if created:
+                logger.info(f"Created new local entry from remote: {entry_id}")
+            else:
+                logger.info(f"Found existing local entry from remote: {entry_id}")
+                
+            return entry
+            
+        except Exception as e:
+            logger.error(f"Error creating local entry from remote data: {e}")
+            return None
 
     def get_queryset(self):
         """
@@ -951,6 +1148,61 @@ class EntryViewSet(viewsets.ModelViewSet):
                     self._send_to_remote_nodes(entry)
         
         return response
+
+    @action(detail=False, methods=["get"], url_path="by-url")
+    def get_entry_by_url(self, request):
+        """
+        Get an entry by its full URL.
+        
+        This endpoint is useful for federation when we receive entry URLs
+        from remote nodes and need to fetch the actual entry data.
+        """
+        entry_url = request.query_params.get('url')
+        if not entry_url:
+            return Response(
+                {"error": "URL parameter is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # First try to find the entry locally by URL
+            try:
+                entry = Entry.objects.get(url=entry_url)
+                serializer = self.get_serializer(entry)
+                return Response(serializer.data)
+            except Entry.DoesNotExist:
+                pass
+            
+            # If not found locally, try to fetch from remote nodes
+            logger.info(f"Entry not found locally for URL {entry_url}, attempting remote fetch")
+            
+            # Parse the URL to extract entry ID
+            from urllib.parse import urlparse
+            parsed = urlparse(entry_url)
+            path_parts = parsed.path.strip("/").split("/")
+            
+            if "entries" in path_parts:
+                entry_index = path_parts.index("entries")
+                if entry_index + 1 < len(path_parts):
+                    entry_id = path_parts[entry_index + 1]
+                    
+                    # Try to fetch the entry using our remote fetching logic
+                    remote_entry = self._fetch_remote_entry(entry_id)
+                    if remote_entry:
+                        serializer = self.get_serializer(remote_entry)
+                        return Response(serializer.data)
+            
+            return Response(
+                {"error": "Entry not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching entry by URL {entry_url}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve entry"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def retrieve_by_fqid(self, request, entry_fqid=None):
         """

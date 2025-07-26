@@ -68,6 +68,7 @@ urlpatterns = [
     path("entries/liked/", EntryViewSet.as_view({'get': 'liked_entries'}), name="entry-liked"),
     path("entries/feed/", EntryViewSet.as_view({'get': 'feed_entries'}), name="entry-feed"),
     path("entries/saved/", EntryViewSet.as_view({'get': 'saved_entries'}), name="entry-saved"),
+    path("entries/by-url/", EntryViewSet.as_view({'get': 'get_entry_by_url'}), name="entry-by-url"),
     path("entries/<uuid:id>/", EntryViewSet.as_view({
         'get': 'retrieve',
         'patch': 'partial_update',

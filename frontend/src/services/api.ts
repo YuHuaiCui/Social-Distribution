@@ -287,9 +287,14 @@ class ApiService {
   }
 
   async getEntry(id: string): Promise<Entry> {
-    // Extract ID from URL if full URL is passed
+    // If this looks like a full URL, use the by-url endpoint
+    if (id.includes("http") || (id.includes("/") && id.split("/").length > 2)) {
+      const encodedUrl = encodeURIComponent(id);
+      return this.request<Entry>(`/api/entries/by-url/?url=${encodedUrl}`);
+    }
+
+    // Extract ID from URL if it's a path
     const entryId = id.includes("/") ? id.split("/").filter(Boolean).pop() : id;
-    // This endpoint needs to be implemented in backend
     return this.request<Entry>(`/api/entries/${entryId}/`);
   }
 
