@@ -61,7 +61,7 @@ class Author(AbstractUser):
 
     # Profile information
     display_name = models.CharField(max_length=255, blank=True)
-    github_username = models.CharField(max_length=255, blank=True, null=True)
+    github_username = models.CharField(max_length=255, blank=True)
     profile_image = models.TextField(
         blank=True, help_text="Profile image as data URL or regular URL"
     )

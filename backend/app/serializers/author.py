@@ -54,7 +54,15 @@ class AuthorSerializer(serializers.ModelSerializer):
             "password_confirm",
             "is_following",
         ]
-        read_only_fields = ["type", "id", "url", "host", "web", "created_at", "updated_at"]
+        read_only_fields = [
+            "type",
+            "id",
+            "url",
+            "host",
+            "web",
+            "created_at",
+            "updated_at",
+        ]
         extra_kwargs = {
             "email": {"required": True},
             "username": {"required": True},
@@ -122,15 +130,15 @@ class AuthorSerializer(serializers.ModelSerializer):
         return Follow.objects.filter(
             follower=request.user, followed=obj, status=Follow.ACCEPTED
         ).exists()
-    
+
     def get_node_id(self, obj):
         """Get the node ID for remote authors"""
         return str(obj.node.id) if obj.node else None
-    
+
     def get_is_remote(self, obj):
         """Check if this is a remote author"""
         return obj.node is not None
-    
+
     def to_representation(self, instance):
         """
         Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
@@ -146,7 +154,7 @@ class AuthorSerializer(serializers.ModelSerializer):
         }
         """
         data = super().to_representation(instance)
-        
+
         # CMPUT 404 compliant format with compatibility fields
         result = {
             # CMPUT 404 required fields
@@ -154,10 +162,13 @@ class AuthorSerializer(serializers.ModelSerializer):
             "id": instance.url,  # Full URL as ID per spec
             "host": f"{settings.SITE_URL}/api/",
             "displayName": instance.display_name,
-            "github": f"https://github.com/{instance.github_username}" if instance.github_username else None,
+            "github": (
+                f"https://github.com/{instance.github_username}"
+                if instance.github_username
+                else ""
+            ),
             "profileImage": instance.profile_image or None,
             "web": f"{settings.SITE_URL}/authors/{instance.id}",
-            
             # Additional fields for frontend compatibility
             "url": instance.url,
             "username": instance.username,
@@ -181,7 +192,7 @@ class AuthorSerializer(serializers.ModelSerializer):
             "updated_at": data.get("updated_at"),
             "is_following": data.get("is_following"),
         }
-        
+
         return result
 
 
@@ -243,21 +254,21 @@ class AuthorListSerializer(serializers.ModelSerializer):
         return Follow.objects.filter(
             follower=request.user, followed=obj, status=Follow.ACCEPTED
         ).exists()
-    
+
     def get_node_id(self, obj):
         """Get the node ID for remote authors"""
         return str(obj.node.id) if obj.node else None
-    
+
     def get_is_remote(self, obj):
         """Check if this is a remote author"""
         return obj.node is not None
-    
+
     def to_representation(self, instance):
         """
         Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
         """
         data = super().to_representation(instance)
-        
+
         # CMPUT 404 compliant format with compatibility fields
         result = {
             # CMPUT 404 required fields
@@ -265,10 +276,13 @@ class AuthorListSerializer(serializers.ModelSerializer):
             "id": instance.url,  # Full URL as ID per spec
             "host": f"{settings.SITE_URL}/api/",
             "displayName": instance.display_name,
-            "github": f"https://github.com/{instance.github_username}" if instance.github_username else None,
+            "github": (
+                f"https://github.com/{instance.github_username}"
+                if instance.github_username
+                else ""
+            ),
             "profileImage": instance.profile_image or None,
             "web": f"{settings.SITE_URL}/authors/{instance.id}",
-            
             # Additional fields for frontend compatibility
             "url": instance.url,
             "username": instance.username,
@@ -287,8 +301,5 @@ class AuthorListSerializer(serializers.ModelSerializer):
             "node_id": data.get("node_id"),
             "is_remote": data.get("is_remote"),
         }
-        
+
         return result
-
-
-
