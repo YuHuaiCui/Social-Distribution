@@ -25,7 +25,11 @@ from django.conf.urls.static import static
 from app.views.follow import FollowViewSet
 from app.views.inbox import InboxViewSet
 from rest_framework.routers import DefaultRouter
-from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
 router = DefaultRouter()
 router.register(r"api/follows", FollowViewSet, basename="follow")
@@ -47,15 +51,20 @@ urlpatterns = [
     # Follow endpoints via router
     path("", include(router.urls)),
     # API Documentation
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/docs/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     # Catch-all pattern for React app - must be last!
     re_path(
         r"^(?!api|admin|accounts|static).*$", ReactAppView.as_view(), name="react-app"
     ),
 ]
 
-# Serve static files in development
+# Serve static and media files in development
 if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
