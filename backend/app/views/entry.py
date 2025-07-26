@@ -219,47 +219,19 @@ class EntryViewSet(viewsets.ModelViewSet):
         FRIENDS: Send only to remote friends
         """
         try:
-            from app.models import Follow, Node, Friendship
-            from requests.auth import HTTPBasicAuth
-            import requests
+            # Use the centralized federation service
+            from app.utils.federation import FederationService
+            results = FederationService.post_entry_to_remote_nodes(entry)
             
-            # Get recipients based on visibility
-            if entry.visibility == Entry.PUBLIC:
-                # For PUBLIC posts, broadcast to ALL connected nodes
-                # This ensures all users on connected nodes can discover the post
-                active_nodes = Node.objects.filter(is_active=True)
-                
-                for node in active_nodes:
-                    self._broadcast_to_node(entry, node)
-                    
-            elif entry.visibility == Entry.FRIENDS:
-                # Get only remote friends
-                friendships = Friendship.objects.filter(
-                    models.Q(author1=entry.author) | models.Q(author2=entry.author)
-                )
-                friend_ids = []
-                for friendship in friendships:
-                    if friendship.author1 == entry.author:
-                        friend_ids.append(friendship.author2.id)
-                    else:
-                        friend_ids.append(friendship.author1.id)
-                
-                remote_followers = Follow.objects.filter(
-                    followed=entry.author,
-                    follower__id__in=friend_ids,
-                    status=Follow.ACCEPTED,
-                    follower__node__isnull=False  # Only remote authors
-                ).select_related('follower', 'follower__node')
-                
-                # Send to remote friends
-                for follow in remote_followers:
-                    remote_author = follow.follower
-                    remote_node = remote_author.node
-                    
-                    if not remote_node or not remote_node.is_active:
-                        continue
-                    
-                    self._send_post_to_author(entry, remote_author, remote_node)
+            # Log the results
+            successful_nodes = [name for name, success in results.items() if success]
+            failed_nodes = [name for name, success in results.items() if not success]
+            
+            if successful_nodes:
+                print(f"Successfully posted entry '{entry.title}' to {len(successful_nodes)} nodes: {', '.join(successful_nodes)}")
+            
+            if failed_nodes:
+                print(f"Failed to post entry '{entry.title}' to {len(failed_nodes)} nodes: {', '.join(failed_nodes)}")
                     
         except Exception as e:
             print(f"Error in _send_to_remote_nodes: {str(e)}")

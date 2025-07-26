@@ -12,34 +12,18 @@ from app.models import Node
 from app.serializers.comment import CommentSerializer
 
 def send_comment_to_remote_inbox(comment):
+    """Send comment to remote inbox using centralized federation service."""
     if not comment.entry or not comment.entry.author or comment.entry.author.is_local:
         return  # Skip local targets
 
-    remote_author = comment.entry.author
-    inbox_url = f"{remote_author.url.rstrip('/')}/inbox/"
-
-    # Get node credentials
-    node = Node.objects.filter(host__icontains=remote_author.host).first()
-    if not node:
-        print(f"[Federation] No node config for {remote_author.host}")
-        return
-
-    payload = {
-        "@context": "https://www.w3.org/ns/activitystreams",
-        "type": "Create",
-        "actor": comment.author.url,
-        "object": CommentSerializer(comment).data,
-    }
-
     try:
-        response = requests.post(
-            inbox_url,
-            json=payload,
-            auth=HTTPBasicAuth(node.username, node.password),
-            headers={"Content-Type": "application/json"},
-            timeout=5,
-        )
-        print(f"[Federation] Comment sent to {inbox_url}: {response.status_code}")
+        from app.utils.federation import FederationService
+        success = FederationService.send_comment(comment)
+        
+        if success:
+            print(f"[Federation] Comment sent successfully to {comment.entry.author.username}")
+        else:
+            print(f"[Federation] Failed to send comment to {comment.entry.author.username}")
     except Exception as e:
         print(f"[Federation] Error sending comment: {e}")
 

@@ -9,6 +9,7 @@ from app.views.comment import CommentListCreateView, CommentDetailView
 from app.views.github import GitHubValidationView, GitHubActivityView  
 from app.views.inbox import InboxViewSet, InboxReceiveView
 from app.views.node import GetNodesView, UpdateNodeView, AddNodeView, DeleteNodeView, RemoteFolloweeView, RemoteAuthorsView
+from app.views import federation as federation_views
 
 # namespacing app
 app_name = "social-distribution"
@@ -170,4 +171,11 @@ urlpatterns = [
     
     # General inbox endpoint for receiving PUBLIC broadcasts
     path('federation/inbox/', InboxReceiveView.as_view(), name='general-inbox-receive'),
+    
+    # Federation API endpoints
+    path('api/federation/sync-all/', federation_views.sync_all_nodes, name='federation-sync-all'),
+    path('api/federation/sync-node/', federation_views.sync_node, name='federation-sync-node'),
+    path('api/federation/post-local/', federation_views.post_local_entries, name='federation-post-local'),
+    path('api/federation/status/', federation_views.federation_status, name='federation-status'),
+    path('api/federation/test-connection/', federation_views.test_node_connection, name='federation-test-connection'),
 ]

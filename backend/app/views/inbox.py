@@ -142,29 +142,23 @@ class InboxReceiveView(APIView):
                 print("DEBUG: No node object available")
                 return Response({"error": "Node authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
             
-            # Process the incoming object
+            # Process the incoming object using the centralized federation service
             data = request.data
             object_type = data.get('type', '')
             
             print(f"DEBUG: Processing object type: {object_type}")
             print(f"DEBUG: Data keys: {list(data.keys())}")
             
-            if object_type == 'Follow':
-                return self._handle_follow_request(author, data, node)
-            elif object_type == 'Like':
-                return self._handle_like(author, data, node)
-            elif object_type == 'Comment':
-                return self._handle_comment(author, data, node)
-            elif object_type == 'Post' or object_type == 'Create':
-                return self._handle_post(author, data, node)
-            elif data.get('content_type') == 'entry':
-                # Handle our custom format for posts
-                return self._handle_post(author, data, node)
+            # Use the centralized federation service to process the inbox item
+            from app.utils.federation import FederationService
+            success = FederationService.process_inbox_item(author, data, node)
+            
+            if success:
+                print(f"DEBUG: Successfully processed inbox item")
+                return Response({"message": "Inbox item processed"}, status=status.HTTP_200_OK)
             else:
-                print(f"DEBUG: Unsupported object type: {object_type}")
-                print(f"DEBUG: Data keys: {list(data.keys())}")
-                return Response({"error": f"Unsupported object type: {object_type}"}, 
-                              status=status.HTTP_400_BAD_REQUEST)
+                print(f"DEBUG: Failed to process inbox item")
+                return Response({"error": "Failed to process inbox item"}, status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:
             import traceback

@@ -363,29 +363,40 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 follower=current_user, followed=author_to_follow, status=Follow.PENDING
             )
 
-            # Create inbox item for the followed user
-            from app.models.inbox import Inbox
+            # If following a remote author, send follow request using centralized service
+            if not author_to_follow.is_local and author_to_follow.node:
+                from app.utils.federation import FederationService
+                success = FederationService.send_follow_request(current_user, author_to_follow)
+                if not success:
+                    print(f"Warning: Failed to send follow request to {author_to_follow.username}")
+                    # Still create the local follow record, but mark it as pending
+                    follow.status = Follow.PENDING
+                    follow.save()
 
-            Inbox.objects.create(
-                recipient=follow.followed,
-                item_type=Inbox.FOLLOW,
-                follow=follow,
-                raw_data={
-                    "type": "Follow",
-                    "actor": {
-                        "id": follow.follower.url,
-                        "display_name": follow.follower.display_name,
-                        "username": follow.follower.username,
-                        "profile_image": (
-                            follow.follower.profile_image
-                            if follow.follower.profile_image
-                            else None
-                        ),
+            # Create inbox item for the followed user (for local authors)
+            if author_to_follow.is_local:
+                from app.models.inbox import Inbox
+
+                Inbox.objects.create(
+                    recipient=follow.followed,
+                    item_type=Inbox.FOLLOW,
+                    follow=follow,
+                    raw_data={
+                        "type": "Follow",
+                        "actor": {
+                            "id": follow.follower.url,
+                            "display_name": follow.follower.display_name,
+                            "username": follow.follower.username,
+                            "profile_image": (
+                                follow.follower.profile_image
+                                if follow.follower.profile_image
+                                else None
+                            ),
+                        },
+                        "object": follow.followed.url,
+                        "status": follow.status,
                     },
-                    "object": follow.followed.url,
-                    "status": follow.status,
-                },
-            )
+                )
 
             serializer = FollowSerializer(follow)
             return Response(
