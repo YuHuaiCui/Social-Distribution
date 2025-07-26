@@ -155,12 +155,26 @@ class AuthorSerializer(serializers.ModelSerializer):
         """
         data = super().to_representation(instance)
 
+        # For remote authors, use their original host and web URLs
+        # For local authors, use the local site URL
+        if instance.node is not None:  # Remote author
+            # Use the stored host and web URLs from the remote node
+            host_url = instance.host if instance.host else f"{instance.node.host}/api/"
+            web_url = (
+                instance.web
+                if instance.web
+                else f"{instance.node.host.rstrip('/')}/authors/{instance.id}"
+            )
+        else:  # Local author
+            host_url = f"{settings.SITE_URL}/api/"
+            web_url = f"{settings.SITE_URL}/authors/{instance.id}"
+
         # CMPUT 404 compliant format with compatibility fields
         result = {
             # CMPUT 404 required fields
             "type": "author",
             "id": instance.url,  # Full URL as ID per spec
-            "host": f"{settings.SITE_URL}/api/",
+            "host": host_url,
             "displayName": instance.display_name,
             "github": (
                 f"https://github.com/{instance.github_username}"
@@ -168,7 +182,7 @@ class AuthorSerializer(serializers.ModelSerializer):
                 else ""
             ),
             "profileImage": instance.profile_image or None,
-            "web": f"{settings.SITE_URL}/authors/{instance.id}",
+            "web": web_url,
             # Additional fields for frontend compatibility
             "url": instance.url,
             "username": instance.username,
