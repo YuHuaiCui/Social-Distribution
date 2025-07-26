@@ -70,9 +70,8 @@ class Like(models.Model):
         """
         Save the like and auto-generate URL if not provided.
         
-        For likes by local authors, automatically generates the API URL based on
-        whether the like is for an entry or a comment. The URL structure follows
-        the hierarchical pattern of the social distribution API.
+        For likes by local authors, automatically generates the API URL.
+        The URL structure follows the pattern: /api/authors/{author_id}/liked/{like_id}
         
         Args:
             *args: Variable length argument list
@@ -80,12 +79,8 @@ class Like(models.Model):
         """
         if not self.url:
             if self.author.is_local:
-                if self.entry:
-                    # URL pattern for likes on entries
-                    self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/entries/{self.entry.id}/likes/{self.id}"
-                elif self.comment:
-                    # URL pattern for likes on comments
-                    self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/comments/{self.comment.id}/likes/{self.id}"
+                # URL pattern for likes: /api/authors/{author_id}/liked/{like_id}
+                self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{self.id}"
         super().save(*args, **kwargs)
 
     def __str__(self):

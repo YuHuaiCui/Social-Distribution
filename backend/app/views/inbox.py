@@ -180,7 +180,8 @@ class InboxReceiveView(APIView):
         """
         Handle incoming follow request from a remote node
         """
-        actor_data = data.get('actor', {})
+        # Handle both 'actor' and 'author' fields for compatibility
+        actor_data = data.get('actor', data.get('author', {}))
         actor_url = actor_data.get('id') if isinstance(actor_data, dict) else actor_data
         
         if not actor_url:
@@ -275,8 +276,8 @@ class InboxReceiveView(APIView):
         print(f"DEBUG: Remote node: {remote_node.name if remote_node else 'None'}")
         
         try:
-            # Extract like data
-            actor_data = data.get('actor', {})
+            # Extract like data - handle both 'actor' and 'author' fields for compatibility
+            actor_data = data.get('actor', data.get('author', {}))
             object_data = data.get('object', {})
             
             print(f"DEBUG: Actor data: {actor_data}")
@@ -289,41 +290,165 @@ class InboxReceiveView(APIView):
             # Determine what was liked (entry or comment)
             object_url = object_data.get('id') if isinstance(object_data, dict) else object_data
             print(f"DEBUG: Object URL: {object_url}")
+            print(f"DEBUG: Object data type: {type(object_data)}")
+            print(f"DEBUG: Object data: {object_data}")
             
-            # Try to find the liked object
+            # Try to find the liked object with more flexible matching
             from app.models import Entry, Comment
             
-            try:
-                # First try to find as entry
-                liked_object = Entry.objects.get(url=object_url)
-                object_type = 'entry'
-                print(f"DEBUG: Found liked entry: {liked_object.title}")
-            except Entry.DoesNotExist:
-                try:
-                    # Then try to find as comment
-                    liked_object = Comment.objects.get(url=object_url)
-                    object_type = 'comment'
-                    print(f"DEBUG: Found liked comment: {liked_object.content[:50]}...")
-                except Comment.DoesNotExist:
-                    # If object doesn't exist, we can't create the like
-                    print(f"DEBUG: Liked object not found: {object_url}")
-                    return Response({"message": "Liked object not found"}, status=status.HTTP_404_NOT_FOUND)
+            liked_object = None
+            object_type = None
             
-            # Create the like
+            # First try to find as entry with flexible URL matching
+            try:
+                if isinstance(object_url, str):
+                    # Try exact match first
+                    try:
+                        liked_object = Entry.objects.get(url=object_url)
+                        object_type = 'entry'
+                        print(f"DEBUG: Found liked entry by exact URL: {liked_object.title}")
+                    except Entry.DoesNotExist:
+                        # Try partial match by extracting ID from URL
+                        from urllib.parse import urlparse
+                        parsed_url = urlparse(object_url)
+                        path_parts = parsed_url.path.strip('/').split('/')
+                        print(f"DEBUG: Parsed URL path parts: {path_parts}")
+                        
+                        # Look for entry ID in the path
+                        for part in reversed(path_parts):
+                            if part and part != 'entries':
+                                print(f"DEBUG: Trying to find entry with ID: {part}")
+                                try:
+                                    liked_object = Entry.objects.get(id=part)
+                                    object_type = 'entry'
+                                    print(f"DEBUG: Found liked entry by ID from URL: {liked_object.title}")
+                                    break
+                                except (Entry.DoesNotExist, ValueError):
+                                    print(f"DEBUG: No entry found with ID: {part}")
+                                    continue
+                        
+                        if not liked_object:
+                            # Try matching by URL containing the entry ID
+                            for part in reversed(path_parts):
+                                if part and part != 'entries':
+                                    print(f"DEBUG: Trying to find entry with URL containing: {part}")
+                                    try:
+                                        liked_object = Entry.objects.get(url__icontains=part)
+                                        object_type = 'entry'
+                                        print(f"DEBUG: Found liked entry by URL contains: {liked_object.title}")
+                                        break
+                                    except Entry.DoesNotExist:
+                                        print(f"DEBUG: No entry found with URL containing: {part}")
+                                        continue
+                else:
+                    # If object_url is not a string, try to find by ID directly
+                    try:
+                        liked_object = Entry.objects.get(id=object_url)
+                        object_type = 'entry'
+                        print(f"DEBUG: Found liked entry by direct ID: {liked_object.title}")
+                    except (Entry.DoesNotExist, ValueError):
+                        pass
+                        
+            except Exception as e:
+                print(f"DEBUG: Error finding entry: {e}")
+            
+            # If not found as entry, try as comment
+            if not liked_object:
+                try:
+                    if isinstance(object_url, str):
+                        # Try exact match first
+                        try:
+                            liked_object = Comment.objects.get(url=object_url)
+                            object_type = 'comment'
+                            print(f"DEBUG: Found liked comment by exact URL: {liked_object.content[:50]}...")
+                        except Comment.DoesNotExist:
+                            # Try partial match by extracting ID from URL
+                            from urllib.parse import urlparse
+                            parsed_url = urlparse(object_url)
+                            path_parts = parsed_url.path.strip('/').split('/')
+                            print(f"DEBUG: Parsed comment URL path parts: {path_parts}")
+                            
+                            # Look for comment ID in the path
+                            for part in reversed(path_parts):
+                                if part and part != 'comments':
+                                    print(f"DEBUG: Trying to find comment with ID: {part}")
+                                    try:
+                                        liked_object = Comment.objects.get(id=part)
+                                        object_type = 'comment'
+                                        print(f"DEBUG: Found liked comment by ID from URL: {liked_object.content[:50]}...")
+                                        break
+                                    except (Comment.DoesNotExist, ValueError):
+                                        print(f"DEBUG: No comment found with ID: {part}")
+                                        continue
+                    else:
+                        # If object_url is not a string, try to find by ID directly
+                        try:
+                            liked_object = Comment.objects.get(id=object_url)
+                            object_type = 'comment'
+                            print(f"DEBUG: Found liked comment by direct ID: {liked_object.content[:50]}...")
+                        except (Comment.DoesNotExist, ValueError):
+                            pass
+                            
+                except Exception as e:
+                    print(f"DEBUG: Error finding comment: {e}")
+            
+            if not liked_object:
+                print(f"DEBUG: Liked object not found: {object_url}")
+                return Response({"message": "Liked object not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Create the like with proper URL generation
             from app.models import Like
-            like, created = Like.objects.get_or_create(
-                author=remote_author,
-                entry=liked_object if object_type == 'entry' else None,
-                comment=liked_object if object_type == 'comment' else None,
-                defaults={'url': f"{remote_author.host}likes/{remote_author.id}/{liked_object.id}"}
-            )
-            print(f"DEBUG: Like created: {like.id} (created: {created})")
+            from django.conf import settings
+            
+            # Generate proper like URL - we'll create the like first, then update the URL
+            # The URL should be /api/authors/{author_id}/liked/{like_id}, not /api/authors/{author_id}/liked/{entry_id}
+            # So we'll create a temporary URL first, then update it after creation
+            temp_url = f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"
+            
+            print(f"DEBUG: About to create like with:")
+            print(f"DEBUG: - author: {remote_author.username} (URL: {remote_author.url})")
+            print(f"DEBUG: - entry: {liked_object.title if object_type == 'entry' else 'None'}")
+            print(f"DEBUG: - comment: {liked_object.content[:50] if object_type == 'comment' else 'None'}")
+            print(f"DEBUG: - temp_url: {temp_url}")
+            
+            # Check if like already exists
+            existing_like = None
+            if object_type == 'entry':
+                existing_like = Like.objects.filter(author=remote_author, entry=liked_object).first()
+            elif object_type == 'comment':
+                existing_like = Like.objects.filter(author=remote_author, comment=liked_object).first()
+            
+            if existing_like:
+                print(f"DEBUG: Like already exists: {existing_like.id}")
+                like = existing_like
+                created = False
+            else:
+                print(f"DEBUG: Creating new like...")
+                like, created = Like.objects.get_or_create(
+                    author=remote_author,
+                    entry=liked_object if object_type == 'entry' else None,
+                    comment=liked_object if object_type == 'comment' else None,
+                    defaults={'url': temp_url}
+                )
+                
+                # Update URL with the actual like ID if it was created
+                if created:
+                    like.url = f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/{like.id}"
+                    like.save(update_fields=['url'])
+            
+            print(f"DEBUG: Like result: {like.id} (created: {created})")
+            print(f"DEBUG: Like URL: {like.url}")
             
             # Create inbox item
+            print(f"DEBUG: Creating inbox item for recipient: {recipient.username}")
+            print(f"DEBUG: - item_type: {Inbox.LIKE}")
+            print(f"DEBUG: - like: {like.id}")
+            print(f"DEBUG: - raw_data keys: {list(data.keys())}")
+            
             inbox_item = Inbox.objects.create(
                 recipient=recipient,
                 item_type=Inbox.LIKE,
-                like=like,
+                like=like.url,  # Use the like's URL since the foreign key uses to_field="url"
                 raw_data=data
             )
             print(f"DEBUG: Inbox item created: {inbox_item.id}")
@@ -332,6 +457,8 @@ class InboxReceiveView(APIView):
             
         except Exception as e:
             print(f"DEBUG: Error processing like: {str(e)}")
+            import traceback
+            print(f"DEBUG: Full traceback: {traceback.format_exc()}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _handle_comment(self, recipient, data, remote_node):
@@ -339,8 +466,8 @@ class InboxReceiveView(APIView):
         Handle incoming comment from a remote node
         """
         try:
-            # Extract comment data
-            actor_data = data.get('actor', {})
+            # Extract comment data - handle both 'actor' and 'author' fields for compatibility
+            actor_data = data.get('actor', data.get('author', {}))
             object_data = data.get('object', {})
             comment_data = data.get('comment', {})
             
@@ -378,7 +505,7 @@ class InboxReceiveView(APIView):
             Inbox.objects.create(
                 recipient=recipient,
                 item_type=Inbox.COMMENT,
-                comment=comment,
+                comment=comment.url,  # Use the comment's URL since the foreign key uses to_field="url"
                 raw_data=data
             )
             
@@ -399,7 +526,8 @@ class InboxReceiveView(APIView):
                 post_data = data
             else:
                 # ActivityPub format (wrapped in Create activity)
-                actor_data = data.get('actor', {})
+                # Handle both 'actor' and 'author' fields for compatibility
+                actor_data = data.get('actor', data.get('author', {}))
                 post_data = data.get('object', {})
             
             # Get or create the remote author
@@ -461,7 +589,7 @@ class InboxReceiveView(APIView):
                 Inbox.objects.create(
                     recipient=recipient,
                     item_type=Inbox.ENTRY,
-                    entry=entry,
+                    entry=entry.url,  # Use the entry's URL since the foreign key uses to_field="url"
                     raw_data=data
                 )
                 print(f"DEBUG: Created inbox item for {entry.visibility} post from {remote_author.username}")
