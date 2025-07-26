@@ -149,11 +149,19 @@ class ApiService {
   }
 
   async getAuthor(id: string): Promise<Author> {
-    // Extract ID from URL if full URL is passed
-    const authorId = id.includes("/")
-      ? id.split("/").filter(Boolean).pop()
-      : id;
-    return this.request<Author>(`/api/authors/${authorId}/`);
+    // Check if this looks like a remote author URL
+    if (id.includes("http") || (id.includes("/") && id.split("/").length > 2)) {
+      // This is likely a remote author URL, use the by-url endpoint
+      const encodedUrl = encodeURIComponent(id);
+      return this.request<Author>(`/api/authors/by-url/${encodedUrl}/`);
+    } else {
+      // This is a local author ID, use the standard endpoint
+      // Extract ID from URL if full URL is passed
+      const authorId = id.includes("/")
+        ? id.split("/").filter(Boolean).pop()
+        : id;
+      return this.request<Author>(`/api/authors/${authorId}/`);
+    }
   }
 
   async getCurrentAuthor(): Promise<Author> {

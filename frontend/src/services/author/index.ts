@@ -82,9 +82,8 @@ export class AuthorService extends BaseApiService {
     const formData = new FormData();
     formData.append("profile_image_file", file);
 
-    return this.requestFormData<Author>("/api/authors/me/", {
+    return this.requestFormData<Author>("/api/authors/me/", formData, {
       method: "PATCH",
-      body: formData,
     });
   }
 
