@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.github",
-    "csp",
+    "csp"
 ]
 
 MIDDLEWARE = [
@@ -97,7 +97,7 @@ CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://project-black-ej-53285e19ae0a.herokuapp.com",
+    "https://project-black-ej-53285e19ae0a.herokuapp.com"
 ]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
 CSRF_COOKIE_NAME = "csrftoken"
@@ -200,9 +200,7 @@ CORS_ALLOWED_HEADERS = [
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-# Static files
-STATIC_URL = "/static/"
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATIC_URL = "static/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -257,31 +255,17 @@ os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # Content Security Policy Configuration
 CONTENT_SECURITY_POLICY_REPORT_ONLY = {
-    "DIRECTIVES": {
-        "base-uri": ["'self'"],
-        "connect-src": ["'self'", "https://api.github.com", "https://github.com"],
-        "default-src": ["'self'"],
-        "font-src": [
-            "'self'",
-            "https://fonts.gstatic.com",
-            "https://github.githubassets.com",
-        ],
-        "form-action": ["'self'"],
-        "frame-src": ["'self'", "https://github.com"],
-        "img-src": ["'self'", "data:", "https:"],
-        "media-src": ["'self'"],
-        "object-src": ["'none'"],
-        "script-src": [
-            "'self'",
-            "https://github.githubassets.com",
-            "https://cdn.jsdelivr.net",
-            "nonce",
-        ],
-        "style-src": [
-            "'self'",
-            "'unsafe-inline'",
-            "https://github.githubassets.com",
-            "https://fonts.googleapis.com",
-        ],
+    'DIRECTIVES': {
+        'base-uri': ["'self'"],
+        'connect-src': ["'self'", 'https://api.github.com', 'https://github.com'],
+        'default-src': ["'self'"],
+        'font-src': ["'self'", 'https://fonts.gstatic.com', 'https://github.githubassets.com'],
+        'form-action': ["'self'"],
+        'frame-src': ["'self'", 'https://github.com'],
+        'img-src': ["'self'", 'data:', 'https:'],
+        'media-src': ["'self'"],
+        'object-src': ["'none'"],
+        'script-src': ["'self'", 'https://github.githubassets.com', 'https://cdn.jsdelivr.net', 'nonce'],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://github.githubassets.com', 'https://fonts.googleapis.com']
     }
 }
