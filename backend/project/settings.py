@@ -38,6 +38,7 @@ ALLOWED_HOSTS = [
     "192.168.1.72",  # pc
     "192.168.1.75",  # laptop
     "172.24.134.109",  # current IP address
+    "172.19.110.73",  # friend's IP address
 ]
 
 
@@ -108,6 +109,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
     "http://172.24.134.109:5173",  # current IP address
+    "http://172.19.110.73:5173",  # friend's IP address
 ]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
 CSRF_COOKIE_NAME = "csrftoken"
@@ -196,6 +198,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
     "http://172.24.134.109:5173",  # current IP address
+    "http://172.19.110.73:5173",  # friend's IP address
 ]
 
 CORS_ALLOW_CREDENTIALS = True
