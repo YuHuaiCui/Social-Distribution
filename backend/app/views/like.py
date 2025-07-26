@@ -150,6 +150,7 @@ class EntryLikeView(APIView):
         print(f"[DEBUG] Entry author: {like.entry.author.username} (local: {like.entry.author.is_local})")
         print(f"[DEBUG] About to call RemoteActivitySender.send_like")
         
+        # Send like to remote nodes (but don't fail if this doesn't work)
         try:
             RemoteActivitySender.send_like(like)
             print(f"[DEBUG] RemoteActivitySender.send_like completed successfully")
@@ -158,6 +159,9 @@ class EntryLikeView(APIView):
             print(f"[DEBUG] Exception type: {type(e)}")
             import traceback
             print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+            # Don't fail the like operation if federation fails
+            # The like was still created successfully locally
+            print(f"[DEBUG] Continuing with like creation despite federation error")
         
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -389,7 +393,15 @@ class CommentLikeView(APIView):
         # Create new like record
         like = Like.objects.create(author=author, comment=comment)
         serializer = LikeSerializer(like)
-        RemoteActivitySender.send_like(like)
+        
+        # Send like to remote nodes (but don't fail if this doesn't work)
+        try:
+            RemoteActivitySender.send_like(like)
+        except Exception as e:
+            print(f"[DEBUG] Error in RemoteActivitySender.send_like for comment: {e}")
+            # Don't fail the like operation if federation fails
+            # The like was still created successfully locally
+        
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, comment_id=None, **kwargs):

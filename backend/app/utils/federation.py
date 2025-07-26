@@ -667,7 +667,12 @@ class FederationService:
             True if processed successfully, False otherwise
         """
         try:
+            logger.info(f"Processing inbox item for recipient {recipient.username}")
+            logger.info(f"Data keys: {list(data.keys())}")
+            logger.info(f"Remote node: {remote_node.name}")
+            
             item_type = data.get('type', '').lower()
+            logger.info(f"Item type: {item_type}")
             
             if item_type == 'like':
                 return FederationService._process_like(recipient, data, remote_node)
@@ -685,51 +690,86 @@ class FederationService:
                 
         except Exception as e:
             logger.error(f"Failed to process inbox item: {e}")
+            logger.error(f"Exception type: {type(e)}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             return False
     
     @staticmethod
     def _process_like(recipient: Author, data: Dict[str, Any], remote_node: Node) -> bool:
         """Process an incoming like."""
         try:
+            logger.info(f"Processing like for recipient: {recipient.username}")
+            
             # Extract like data - handle both 'actor' and 'author' fields for compatibility
             actor_data = data.get('actor', data.get('author', {}))
             object_data = data.get('object', {})
             
+            logger.info(f"Actor data keys: {list(actor_data.keys() if isinstance(actor_data, dict) else 'Not a dict')}")
+            logger.info(f"Object data: {object_data}")
+            
             # Get or create the remote author
-            remote_author, _ = FederationService._get_or_create_remote_author(actor_data, remote_node)
+            try:
+                remote_author, _ = FederationService._get_or_create_remote_author(actor_data, remote_node)
+                logger.info(f"Remote author: {remote_author.username}")
+            except Exception as e:
+                logger.error(f"Failed to get/create remote author: {e}")
+                return False
             
             # Find the liked object
             object_url = object_data.get('id') if isinstance(object_data, dict) else object_data
-            liked_object = FederationService._find_liked_object(object_url)
+            logger.info(f"Looking for object with URL: {object_url}")
             
-            if not liked_object:
-                logger.warning(f"Liked object not found: {object_url}")
+            try:
+                liked_object = FederationService._find_liked_object(object_url)
+                if not liked_object:
+                    logger.warning(f"Liked object not found: {object_url}")
+                    return False
+                logger.info(f"Found liked object: {liked_object}")
+            except Exception as e:
+                logger.error(f"Error finding liked object: {e}")
                 return False
             
-            # Create the like
-            like, created = Like.objects.get_or_create(
-                author=remote_author,
-                entry=liked_object if isinstance(liked_object, Entry) else None,
-                comment=liked_object if isinstance(liked_object, Comment) else None,
-                defaults={'url': f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"}
-            )
+            # Create the like with proper error handling
+            try:
+                like, created = Like.objects.get_or_create(
+                    author=remote_author,
+                    entry=liked_object if isinstance(liked_object, Entry) else None,
+                    comment=liked_object if isinstance(liked_object, Comment) else None,
+                    defaults={'url': f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"}
+                )
+                
+                if created:
+                    like.url = f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/{like.id}"
+                    like.save(update_fields=['url'])
+                    logger.info(f"Created new like: {like.id}")
+                else:
+                    logger.info(f"Like already exists: {like.id}")
+            except Exception as e:
+                logger.error(f"Error creating like: {e}")
+                return False
             
-            if created:
-                like.url = f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/{like.id}"
-                like.save(update_fields=['url'])
-            
-            # Create inbox item
-            Inbox.objects.create(
-                recipient=recipient,
-                item_type=Inbox.LIKE,
-                like=like.url,
-                raw_data=data
-            )
+            # Create inbox item with proper error handling
+            try:
+                Inbox.objects.create(
+                    recipient=recipient,
+                    item_type=Inbox.LIKE,
+                    like=like.url,
+                    raw_data=data
+                )
+                logger.info(f"Created inbox item for like")
+            except Exception as e:
+                logger.error(f"Error creating inbox item: {e}")
+                # Don't fail the entire operation if inbox item creation fails
+                # The like was still created successfully
             
             return True
             
         except Exception as e:
             logger.error(f"Failed to process like: {e}")
+            logger.error(f"Exception type: {type(e)}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             return False
     
     @staticmethod
@@ -905,43 +945,62 @@ class FederationService:
     @staticmethod
     def _get_or_create_remote_author(actor_data: Dict[str, Any], remote_node: Node) -> Tuple[Author, bool]:
         """Get or create a remote author from actor data."""
-        if isinstance(actor_data, str):
-            # If actor_data is just a URL, we need to fetch the full data
-            try:
-                client = RemoteNodeClient(remote_node)
-                response = client.get(actor_data)
-                actor_data = response.json()
-            except Exception as e:
-                raise Exception(f"Failed to fetch actor data: {str(e)}")
-        
-        actor_url = actor_data.get('id')
-        if not actor_url:
-            raise Exception("Actor URL not found in data")
-        
-        # Try to get existing remote author
         try:
-            return Author.objects.get(url=actor_url), False
-        except Author.DoesNotExist:
-            pass
-        
-        # Create new remote author
-        remote_author = Author.objects.create(
-            url=actor_url,
-            username=actor_data.get('username', ''),
-            display_name=actor_data.get('displayName', ''),
-            github_username=actor_data.get('github', ''),
-            profile_image=actor_data.get('profileImage', ''),
-            bio=actor_data.get('bio', ''),
-            location=actor_data.get('location', ''),
-            website=actor_data.get('website', ''),
-            host=actor_data.get('host', ''),
-            web=actor_data.get('page', ''),
-            node=remote_node,
-            is_approved=True,
-            is_active=True
-        )
-        
-        return remote_author, True
+            logger.info(f"Getting/creating remote author from actor data")
+            
+            if isinstance(actor_data, str):
+                # If actor_data is just a URL, we need to fetch the full data
+                try:
+                    client = RemoteNodeClient(remote_node)
+                    response = client.get(actor_data)
+                    actor_data = response.json()
+                    logger.info(f"Fetched actor data from URL: {actor_data}")
+                except Exception as e:
+                    logger.error(f"Failed to fetch actor data from URL {actor_data}: {e}")
+                    raise Exception(f"Failed to fetch actor data: {str(e)}")
+            
+            actor_url = actor_data.get('id')
+            if not actor_url:
+                logger.error("Actor URL not found in data")
+                raise Exception("Actor URL not found in data")
+            
+            logger.info(f"Looking for author with URL: {actor_url}")
+            
+            # Try to get existing remote author
+            try:
+                existing_author = Author.objects.get(url=actor_url)
+                logger.info(f"Found existing remote author: {existing_author.username}")
+                return existing_author, False
+            except Author.DoesNotExist:
+                logger.info(f"No existing author found, creating new one")
+                pass
+            
+            # Create new remote author with proper error handling
+            try:
+                remote_author = Author.objects.create(
+                    url=actor_url,
+                    username=actor_data.get('username', ''),
+                    display_name=actor_data.get('displayName', ''),
+                    github_username=actor_data.get('github', ''),
+                    profile_image=actor_data.get('profileImage', ''),
+                    bio=actor_data.get('bio', ''),
+                    location=actor_data.get('location', ''),
+                    website=actor_data.get('website', ''),
+                    host=actor_data.get('host', ''),
+                    web=actor_data.get('page', ''),
+                    node=remote_node,
+                    is_approved=True,
+                    is_active=True
+                )
+                logger.info(f"Created new remote author: {remote_author.username}")
+                return remote_author, True
+            except Exception as e:
+                logger.error(f"Error creating remote author: {e}")
+                raise Exception(f"Failed to create remote author: {str(e)}")
+                
+        except Exception as e:
+            logger.error(f"Error in _get_or_create_remote_author: {e}")
+            raise e
     
     @staticmethod
     def _find_liked_object(object_url: str) -> Optional[Entry | Comment]:

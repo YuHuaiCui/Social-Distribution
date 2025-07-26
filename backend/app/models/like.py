@@ -77,11 +77,15 @@ class Like(models.Model):
             *args: Variable length argument list
             **kwargs: Arbitrary keyword arguments
         """
-        if not self.url:
-            if self.author.is_local:
-                # URL pattern for likes: /api/authors/{author_id}/liked/{like_id}
-                self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{self.id}"
+        # First save to get the ID
         super().save(*args, **kwargs)
+        
+        # Then update the URL if not provided
+        if not self.url and self.author.is_local:
+            # URL pattern for likes: /api/authors/{author_id}/liked/{like_id}
+            self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{self.id}"
+            # Save again to update the URL
+            super().save(update_fields=['url'])
 
     def __str__(self):
         """
