@@ -81,7 +81,7 @@ def deliver_to_inboxes(entry, recipients):
             Inbox(
                 recipient=recipient,
                 item_type=Inbox.ENTRY,
-                entry=entry.url,  # Use the entry's URL since the foreign key uses to_field="url"
+                entry=entry,  # Pass the Entry instance; Django handles the to_field="url" automatically
                 raw_data={
                     "type": "entry",
                     "id": entry.url,

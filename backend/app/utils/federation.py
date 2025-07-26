@@ -825,7 +825,7 @@ class FederationService:
                 Inbox.objects.create(
                     recipient=recipient,
                     item_type=Inbox.LIKE,
-                    like=like.url,
+                    like=like,  # Pass the Like instance; Django handles the to_field="url" automatically
                     raw_data=data,
                 )
                 logger.info(f"Created inbox item for like")
@@ -887,7 +887,7 @@ class FederationService:
             Inbox.objects.create(
                 recipient=recipient,
                 item_type=Inbox.COMMENT,
-                comment=comment.url,
+                comment=comment,  # Pass the Comment instance; Django handles the to_field="url" automatically
                 raw_data=data,
             )
 
@@ -935,7 +935,7 @@ class FederationService:
             Inbox.objects.create(
                 recipient=recipient,
                 item_type=Inbox.ENTRY,
-                entry=entry.url,
+                entry=entry,  # Pass the Entry instance; Django handles the to_field="url" automatically
                 raw_data=data,
             )
 
