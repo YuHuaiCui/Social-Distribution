@@ -75,11 +75,11 @@ class RemoteNodeClient:
             }
         )
 
-    def get(self, path, **kwargs):
+    def get(self, path, timeout=30, **kwargs):
         """Make GET request to remote node"""
         url = urljoin(self.base_url, path.lstrip("/"))
         try:
-            response = self.session.get(url, timeout=30, **kwargs)
+            response = self.session.get(url, timeout=timeout, **kwargs)
             response.raise_for_status()
             return response
         except requests.RequestException as e:

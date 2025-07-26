@@ -110,59 +110,86 @@ class EntrySerializer(serializers.ModelSerializer):
             "visibility": "PUBLIC"
         }
         """
-        data = super().to_representation(instance)
-        
-        # Get counts for nested objects
-        comments_count = instance.comments.count()
-        likes_count = instance.likes.count()
-        
-        # CMPUT 404 compliant format with compatibility fields
-        result = {
-            # CMPUT 404 required fields
-            "type": "entry",
-            "title": instance.title,
-            "id": instance.url,  # Full URL as ID per spec
-            "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
-            "description": instance.description or "",
-            "contentType": instance.content_type,
-            "content": instance.content,
-            "author": AuthorSerializer(instance.author, context=self.context).data,
-            "comments": {
-                "type": "comments",
-                "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
-                "id": f"{instance.url}/comments",
-                "page_number": 1,
-                "size": 5,
-                "count": comments_count,
-                "src": []
-            },
-            "likes": {
-                "type": "likes",
-                "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
-                "id": f"{instance.url}/likes",
-                "page_number": 1,
-                "size": 50,
-                "count": likes_count,
-                "src": []
-            },
-            "published": instance.created_at.isoformat() if instance.created_at else None,
-            "visibility": instance.visibility,
+        try:
+            data = super().to_representation(instance)
             
-            # Additional fields for frontend compatibility  
-            "url": instance.url,
-            "content_type": instance.content_type,  # Snake case version
-            "source": instance.source,
-            "origin": instance.origin,
-            "created_at": data.get("created_at"),
-            "updated_at": data.get("updated_at"),
-            "comments_count": comments_count,
-            "likes_count": likes_count,
-            "image": data.get("image"),
-            "is_liked": data.get("is_liked"),
-            "is_saved": data.get("is_saved"),
-        }
-        
-        return result
+            # Get counts for nested objects with error handling
+            try:
+                comments_count = instance.comments.count()
+            except Exception:
+                comments_count = 0
+                
+            try:
+                likes_count = instance.likes.count()
+            except Exception:
+                likes_count = 0
+            
+            # CMPUT 404 compliant format with compatibility fields
+            result = {
+                # CMPUT 404 required fields
+                "type": "entry",
+                "title": instance.title,
+                "id": instance.url,  # Full URL as ID per spec
+                "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+                "description": instance.description or "",
+                "contentType": instance.content_type,
+                "content": instance.content,
+                "author": AuthorSerializer(instance.author, context=self.context).data,
+                "comments": {
+                    "type": "comments",
+                    "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+                    "id": f"{instance.url}/comments",
+                    "page_number": 1,
+                    "size": 5,
+                    "count": comments_count,
+                    "src": []
+                },
+                "likes": {
+                    "type": "likes",
+                    "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+                    "id": f"{instance.url}/likes",
+                    "page_number": 1,
+                    "size": 50,
+                    "count": likes_count,
+                    "src": []
+                },
+                "published": instance.created_at.isoformat() if instance.created_at else None,
+                "visibility": instance.visibility,
+                
+                # Additional fields for frontend compatibility  
+                "url": instance.url,
+                "content_type": instance.content_type,  # Snake case version
+                "source": instance.source,
+                "origin": instance.origin,
+                "created_at": data.get("created_at"),
+                "updated_at": data.get("updated_at"),
+                "comments_count": comments_count,
+                "likes_count": likes_count,
+                "image": data.get("image"),
+                "is_liked": data.get("is_liked"),
+                "is_saved": data.get("is_saved"),
+            }
+            
+            return result
+        except Exception as e:
+            # Log the error and return a minimal representation to prevent 503 errors
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error serializing entry {instance.id}: {e}")
+            
+            # Return a minimal representation that won't cause errors
+            return {
+                "type": "entry",
+                "id": getattr(instance, 'url', ''),
+                "title": getattr(instance, 'title', ''),
+                "content": getattr(instance, 'content', ''),
+                "contentType": getattr(instance, 'content_type', 'text/plain'),
+                "visibility": getattr(instance, 'visibility', 'PUBLIC'),
+                "author": {"id": "", "displayName": "Unknown"},
+                "comments_count": 0,
+                "likes_count": 0,
+                "error": "Serialization error occurred"
+            }
 
     def update(self, instance, validated_data):
         print("ENTRY UPDATE VALIDATED DATA:", validated_data)

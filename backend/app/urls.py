@@ -10,6 +10,7 @@ from app.views.github import GitHubValidationView, GitHubActivityView
 from app.views.inbox import InboxViewSet, InboxReceiveView
 from app.views.node import GetNodesView, UpdateNodeView, AddNodeView, DeleteNodeView, RemoteFolloweeView, RemoteAuthorsView
 from app.views import federation as federation_views
+from app.views.base import health_check
 
 # namespacing app
 app_name = "social-distribution"
@@ -179,4 +180,7 @@ urlpatterns = [
     path('api/federation/post-local/', federation_views.post_local_entries, name='federation-post-local'),
     path('api/federation/status/', federation_views.federation_status, name='federation-status'),
     path('api/federation/test-connection/', federation_views.test_node_connection, name='federation-test-connection'),
+
+    # Health check endpoint
+    path('health/', health_check, name='health-check'),
 ]

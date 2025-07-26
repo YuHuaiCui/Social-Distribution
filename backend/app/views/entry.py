@@ -100,16 +100,21 @@ class EntryViewSet(viewsets.ModelViewSet):
             # Entry not found locally, try to fetch from remote nodes
             logger.info(f"Entry {lookup_value} not found locally, attempting remote fetch")
             
-            # Try to fetch from remote nodes
-            remote_entry = self._fetch_remote_entry(lookup_value)
-            if remote_entry:
-                logger.info(f"Successfully fetched remote entry {lookup_value}")
-                
-                # Check if the fetched entry is visible to the user
-                if remote_entry in Entry.objects.visible_to_author(user_author):
-                    return remote_entry
-                else:
-                    raise PermissionDenied("You do not have permission to view this post.")
+            try:
+                # Try to fetch from remote nodes with timeout protection
+                remote_entry = self._fetch_remote_entry(lookup_value)
+                if remote_entry:
+                    logger.info(f"Successfully fetched remote entry {lookup_value}")
+                    
+                    # Check if the fetched entry is visible to the user
+                    if remote_entry in Entry.objects.visible_to_author(user_author):
+                        return remote_entry
+                    else:
+                        raise PermissionDenied("You do not have permission to view this post.")
+            except Exception as remote_error:
+                # Log the error but don't let it cause a 503
+                logger.warning(f"Remote fetch failed for entry {lookup_value}: {remote_error}")
+                # Continue to raise NotFound instead of letting remote errors bubble up
             
             raise NotFound("Entry not found.")
 
@@ -129,6 +134,8 @@ class EntryViewSet(viewsets.ModelViewSet):
             from app.utils.remote import RemoteObjectFetcher, RemoteNodeClient
             from app.utils.federation import FederationService
             from app.models import Node
+            import requests
+            from requests.exceptions import Timeout, ConnectionError, RequestException
             
             # Get all active nodes
             active_nodes = Node.objects.filter(is_active=True)
@@ -148,7 +155,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                     
                     logger.info(f"Trying to fetch entry {entry_id} from node {node.name} ({node.host})")
                     
-                    # Try to fetch the entry from this node
+                    # Try to fetch the entry from this node with shorter timeout
                     client = RemoteNodeClient(node)
                     
                     # Try different endpoint patterns
@@ -160,7 +167,8 @@ class EntryViewSet(viewsets.ModelViewSet):
                     for endpoint in endpoints_to_try:
                         try:
                             logger.debug(f"Trying endpoint: {endpoint}")
-                            response = client.get(endpoint)
+                            # Use a shorter timeout for remote fetching to prevent 503 errors
+                            response = client.get(endpoint, timeout=10)
                             if response.status_code == 200:
                                 entry_data = response.json()
                                 logger.info(f"Successfully fetched entry data from {node.name}")
@@ -173,8 +181,14 @@ class EntryViewSet(viewsets.ModelViewSet):
                                 else:
                                     logger.warning(f"Failed to create local entry from remote data")
                                     
+                        except (Timeout, ConnectionError) as e:
+                            logger.debug(f"Timeout/Connection error fetching from {endpoint} on node {node.name}: {e}")
+                            continue
+                        except RequestException as e:
+                            logger.debug(f"Request error fetching from {endpoint} on node {node.name}: {e}")
+                            continue
                         except Exception as e:
-                            logger.debug(f"Failed to fetch from {endpoint} on node {node.name}: {e}")
+                            logger.debug(f"Unexpected error fetching from {endpoint} on node {node.name}: {e}")
                             continue
                             
                 except Exception as e:
