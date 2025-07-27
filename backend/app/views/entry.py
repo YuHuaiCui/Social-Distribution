@@ -210,7 +210,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             
         return None
 
-        def _create_local_entry_from_remote(self, entry_data, node):
+    def _create_local_entry_from_remote(self, entry_data, node):
         """
         Create or get a local entry from remote entry data using full URL as fqid.
         """
