@@ -64,6 +64,12 @@ class RemoteNodeClient:
 
     def __init__(self, node):
         self.node = node
+        print(f"[DEBUG] RemoteNodeClient created for node: {node.name}")
+        print(f"[DEBUG] Node host: {node.host}")
+        print(f"[DEBUG] Node username: {node.username}")
+        print(f"[DEBUG] Node has password: {'Yes' if node.password else 'No'}")
+        print(f"[DEBUG] Node is active: {node.is_active}")
+
         self.auth = RemoteNodeAuth.get_auth_for_node(node)
         self.base_url = node.host.rstrip("/")
         self.session = requests.Session()
@@ -74,6 +80,9 @@ class RemoteNodeClient:
                 "User-Agent": f"SocialDistribution/{settings.SITE_URL}",
             }
         )
+
+        print(f"[DEBUG] Base URL: {self.base_url}")
+        print(f"[DEBUG] Auth setup complete")
 
     def get(self, path, timeout=30, **kwargs):
         """Make GET request to remote node"""
@@ -92,10 +101,31 @@ class RemoteNodeClient:
         try:
             if data:
                 kwargs["json"] = data
+
+            # Debug logging for federation requests
+            print(f"[DEBUG] RemoteNodeClient POST to: {url}")
+            print(f"[DEBUG] Node: {self.node.name}")
+            print(f"[DEBUG] Auth username: {self.node.username}")
+            print(f"[DEBUG] Session headers: {dict(self.session.headers)}")
+            print(f"[DEBUG] Auth type: {type(self.session.auth)}")
+            if hasattr(self.session.auth, "username"):
+                print(
+                    f"[DEBUG] Auth username from session: {self.session.auth.username}"
+                )
+            print(f"[DEBUG] Request kwargs: {kwargs}")
+
             response = self.session.post(url, timeout=30, **kwargs)
+            print(f"[DEBUG] Response status: {response.status_code}")
+            print(f"[DEBUG] Response headers: {dict(response.headers)}")
+            try:
+                print(f"[DEBUG] Response content: {response.text[:500]}")
+            except:
+                print(f"[DEBUG] Could not decode response content")
+
             response.raise_for_status()
             return response
         except requests.RequestException as e:
+            print(f"[DEBUG] POST request exception: {e}")
             logger.error(f"POST request failed to {url}: {e}")
             raise RemoteNodeError(f"Failed to POST {url}: {e}")
 
