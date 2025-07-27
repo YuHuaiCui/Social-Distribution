@@ -449,22 +449,26 @@ class RemoteActivitySender:
             client = RemoteNodeClient(target_author.node)
             print(f"[DEBUG] Created client for node: {target_author.node.name}")
 
+            # Prepare author data to use for both actor and author fields
+            author_data = {
+                "type": "author",
+                "id": like.author.url,
+                "host": f"{settings.SITE_URL}/api/",
+                "displayName": like.author.display_name,
+                "github": (
+                    f"https://github.com/{like.author.github_username}"
+                    if like.author.github_username
+                    else ""
+                ),
+                "profileImage": like.author.profile_image,
+                "web": f"{settings.SITE_URL}/authors/{like.author.id}",
+            }
+
             like_data = {
                 "type": "like",
                 "content_type": "like",
-                "author": {
-                    "type": "author",
-                    "id": like.author.url,
-                    "host": f"{settings.SITE_URL}/api/",
-                    "displayName": like.author.display_name,
-                    "github": (
-                        f"https://github.com/{like.author.github_username}"
-                        if like.author.github_username
-                        else ""
-                    ),
-                    "profileImage": like.author.profile_image,
-                    "web": f"{settings.SITE_URL}/authors/{like.author.id}",
-                },
+                "actor": author_data,
+                "author": author_data,
                 "published": like.created_at.isoformat(),
                 "id": like.url,
                 "object": target_object.url,
