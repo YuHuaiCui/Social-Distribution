@@ -226,10 +226,12 @@ class EntryViewSet(viewsets.ModelViewSet):
             # Parse entry ID from URL
             parsed = urlparse(entry_url)
             path_parts = parsed.path.strip("/").split("/")
+            logger.info(f"Parsing entry URL: {entry_url}, path_parts: {path_parts}")
             if "entries" in path_parts:
                 entry_index = path_parts.index("entries")
                 if entry_index + 1 < len(path_parts):
                     entry_id = path_parts[entry_index + 1]
+                    logger.info(f"Extracted entry_id: {entry_id}")
                 else:
                     logger.warning("Could not extract entry ID from URL")
                     return None
@@ -263,7 +265,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                 return None
             
             # Get or create the remote author
-            author,  = Author.objects.get_or_create(
+            author, _ = Author.objects.get_or_create(
                 url=author_url,
                 defaults={
                     "id": author_id,
@@ -283,22 +285,27 @@ class EntryViewSet(viewsets.ModelViewSet):
             )
             
             # Create the entry
-            entry, created = Entry.objects.get_or_create(
-                id=entry_id,
-                defaults={
-                    "url": entry_url,
-                    "author": author,
-                    "title": entry_data.get("title", ""),
-                    "content": entry_data.get("content", ""),
-                    "content_type": entry_data.get(
-                        "contentType", "text/plain"
-                    ),
-                    "visibility": entry_data.get("visibility", "PUBLIC"),
-                    "description": entry_data.get("description", ""),
-                    "source": entry_data.get("source", ""),
-                    "origin": entry_data.get("origin", ""),
-                },
-            )
+            logger.info(f"Creating entry with ID: {entry_id}, URL: {entry_url}")
+            try:
+                entry, created = Entry.objects.get_or_create(
+                    id=entry_id,
+                    defaults={
+                        "url": entry_url,
+                        "author": author,
+                        "title": entry_data.get("title", ""),
+                        "content": entry_data.get("content", ""),
+                        "content_type": entry_data.get(
+                            "contentType", "text/plain"
+                        ),
+                        "visibility": entry_data.get("visibility", "PUBLIC"),
+                        "description": entry_data.get("description", ""),
+                        "source": entry_data.get("source", ""),
+                         "origin": entry_data.get("origin", ""),
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Error in Entry.objects.get_or_create: {e}")
+                raise
             
             if created:
                 logger.info(f"Created new local entry from remote: {entry_id}")
