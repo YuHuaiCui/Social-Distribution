@@ -7,7 +7,6 @@ It consolidates the federation logic that was previously scattered across
 different views and utilities.
 """
 
-import logging
 from typing import List, Dict, Any, Optional, Tuple
 from django.conf import settings
 from django.db import transaction
@@ -22,8 +21,6 @@ from app.utils.remote import (
     RemoteObjectFetcher,
     RemoteActivitySender,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class FederationService:
@@ -154,7 +151,7 @@ class FederationService:
             return node
 
         except Exception as e:
-            logger.error(f"Error getting node for URL {url}: {e}")
+            print(f"Error getting node for URL {url}: {e}")
             return None
 
     @staticmethod
@@ -172,7 +169,7 @@ class FederationService:
         try:
             # Skip if this is the same localhost instance (self-federation)
             if FederationService.is_same_localhost_instance(node.host):
-                logger.info(f"Skipping self-federation with node {node.name}")
+                print(f"Skipping self-federation with node {node.name}")
                 return []
 
             client = RemoteNodeClient(node)
@@ -188,7 +185,7 @@ class FederationService:
                 return data if isinstance(data, list) else []
 
         except RemoteNodeError as e:
-            logger.error(f"Failed to fetch authors from {node.name}: {e}")
+            print(f"Failed to fetch authors from {node.name}: {e}")
             return []
 
     @staticmethod
@@ -206,7 +203,7 @@ class FederationService:
         try:
             # Skip if this is the same localhost instance (self-federation)
             if FederationService.is_same_localhost_instance(node.host):
-                logger.info(f"Skipping self-federation with node {node.name}")
+                print(f"Skipping self-federation with node {node.name}")
                 return []
 
             client = RemoteNodeClient(node)
@@ -222,7 +219,7 @@ class FederationService:
                 return data if isinstance(data, list) else []
 
         except RemoteNodeError as e:
-            logger.error(f"Failed to fetch entries from {node.name}: {e}")
+            print(f"Failed to fetch entries from {node.name}: {e}")
             return []
 
     @staticmethod
@@ -239,7 +236,7 @@ class FederationService:
         """
         # Skip if this is the same localhost instance (self-federation)
         if FederationService.is_same_localhost_instance(node.host):
-            logger.info(f"Skipping self-federation with node {node.name}")
+            print(f"Skipping self-federation with node {node.name}")
             return 0, 0
 
         try:
@@ -320,18 +317,18 @@ class FederationService:
                             updated_count += 1
 
                 except Exception as e:
-                    logger.error(
+                    print(
                         f"Error syncing author {author_data.get('username', 'unknown')}: {e}"
                     )
                     continue
 
-            logger.info(
+            print(
                 f"Synced {created_count} new and {updated_count} updated authors from {node.name}"
             )
             return created_count, updated_count
 
         except Exception as e:
-            logger.error(f"Failed to sync authors from {node.name}: {e}")
+            print(f"Failed to sync authors from {node.name}: {e}")
             return 0, 0
 
     @staticmethod
@@ -348,7 +345,7 @@ class FederationService:
         """
         # Skip if this is the same localhost instance (self-federation)
         if FederationService.is_same_localhost_instance(node.host):
-            logger.info(f"Skipping self-federation with node {node.name}")
+            print(f"Skipping self-federation with node {node.name}")
             return 0, 0
 
         try:
@@ -452,18 +449,18 @@ class FederationService:
                             updated_count += 1
 
                 except Exception as e:
-                    logger.error(
+                    print(
                         f"Error syncing entry {entry_data.get('title', 'unknown')}: {e}"
                     )
                     continue
 
-            logger.info(
+            print(
                 f"Synced {created_count} new and {updated_count} updated entries from {node.name}"
             )
             return created_count, updated_count
 
         except Exception as e:
-            logger.error(f"Failed to sync entries from {node.name}: {e}")
+            print(f"Failed to sync entries from {node.name}: {e}")
             return 0, 0
 
     @staticmethod
@@ -490,7 +487,7 @@ class FederationService:
                 }
 
             except Exception as e:
-                logger.error(f"Failed to sync node {node.name}: {e}")
+                print(f"Failed to sync node {node.name}: {e}")
                 results[node.name] = {"error": str(e)}
 
         return results
@@ -514,7 +511,7 @@ class FederationService:
             for node in active_nodes:
                 # Skip if this is the same localhost instance (self-federation)
                 if FederationService.is_same_localhost_instance(node.host):
-                    logger.info(f"Skipping self-federation with node {node.name}")
+                    print(f"Skipping self-federation with node {node.name}")
                     results[node.name] = True  # Mark as successful to avoid errors
                     continue
 
@@ -522,7 +519,7 @@ class FederationService:
                     FederationService._post_entry_to_node(entry, node)
                     results[node.name] = True
                 except Exception as e:
-                    logger.error(f"Failed to post entry to {node.name}: {e}")
+                    print(f"Failed to post entry to {node.name}: {e}")
                     results[node.name] = False
 
         elif entry.visibility == Entry.FRIENDS_ONLY:
@@ -548,9 +545,7 @@ class FederationService:
             for friend in remote_friends:
                 # Skip if this is the same localhost instance (self-federation)
                 if FederationService.is_same_localhost_instance(friend.host):
-                    logger.info(
-                        f"Skipping self-federation with friend {friend.username}"
-                    )
+                    print(f"Skipping self-federation with friend {friend.username}")
                     results[friend.node.name] = (
                         True  # Mark as successful to avoid errors
                     )
@@ -560,9 +555,7 @@ class FederationService:
                     FederationService._post_entry_to_author(entry, friend)
                     results[friend.node.name] = True
                 except Exception as e:
-                    logger.error(
-                        f"Failed to post entry to friend {friend.username}: {e}"
-                    )
+                    print(f"Failed to post entry to friend {friend.username}: {e}")
                     results[friend.node.name] = False
 
         return results
@@ -572,7 +565,7 @@ class FederationService:
         """Post entry to a specific node's general inbox."""
         # Skip if this is the same localhost instance (self-federation)
         if FederationService.is_same_localhost_instance(node.host):
-            logger.info(f"Skipping self-federation with node {node.name}")
+            print(f"Skipping self-federation with node {node.name}")
             return
 
         try:
@@ -581,10 +574,10 @@ class FederationService:
 
             # Send to general federation inbox
             response = client.post("/api/federation/inbox/", entry_data)
-            logger.info(f"Entry sent to node {node.host}: {response.status_code}")
+            print(f"Entry sent to node {node.host}: {response.status_code}")
 
         except Exception as e:
-            logger.error(f"Failed to send entry to node {node.host}: {e}")
+            print(f"Failed to send entry to node {node.host}: {e}")
             raise
 
     @staticmethod
@@ -592,7 +585,7 @@ class FederationService:
         """Post entry to a specific remote author's inbox."""
         # Skip if this is the same localhost instance (self-federation)
         if FederationService.is_same_localhost_instance(author.host):
-            logger.info(f"Skipping self-federation with author {author.username}")
+            print(f"Skipping self-federation with author {author.username}")
             return
 
         try:
@@ -607,16 +600,14 @@ class FederationService:
                 author.url, author.id
             )
 
-            logger.info(
-                f"Sending entry to author inbox: /api/authors/{author_id}/inbox/"
-            )
+            print(f"Sending entry to author inbox: /api/authors/{author_id}/inbox/")
 
             # Send to specific author's inbox
             response = client.post(f"/api/authors/{author_id}/inbox/", entry_data)
-            logger.info(f"Entry sent to author {author.url}: {response.status_code}")
+            print(f"Entry sent to author {author.url}: {response.status_code}")
 
         except Exception as e:
-            logger.error(f"Failed to send entry to author {author.url}: {e}")
+            print(f"Failed to send entry to author {author.url}: {e}")
             raise
 
     @staticmethod
@@ -736,12 +727,12 @@ class FederationService:
             True if processed successfully, False otherwise
         """
         try:
-            logger.info(f"Processing inbox item for recipient {recipient.username}")
-            logger.info(f"Data keys: {list(data.keys())}")
-            logger.info(f"Remote node: {remote_node.name}")
+            print(f"Processing inbox item for recipient {recipient.username}")
+            print(f"Data keys: {list(data.keys())}")
+            print(f"Remote node: {remote_node.name}")
 
             item_type = data.get("type", "").lower()
-            logger.info(f"Item type: {item_type}")
+            print(f"Item type: {item_type}")
 
             if item_type == "like":
                 return FederationService._process_like(recipient, data, remote_node)
@@ -758,15 +749,15 @@ class FederationService:
                     recipient, data, remote_node
                 )
             else:
-                logger.warning(f"Unknown inbox item type: {item_type}")
+                print(f"Unknown inbox item type: {item_type}")
                 return False
 
         except Exception as e:
-            logger.error(f"Failed to process inbox item: {e}")
-            logger.error(f"Exception type: {type(e)}")
+            print(f"Failed to process inbox item: {e}")
+            print(f"Exception type: {type(e)}")
             import traceback
 
-            logger.error(f"Full traceback: {traceback.format_exc()}")
+            print(f"Full traceback: {traceback.format_exc()}")
             return False
 
     @staticmethod
@@ -775,41 +766,41 @@ class FederationService:
     ) -> bool:
         """Process an incoming like."""
         try:
-            logger.info(f"Processing like for recipient: {recipient.username}")
+            print(f"Processing like for recipient: {recipient.username}")
 
             # Extract like data - handle both 'actor' and 'author' fields for compatibility
             actor_data = data.get("actor", data.get("author", {}))
             object_data = data.get("object", {})
 
-            logger.info(
+            print(
                 f"Actor data keys: {list(actor_data.keys() if isinstance(actor_data, dict) else 'Not a dict')}"
             )
-            logger.info(f"Object data: {object_data}")
+            print(f"Object data: {object_data}")
 
             # Get or create the remote author
             try:
                 remote_author, _ = FederationService._get_or_create_remote_author(
                     actor_data, remote_node
                 )
-                logger.info(f"Remote author: {remote_author.username}")
+                print(f"Remote author: {remote_author.username}")
             except Exception as e:
-                logger.error(f"Failed to get/create remote author: {e}")
+                print(f"Failed to get/create remote author: {e}")
                 return False
 
             # Find the liked object
             object_url = (
                 object_data.get("id") if isinstance(object_data, dict) else object_data
             )
-            logger.info(f"Looking for object with URL: {object_url}")
+            print(f"Looking for object with URL: {object_url}")
 
             try:
                 liked_object = FederationService._find_liked_object(object_url)
                 if not liked_object:
-                    logger.warning(f"Liked object not found: {object_url}")
+                    print(f"Liked object not found: {object_url}")
                     return False
-                logger.info(f"Found liked object: {liked_object}")
+                print(f"Found liked object: {liked_object}")
             except Exception as e:
-                logger.error(f"Error finding liked object: {e}")
+                print(f"Error finding liked object: {e}")
                 return False
 
             # Create the like with proper error handling
@@ -826,11 +817,11 @@ class FederationService:
                 if created:
                     like.url = f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/{like.id}"
                     like.save(update_fields=["url"])
-                    logger.info(f"Created new like: {like.id}")
+                    print(f"Created new like: {like.id}")
                 else:
-                    logger.info(f"Like already exists: {like.id}")
+                    print(f"Like already exists: {like.id}")
             except Exception as e:
-                logger.error(f"Error creating like: {e}")
+                print(f"Error creating like: {e}")
                 return False
 
             # Create inbox item with proper error handling
@@ -841,20 +832,20 @@ class FederationService:
                     like=like,  # Pass the Like instance; Django handles the to_field="url" automatically
                     raw_data=data,
                 )
-                logger.info(f"Created inbox item for like")
+                print(f"Created inbox item for like")
             except Exception as e:
-                logger.error(f"Error creating inbox item: {e}")
+                print(f"Error creating inbox item: {e}")
                 # Don't fail the entire operation if inbox item creation fails
                 # The like was still created successfully
 
             return True
 
         except Exception as e:
-            logger.error(f"Failed to process like: {e}")
-            logger.error(f"Exception type: {type(e)}")
+            print(f"Failed to process like: {e}")
+            print(f"Exception type: {type(e)}")
             import traceback
 
-            logger.error(f"Full traceback: {traceback.format_exc()}")
+            print(f"Full traceback: {traceback.format_exc()}")
             return False
 
     @staticmethod
@@ -874,13 +865,13 @@ class FederationService:
             # Find the entry being commented on
             entry_url = data.get("entry")
             if not entry_url:
-                logger.warning("No entry URL in comment data")
+                print("No entry URL in comment data")
                 return False
 
             try:
                 entry = Entry.objects.get(url=entry_url)
             except Entry.DoesNotExist:
-                logger.warning(f"Entry not found: {entry_url}")
+                print(f"Entry not found: {entry_url}")
                 return False
 
             # Create the comment
@@ -907,7 +898,7 @@ class FederationService:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to process comment: {e}")
+            print(f"Failed to process comment: {e}")
             return False
 
     @staticmethod
@@ -955,7 +946,7 @@ class FederationService:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to process entry: {e}")
+            print(f"Failed to process entry: {e}")
             return False
 
     @staticmethod
@@ -990,7 +981,7 @@ class FederationService:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to process follow request: {e}")
+            print(f"Failed to process follow request: {e}")
             return False
 
     @staticmethod
@@ -1013,13 +1004,13 @@ class FederationService:
             followed_url = follow_data.get("id")
 
             if not followed_url:
-                logger.warning("No followed URL in follow response data")
+                print("No followed URL in follow response data")
                 return False
 
             try:
                 followed = Author.objects.get(url=followed_url)
             except Author.DoesNotExist:
-                logger.warning(f"Followed author not found: {followed_url}")
+                print(f"Followed author not found: {followed_url}")
                 return False
 
             # Update the follow relationship
@@ -1030,7 +1021,7 @@ class FederationService:
                 )
                 follow.save()
             except Follow.DoesNotExist:
-                logger.warning(f"Follow relationship not found")
+                print(f"Follow relationship not found")
                 return False
 
             # Create inbox item
@@ -1044,7 +1035,7 @@ class FederationService:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to process follow response: {e}")
+            print(f"Failed to process follow response: {e}")
             return False
 
     @staticmethod
@@ -1058,7 +1049,7 @@ class FederationService:
             print(f"DEBUG: actor_data: {actor_data}")
             print(f"DEBUG: remote_node: {remote_node.name}")
 
-            logger.info(f"Getting/creating remote author from actor data")
+            print(f"Getting/creating remote author from actor data")
 
             if isinstance(actor_data, str):
                 print(f"DEBUG: actor_data is string, fetching from URL: {actor_data}")
@@ -1068,22 +1059,20 @@ class FederationService:
                     response = client.get(actor_data)
                     actor_data = response.json()
                     print(f"DEBUG: Fetched actor data from URL: {actor_data}")
-                    logger.info(f"Fetched actor data from URL: {actor_data}")
+                    print(f"Fetched actor data from URL: {actor_data}")
                 except Exception as e:
                     print(f"DEBUG: Error fetching actor data from URL: {e}")
-                    logger.error(
-                        f"Failed to fetch actor data from URL {actor_data}: {e}"
-                    )
+                    print(f"Failed to fetch actor data from URL {actor_data}: {e}")
                     raise Exception(f"Failed to fetch actor data: {str(e)}")
 
             actor_url = actor_data.get("id")
             print(f"DEBUG: actor_url extracted: {actor_url}")
             if not actor_url:
                 print(f"DEBUG: No actor URL found in data")
-                logger.error("Actor URL not found in data")
+                print("Actor URL not found in data")
                 raise Exception("Actor URL not found in data")
 
-            logger.info(f"Looking for author with URL: {actor_url}")
+            print(f"Looking for author with URL: {actor_url}")
             print(f"DEBUG: Looking for existing author with URL: {actor_url}")
 
             # Try to get existing remote author
@@ -1092,11 +1081,11 @@ class FederationService:
                 print(
                     f"DEBUG: Found existing remote author: {existing_author.username}"
                 )
-                logger.info(f"Found existing remote author: {existing_author.username}")
+                print(f"Found existing remote author: {existing_author.username}")
                 return existing_author, False
             except Author.DoesNotExist:
                 print(f"DEBUG: No existing author found, creating new one")
-                logger.info(f"No existing author found, creating new one")
+                print(f"No existing author found, creating new one")
                 pass
             except Exception as e:
                 print(f"DEBUG: Error looking up existing author: {e}")
@@ -1132,7 +1121,7 @@ class FederationService:
                 print(
                     f"DEBUG: Successfully created new remote author: {remote_author.username} (ID: {remote_author.id})"
                 )
-                logger.info(f"Created new remote author: {remote_author.username}")
+                print(f"Created new remote author: {remote_author.username}")
                 return remote_author, True
             except Exception as e:
                 print(f"DEBUG: CRITICAL ERROR creating remote author: {e}")
@@ -1141,7 +1130,7 @@ class FederationService:
                 print(
                     f"DEBUG: Remote author creation traceback: {traceback.format_exc()}"
                 )
-                logger.error(f"Error creating remote author: {e}")
+                print(f"Error creating remote author: {e}")
                 raise Exception(f"Failed to create remote author: {str(e)}")
 
         except Exception as e:
@@ -1151,7 +1140,7 @@ class FederationService:
             print(
                 f"DEBUG: Full _get_or_create_remote_author traceback: {traceback.format_exc()}"
             )
-            logger.error(f"Error in _get_or_create_remote_author: {e}")
+            print(f"Error in _get_or_create_remote_author: {e}")
             raise e
 
     @staticmethod
@@ -1208,7 +1197,7 @@ class FederationService:
             import traceback
 
             print(f"DEBUG: Entry search traceback: {traceback.format_exc()}")
-            logger.error(f"Error finding entry: {e}")
+            print(f"Error finding entry: {e}")
 
         # Try to find as comment
         try:
@@ -1248,7 +1237,7 @@ class FederationService:
             import traceback
 
             print(f"DEBUG: Comment search traceback: {traceback.format_exc()}")
-            logger.error(f"Error finding comment: {e}")
+            print(f"Error finding comment: {e}")
 
         print(f"DEBUG: No liked object found for URL: {object_url}")
         return None
