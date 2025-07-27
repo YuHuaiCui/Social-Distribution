@@ -779,7 +779,7 @@ class FederationService:
 
             # Get or create the remote author
             try:
-                remote_author, _ = FederationService._get_or_create_remote_author(
+                remoteauthor,  = FederationService._get_or_create_remote_author(
                     actor_data, remote_node
                 )
                 print(f"Remote author: {remote_author.username}")
@@ -803,16 +803,26 @@ class FederationService:
                 print(f"Error finding liked object: {e}")
                 return False
 
-            # Create the like with proper error handling
             try:
-                like, created = Like.objects.get_or_create(
-                    author=remote_author,
-                    entry=liked_object if isinstance(liked_object, Entry) else None,
-                    comment=liked_object if isinstance(liked_object, Comment) else None,
-                    defaults={
-                        "url": f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"
-                    },
-                )
+                if isinstance(liked_object, Entry):
+                    like, created = Like.objects.get_or_create(
+                        author=remote_author,
+                        entry=liked_object,
+                        defaults={
+                            "url": f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"
+                        },
+                    )
+                elif isinstance(liked_object, Comment):
+                    like, created = Like.objects.get_or_create(
+                        author=remote_author,
+                        comment=liked_object,
+                        defaults={
+                            "url": f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"
+                        },
+                    )
+                else:
+                    print(f"Unsupported liked_object type: {type(liked_object)}")
+                    return False
 
                 if created:
                     like.url = f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/{like.id}"
@@ -824,30 +834,27 @@ class FederationService:
                 print(f"Error creating like: {e}")
                 return False
 
-            # Create inbox item with proper error handling
+            # Create inbox item
             try:
                 Inbox.objects.create(
                     recipient=recipient,
                     item_type=Inbox.LIKE,
-                    like=like,  # Pass the Like instance; Django handles the to_field="url" automatically
+                    like=like,
                     raw_data=data,
                 )
                 print(f"Created inbox item for like")
             except Exception as e:
                 print(f"Error creating inbox item: {e}")
-                # Don't fail the entire operation if inbox item creation fails
-                # The like was still created successfully
+                # Non-fatal
 
             return True
 
         except Exception as e:
             print(f"Failed to process like: {e}")
-            print(f"Exception type: {type(e)}")
             import traceback
-
-            print(f"Full traceback: {traceback.format_exc()}")
+            print(traceback.format_exc())
             return False
-
+            
     @staticmethod
     def _process_comment(
         recipient: Author, data: Dict[str, Any], remote_node: Node
