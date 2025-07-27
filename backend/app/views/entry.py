@@ -16,6 +16,7 @@ from app.models import Like,InboxDelivery, SavedEntry
 from django.db.models import Count, F
 from django.utils import timezone
 from datetime import timedelta
+from app.utils.federation import get_or_create_remote_entry
 
 
 logger = logging.getLogger(__name__)
@@ -257,21 +258,28 @@ class EntryViewSet(viewsets.ModelViewSet):
             )
 
             # Create or get Entry using fqid
-            entry, created = Entry.objects.get_or_create(
-                fqid=entry_url,
-                defaults={
-                    "id": entry_uuid,
-                    "url": entry_url,
-                    "author": author,
-                    "title": entry_data.get("title", ""),
-                    "content": entry_data.get("content", ""),
-                    "content_type": entry_data.get("contentType", "text/plain"),
-                    "visibility": entry_data.get("visibility", "PUBLIC"),
-                    "description": entry_data.get("description", ""),
-                    "source": entry_data.get("source", entry_url),
-                    "origin": entry_data.get("origin", entry_url),
-                }
-            )
+            try:
+                entry = Entry.objects.get(url=entry_url)
+                # Update fqid if missing
+                if not entry.fqid:
+                    entry.fqid = entry_url
+                    entry.save(update_fields=["fqid"])
+                created = False
+            except Entry.DoesNotExist:
+                entry = Entry.objects.create(
+                    id=entry_uuid,
+                    url=entry_url,
+                    fqid=entry_url,
+                    author=author,
+                    title=entry_data.get("title", ""),
+                    content=entry_data.get("content", ""),
+                    content_type=entry_data.get("contentType", "text/plain"),
+                    visibility=entry_data.get("visibility", "PUBLIC"),
+                    description=entry_data.get("description", ""),
+                    source=entry_data.get("source", entry_url),
+                    origin=entry_data.get("origin", entry_url),
+                )
+                created = True
 
             logger.info(f"{'Created' if created else 'Retrieved'} remote entry: {entry_url}")
             return entry
