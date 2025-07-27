@@ -119,6 +119,7 @@ class Entry(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")
+    fqid = models.URLField(unique=True, null=True, blank=True)
 
     # Foreign key to Author using URL field for federation compatibility
     author = models.ForeignKey(
