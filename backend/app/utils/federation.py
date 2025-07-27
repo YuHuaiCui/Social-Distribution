@@ -792,6 +792,13 @@ class FederationService:
                 object_data.get("id") if isinstance(object_data, dict) else object_data
             )
             print(f"Looking for object with URL: {object_url}")
+            if not object_url or not isinstance(object_url, str):
+                print("Invalid or missing object URL for Like.")
+                return False
+            if not object_url.startswith("http"):
+                print("Object URL must be a full HTTP URL.")
+                return False
+
 
             try:
                 liked_object = FederationService._find_liked_object(object_url)
@@ -1073,6 +1080,12 @@ class FederationService:
                     raise Exception(f"Failed to fetch actor data: {str(e)}")
 
             actor_url = actor_data.get("id")
+            if not remote_node:
+                from app.utils.federation import FederationService
+                remote_node = FederationService.get_node_for_url(actor_url)
+                if not remote_node:
+                    print(f"WARNING: Could not determine node for author: {actor_url}")
+
             print(f"DEBUG: actor_url extracted: {actor_url}")
             if not actor_url:
                 print(f"DEBUG: No actor URL found in data")

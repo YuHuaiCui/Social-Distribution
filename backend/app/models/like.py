@@ -81,11 +81,13 @@ class Like(models.Model):
         super().save(*args, **kwargs)
         
         # Then update the URL if not provided
-        if not self.url and self.author.is_local:
-            # URL pattern for likes: /api/authors/{author_id}/liked/{like_id}
-            self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{self.id}"
-            # Save again to update the URL
-            super().save(update_fields=['url'])
+        if not self.url:
+            if self.author.is_local:
+                self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{self.id}"
+            else:
+                # Remote Likes must include their own URL; skip
+                raise ValueError("Remote Like must have a URL.")
+
 
     def __str__(self):
         """

@@ -5,6 +5,7 @@ This module provides utilities for communicating with remote federated nodes,
 including authentication, request handling, and activity federation.
 """
 
+from xmlrpc import client
 import requests
 from requests.auth import HTTPBasicAuth
 import json
@@ -478,9 +479,14 @@ class RemoteActivitySender:
 
             # Extract the correct author ID from the target author's URL
             # For remote authors, we need to use the ID from their URL, not the local database ID
+            #target_author_id = RemoteActivitySender._extract_author_id_from_url(
+            #    target_author.url, target_author.id
+            #)
             target_author_id = RemoteActivitySender._extract_author_id_from_url(
                 target_author.url, target_author.id
             )
+            response = client.post(f"/api/authors/{target_author_id}/inbox/", like_data)
+
 
             print(f"[DEBUG] Final target author ID for inbox: {target_author_id}")
             print(f"[DEBUG] Sending to: /api/authors/{target_author_id}/inbox/")
