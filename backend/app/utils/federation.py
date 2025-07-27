@@ -624,6 +624,7 @@ class FederationService:
         """Prepare entry data for remote sending."""
         return {
             "type": "entry",
+            "content_type": "entry",
             "title": entry.title,
             "id": entry.url,
             "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",

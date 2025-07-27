@@ -288,6 +288,7 @@ class RemoteActivitySender:
 
             follow_data = {
                 "type": "follow",
+                "content_type": "follow",
                 "summary": f"{follower.display_name} wants to follow {followed.display_name}",
                 "actor": {
                     "type": "author",
@@ -450,6 +451,7 @@ class RemoteActivitySender:
 
             like_data = {
                 "type": "like",
+                "content_type": "like",
                 "author": {
                     "type": "author",
                     "id": like.author.url,
@@ -501,6 +503,7 @@ class RemoteActivitySender:
 
             comment_data = {
                 "type": "comment",
+                "content_type": "comment",
                 "author": {
                     "type": "author",
                     "id": comment.author.url,
@@ -626,6 +629,7 @@ class RemoteActivitySender:
 
         return {
             "type": "entry",
+            "content_type": "entry",
             "title": entry.title,
             "id": entry.url,
             "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
