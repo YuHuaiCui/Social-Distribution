@@ -55,11 +55,12 @@ class EntryViewSet(viewsets.ModelViewSet):
         Override to enforce visibility permissions and exclude deleted entries.
 
         This method implements the core security logic for entry access:
-        - Prevents access to soft-deleted entries
-        - Enforces visibility rules based on user relationships
-        - Allows authors to access their own entries for editing
-        - Allows staff to access any entry
-        - Attempts to fetch remote entries when not found locally
+        
+        Prevents access to soft-deleted entries
+        Enforces visibility rules based on user relationships
+        Allows authors to access their own entries for editing
+        Allows staff to access any entry
+        Attempts to fetch remote entries when not found locally
 
         Returns:
             Entry: The requested entry if user has permission
@@ -68,57 +69,63 @@ class EntryViewSet(viewsets.ModelViewSet):
             NotFound: If entry doesn't exist or user can't view it
             PermissionDenied: If user can't perform the requested action
         """
-        lookup_url_kwarg = self.lookup_field
-        lookup_value = self.kwargs.get(lookup_url_kwarg)
-
-        if lookup_value is None:
+        lookup_value = self.kwargs.get(self.lookup_field)
+        if not lookup_value:
             raise NotFound("No Entry ID provided.")
 
-        user = self.request.user
-        user_author = (
-            getattr(user, "author", None) or user if user.is_authenticated else None
-        )
+        request = self.request
+        user = request.user
+        user_author = getattr(user, "author", None) or (user if user.is_authenticated else None)
 
+        obj = None
+
+        # Try to find locally by UUID
         try:
             obj = Entry.objects.get(id=lookup_value)
+        except Entry.DoesNotExist:
+            pass
 
-            # Staff users can access any entry (including deleted ones for moderation)
+        # Try by fqid (if used)
+        if not obj:
+            try:
+                obj = Entry.objects.get(fqid=lookup_value)
+            except Entry.DoesNotExist:
+                pass
+
+        # Try by full URL
+        if not obj:
+            try:
+                obj = Entry.objects.get(url=lookup_value)
+            except Entry.DoesNotExist:
+                pass
+
+        # Permissions + visibility
+        if obj:
             if user.is_staff:
-                return obj
+                return obj  # Staff can view everything
 
-            # For write operations (PATCH, PUT, DELETE), check if user is the author
-            if self.request.method in ["PATCH", "PUT", "DELETE"]:
+            if request.method in ["PATCH", "PUT", "DELETE"]:
                 if user_author and obj.author == user_author:
                     return obj
                 raise PermissionDenied("You cannot edit this post.")
 
-            # For read operations, check if entry is visible to the user
+            # For GET/read operations, enforce visibility
             if obj in Entry.objects.visible_to_author(user_author):
                 return obj
+            raise PermissionDenied("You do not have permission to view this post.")
 
-        except Entry.DoesNotExist:
-            # Entry not found locally, try to fetch from remote nodes
-            logger.info(f"Entry {lookup_value} not found locally, attempting remote fetch")
-            
-            try:
-                # Try to fetch from remote nodes with timeout protection
-                remote_entry = self._fetch_remote_entry(lookup_value)
-                if remote_entry:
-                    logger.info(f"Successfully fetched remote entry {lookup_value}")
-                    
-                    # Check if the fetched entry is visible to the user
-                    if remote_entry in Entry.objects.visible_to_author(user_author):
-                        return remote_entry
-                    else:
-                        raise PermissionDenied("You do not have permission to view this post.")
-            except Exception as remote_error:
-                # Log the error but don't let it cause a 503
-                logger.warning(f"Remote fetch failed for entry {lookup_value}: {remote_error}")
-                # Continue to raise NotFound instead of letting remote errors bubble up
-            
-            raise NotFound("Entry not found.")
+        # Remote fetch attempt
+        logger.info(f"Entry {lookup_value} not found locally. Attempting remote fetch.")
+        try:
+            remote_entry = self._fetch_remote_entry(lookup_value)
+            if remote_entry and remote_entry in Entry.objects.visible_to_author(user_author):
+                return remote_entry
+            elif remote_entry:
+                raise PermissionDenied("You do not have permission to view this post.")
+        except Exception as e:
+            logger.warning(f"Remote fetch failed for {lookup_value}: {e}")
 
-        raise PermissionDenied("You do not have permission to view this post.")
+        raise NotFound("Entry not found.")
 
     def _fetch_remote_entry(self, entry_id):
         """
@@ -204,109 +211,78 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     def _create_local_entry_from_remote(self, entry_data, node):
         """
-        Create a local entry from remote entry data.
-        
-        Args:
-            entry_data: The entry data from the remote node
-            node: The remote node
-            
-        Returns:
-            Entry: The created entry if successful, None otherwise
+        Create or get a local entry from remote entry data using full URL as fqid.
         """
         try:
             from app.models import Author
             from urllib.parse import urlparse
-            
-            # Extract entry URL and ID
+
+            # Use full entry URL
             entry_url = entry_data.get("id") or entry_data.get("url")
             if not entry_url:
                 logger.warning("No entry URL found in remote data")
                 return None
-                
-            # Parse entry ID from URL
+
+            # Parse UUID from URL path
             parsed = urlparse(entry_url)
             path_parts = parsed.path.strip("/").split("/")
-            if "entries" in path_parts:
-                entry_index = path_parts.index("entries")
-                if entry_index + 1 < len(path_parts):
-                    entry_id = path_parts[entry_index + 1]
-                else:
-                    logger.warning("Could not extract entry ID from URL")
-                    return None
-            else:
-                logger.warning("No 'entries' in URL path")
+            entry_uuid = path_parts[-1] if path_parts else None
+            if not entry_uuid:
+                logger.warning("Unable to parse UUID from entry URL")
                 return None
-            
-            # Get or create the author
+
+            # Get or create author
             author_data = entry_data.get("author", {})
-            if not author_data:
-                logger.warning("No author data in remote entry")
-                return None
-                
             author_url = author_data.get("id") or author_data.get("url")
             if not author_url:
-                logger.warning("No author URL in remote data")
+                logger.warning("No author URL found in entry")
                 return None
-                
-            # Parse author ID from URL
+
             author_parsed = urlparse(author_url)
-            author_path_parts = author_parsed.path.strip("/").split("/")
-            if "authors" in author_path_parts:
-                author_index = author_path_parts.index("authors")
-                if author_index + 1 < len(author_path_parts):
-                    author_id = author_path_parts[author_index + 1]
-                else:
-                    logger.warning("Could not extract author ID from URL")
-                    return None
-            else:
-                logger.warning("No 'authors' in author URL path")
-                return None
-            
-            # Get or create the remote author
+            author_id = author_parsed.path.strip("/").split("/")[-1]
+
             author, _ = Author.objects.get_or_create(
-                id=author_id,
+                url=author_url,
                 defaults={
-                    "url": author_url,
-                    "username": author_data.get("username", ""),
-                    "display_name": author_data.get(
-                        "displayName", author_data.get("display_name", "")
-                    ),
+                    "id": author_id,
+                    "username": author_data.get("username", f"{author_id}@{node.host}"),
+                    "display_name": author_data.get("displayName", author_data.get("display_name", "")),
                     "github_username": author_data.get("github", ""),
-                    "profile_image": author_data.get(
-                        "profileImage", author_data.get("profile_image", "")
-                    ),
+                    "profile_image": author_data.get("profileImage", ""),
                     "host": author_data.get("host", node.host),
                     "node": node,
                     "is_approved": True,
                     "is_active": True,
-                },
+                }
             )
-            
-            # Create the entry
-            entry, created = Entry.objects.get_or_create(
-                id=entry_id,
-                defaults={
-                    "url": entry_url,
-                    "author": author,
-                    "title": entry_data.get("title", ""),
-                    "content": entry_data.get("content", ""),
-                    "content_type": entry_data.get(
-                        "contentType", "text/plain"
-                    ),
-                    "visibility": entry_data.get("visibility", "PUBLIC"),
-                    "description": entry_data.get("description", ""),
-                    "source": entry_data.get("source", ""),
-                    "origin": entry_data.get("origin", ""),
-                },
-            )
-            
-            if created:
-                logger.info(f"Created new local entry from remote: {entry_id}")
-            else:
-                logger.info(f"Found existing local entry from remote: {entry_id}")
-                
+
+            # Create or get Entry using fqid
+            try:
+                entry = Entry.objects.get(url=entry_url)
+                # Update fqid if missing
+                if not entry.fqid:
+                    entry.fqid = entry_url
+                    entry.save(update_fields=["fqid"])
+                created = False
+            except Entry.DoesNotExist:
+                entry = Entry.objects.create(
+                    id=entry_uuid,
+                    url=entry_url,
+                    fqid=entry_url,
+                    author=author,
+                    title=entry_data.get("title", ""),
+                    content=entry_data.get("content", ""),
+                    content_type=entry_data.get("contentType", "text/plain"),
+                    visibility=entry_data.get("visibility", "PUBLIC"),
+                    description=entry_data.get("description", ""),
+                    source=entry_data.get("source", entry_url),
+                    origin=entry_data.get("origin", entry_url),
+                )
+                created = True
+
+            logger.info(f"{'Created' if created else 'Retrieved'} remote entry: {entry_url}")
             return entry
-            
+
         except Exception as e:
             logger.error(f"Error creating local entry from remote data: {e}")
             return None

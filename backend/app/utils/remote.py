@@ -602,3 +602,4 @@ def get_or_create_remote_author(author_data, source_node):
     except Exception as e:
         logger.error(f"Failed to create remote author: {e}")
         return None
+
