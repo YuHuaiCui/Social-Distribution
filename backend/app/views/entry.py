@@ -263,7 +263,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                 return None
             
             # Get or create the remote author
-             author,  = Author.objects.get_or_create(
+            author,  = Author.objects.get_or_create(
                 url=author_url,
                 defaults={
                     "id": author_id,
