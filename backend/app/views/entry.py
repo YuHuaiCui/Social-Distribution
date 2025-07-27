@@ -56,11 +56,11 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         This method implements the core security logic for entry access:
         
-    Prevents access to soft-deleted entries
-    Enforces visibility rules based on user relationships
-    Allows authors to access their own entries for editing
-    Allows staff to access any entry
-    Attempts to fetch remote entries when not found locally
+        Prevents access to soft-deleted entries
+        Enforces visibility rules based on user relationships
+        Allows authors to access their own entries for editing
+        Allows staff to access any entry
+        Attempts to fetch remote entries when not found locally
 
         Returns:
             Entry: The requested entry if user has permission
@@ -69,62 +69,61 @@ class EntryViewSet(viewsets.ModelViewSet):
             NotFound: If entry doesn't exist or user can't view it
             PermissionDenied: If user can't perform the requested action
         """
-        lookup_url_kwarg = self.lookup_field
-        lookup_value = self.kwargs.get(lookup_url_kwarg)
-
-        if lookup_value is None:
+        lookup_value = self.kwargs.get(self.lookup_field)
+        if not lookup_value:
             raise NotFound("No Entry ID provided.")
 
-        user = self.request.user
-        user_author = (
-            getattr(user, "author", None) or user if user.is_authenticated else None
-        )
+        request = self.request
+        user = request.user
+        user_author = getattr(user, "author", None) or (user if user.is_authenticated else None)
 
         obj = None
 
-        # Try to get by UUID (id)
+        # Try to find locally by UUID
         try:
             obj = Entry.objects.get(id=lookup_value)
         except Entry.DoesNotExist:
             pass
 
-        # Try to get by fqid (remote full URL)
-        if obj is None:
+        # Try by fqid (if used)
+        if not obj:
             try:
                 obj = Entry.objects.get(fqid=lookup_value)
             except Entry.DoesNotExist:
                 pass
 
-        # If found locally, apply permission rules
+        # Try by full URL
+        if not obj:
+            try:
+                obj = Entry.objects.get(url=lookup_value)
+            except Entry.DoesNotExist:
+                pass
+
+        # Permissions + visibility
         if obj:
-            # Staff can access anything
             if user.is_staff:
-                return obj
-            # Write operations: check author match
-            if self.request.method in ["PATCH", "PUT", "DELETE"]:
+                return obj  # Staff can view everything
+
+            if request.method in ["PATCH", "PUT", "DELETE"]:
                 if user_author and obj.author == user_author:
                     return obj
                 raise PermissionDenied("You cannot edit this post.")
 
-            # Read: enforce visibility rules
+            # For GET/read operations, enforce visibility
             if obj in Entry.objects.visible_to_author(user_author):
                 return obj
-
             raise PermissionDenied("You do not have permission to view this post.")
 
-        # Try to fetch from remote nodes
-        logger.info(f"Entry {lookup_value} not found locally, attempting remote fetch")
-
+        # Remote fetch attempt
+        logger.info(f"Entry {lookup_value} not found locally. Attempting remote fetch.")
         try:
             remote_entry = self._fetch_remote_entry(lookup_value)
-            if remote_entry:
-                logger.info(f"Successfully fetched remote entry {lookup_value}")
-                if remote_entry in Entry.objects.visible_to_author(user_author):
-                    return remote_entry
+            if remote_entry and remote_entry in Entry.objects.visible_to_author(user_author):
+                return remote_entry
+            elif remote_entry:
                 raise PermissionDenied("You do not have permission to view this post.")
-                
-        except Exception as remote_error:
-            logger.warning(f"Remote fetch failed for entry {lookup_value}: {remote_error}")
+        except Exception as e:
+            logger.warning(f"Remote fetch failed for {lookup_value}: {e}")
 
         raise NotFound("Entry not found.")
 
