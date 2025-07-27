@@ -16,7 +16,6 @@ from app.models import Like,InboxDelivery, SavedEntry
 from django.db.models import Count, F
 from django.utils import timezone
 from datetime import timedelta
-from app.utils.federation import get_or_create_remote_entry
 
 
 logger = logging.getLogger(__name__)
