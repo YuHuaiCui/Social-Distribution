@@ -45,6 +45,9 @@ class InboxReceiveView(APIView):
             print(f"DEBUG: Request path: {request.path}")
             print(f"DEBUG: Request META: {dict(request.META)}")
 
+            # Enhanced error logging - check each step
+            print(f"DEBUG: Step 1 - Author lookup")
+
             # If no author_id, this is a general broadcast (for PUBLIC posts)
             if author_id is None:
                 # For general broadcasts, we'll use a system user or the first local user
@@ -62,6 +65,7 @@ class InboxReceiveView(APIView):
                     )
             else:
                 # Extract the author from the URL
+                print(f"DEBUG: Looking up author with ID: {author_id}")
                 try:
                     author = Author.objects.get(id=author_id)
                     print(
@@ -90,7 +94,17 @@ class InboxReceiveView(APIView):
                     return Response(
                         {"error": error_msg}, status=status.HTTP_404_NOT_FOUND
                     )
+                except Exception as e:
+                    print(f"DEBUG: CRITICAL ERROR during author lookup: {e}")
+                    import traceback
 
+                    print(f"DEBUG: Author lookup traceback: {traceback.format_exc()}")
+                    return Response(
+                        {"error": f"Database error during author lookup: {str(e)}"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
+            print(f"DEBUG: Step 2 - Authentication")
             # Check authentication
             auth_header = request.headers.get("Authorization")
             node = None
@@ -199,28 +213,59 @@ class InboxReceiveView(APIView):
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
 
+            print(f"DEBUG: Step 3 - Processing federation item")
+            # Ensure we have a node object
+            if not node:
+                print("DEBUG: No node object available")
+                return Response(
+                    {"error": "Node authentication required"},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
             # Process the incoming object using the centralized federation service
             data = request.data
             object_type = data.get("type", "")
 
             print(f"DEBUG: Processing object type: {object_type}")
             print(f"DEBUG: Data keys: {list(data.keys())}")
+            print(f"DEBUG: Full data: {data}")
 
             # Use the centralized federation service to process the inbox item
             from app.utils.federation import FederationService
 
-            success = FederationService.process_inbox_item(author, data, node)
+            try:
+                print(f"DEBUG: About to call FederationService.process_inbox_item")
+                print(f"DEBUG: - recipient: {author.username}")
+                print(f"DEBUG: - data type: {object_type}")
+                print(f"DEBUG: - remote_node: {node.name}")
 
-            if success:
-                print(f"DEBUG: Successfully processed inbox item")
-                return Response(
-                    {"message": "Inbox item processed"}, status=status.HTTP_200_OK
+                success = FederationService.process_inbox_item(author, data, node)
+
+                print(
+                    f"DEBUG: FederationService.process_inbox_item returned: {success}"
                 )
-            else:
-                print(f"DEBUG: Failed to process inbox item")
+
+                if success:
+                    print(f"DEBUG: Successfully processed inbox item")
+                    return Response(
+                        {"message": "Inbox item processed"}, status=status.HTTP_200_OK
+                    )
+                else:
+                    print(f"DEBUG: Failed to process inbox item")
+                    return Response(
+                        {"error": "Failed to process inbox item"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            except Exception as federation_error:
+                print(
+                    f"DEBUG: CRITICAL ERROR in FederationService.process_inbox_item: {federation_error}"
+                )
+                import traceback
+
+                print(f"DEBUG: Federation error traceback: {traceback.format_exc()}")
                 return Response(
-                    {"error": "Failed to process inbox item"},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"error": f"Federation processing error: {str(federation_error)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
         except Exception as e:

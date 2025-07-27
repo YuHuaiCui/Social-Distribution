@@ -1040,39 +1040,67 @@ class FederationService:
     ) -> Tuple[Author, bool]:
         """Get or create a remote author from actor data."""
         try:
+            print(f"DEBUG: _get_or_create_remote_author called")
+            print(f"DEBUG: actor_data type: {type(actor_data)}")
+            print(f"DEBUG: actor_data: {actor_data}")
+            print(f"DEBUG: remote_node: {remote_node.name}")
+
             logger.info(f"Getting/creating remote author from actor data")
 
             if isinstance(actor_data, str):
+                print(f"DEBUG: actor_data is string, fetching from URL: {actor_data}")
                 # If actor_data is just a URL, we need to fetch the full data
                 try:
                     client = RemoteNodeClient(remote_node)
                     response = client.get(actor_data)
                     actor_data = response.json()
+                    print(f"DEBUG: Fetched actor data from URL: {actor_data}")
                     logger.info(f"Fetched actor data from URL: {actor_data}")
                 except Exception as e:
+                    print(f"DEBUG: Error fetching actor data from URL: {e}")
                     logger.error(
                         f"Failed to fetch actor data from URL {actor_data}: {e}"
                     )
                     raise Exception(f"Failed to fetch actor data: {str(e)}")
 
             actor_url = actor_data.get("id")
+            print(f"DEBUG: actor_url extracted: {actor_url}")
             if not actor_url:
+                print(f"DEBUG: No actor URL found in data")
                 logger.error("Actor URL not found in data")
                 raise Exception("Actor URL not found in data")
 
             logger.info(f"Looking for author with URL: {actor_url}")
+            print(f"DEBUG: Looking for existing author with URL: {actor_url}")
 
             # Try to get existing remote author
             try:
                 existing_author = Author.objects.get(url=actor_url)
+                print(
+                    f"DEBUG: Found existing remote author: {existing_author.username}"
+                )
                 logger.info(f"Found existing remote author: {existing_author.username}")
                 return existing_author, False
             except Author.DoesNotExist:
+                print(f"DEBUG: No existing author found, creating new one")
                 logger.info(f"No existing author found, creating new one")
                 pass
+            except Exception as e:
+                print(f"DEBUG: Error looking up existing author: {e}")
+                import traceback
+
+                print(f"DEBUG: Author lookup traceback: {traceback.format_exc()}")
+                raise Exception(f"Database error during author lookup: {str(e)}")
 
             # Create new remote author with proper error handling
             try:
+                print(f"DEBUG: Creating new remote author with data:")
+                print(f"DEBUG: - url: {actor_url}")
+                print(f"DEBUG: - username: {actor_data.get('username', '')}")
+                print(f"DEBUG: - displayName: {actor_data.get('displayName', '')}")
+                print(f"DEBUG: - host: {actor_data.get('host', '')}")
+                print(f"DEBUG: - node: {remote_node.name}")
+
                 remote_author = Author.objects.create(
                     url=actor_url,
                     username=actor_data.get("username", ""),
@@ -1088,13 +1116,28 @@ class FederationService:
                     is_approved=True,
                     is_active=True,
                 )
+                print(
+                    f"DEBUG: Successfully created new remote author: {remote_author.username} (ID: {remote_author.id})"
+                )
                 logger.info(f"Created new remote author: {remote_author.username}")
                 return remote_author, True
             except Exception as e:
+                print(f"DEBUG: CRITICAL ERROR creating remote author: {e}")
+                import traceback
+
+                print(
+                    f"DEBUG: Remote author creation traceback: {traceback.format_exc()}"
+                )
                 logger.error(f"Error creating remote author: {e}")
                 raise Exception(f"Failed to create remote author: {str(e)}")
 
         except Exception as e:
+            print(f"DEBUG: CRITICAL ERROR in _get_or_create_remote_author: {e}")
+            import traceback
+
+            print(
+                f"DEBUG: Full _get_or_create_remote_author traceback: {traceback.format_exc()}"
+            )
             logger.error(f"Error in _get_or_create_remote_author: {e}")
             raise e
 
@@ -1102,60 +1145,99 @@ class FederationService:
     def _find_liked_object(object_url: str) -> Optional[Entry | Comment]:
         """Find the liked object (Entry or Comment) by URL."""
 
+        print(f"DEBUG: _find_liked_object called with URL: {object_url}")
+
         # Try to find as entry first
         try:
+            print(f"DEBUG: Trying to find entry...")
             # Try exact match
             try:
-                return Entry.objects.get(url=object_url)
+                entry = Entry.objects.get(url=object_url)
+                print(f"DEBUG: Found entry by exact URL match: {entry.title}")
+                return entry
             except Entry.DoesNotExist:
+                print(f"DEBUG: No exact URL match for entry")
                 pass
 
             # Try partial match by extracting ID from URL
+            print(f"DEBUG: Trying partial URL matching for entry...")
             parsed_url = urlparse(object_url)
             path_parts = parsed_url.path.strip("/").split("/")
+            print(f"DEBUG: URL path parts: {path_parts}")
 
             # Look for entry ID in the path
             for part in reversed(path_parts):
                 if part and part != "entries":
+                    print(f"DEBUG: Trying to find entry with ID: {part}")
                     try:
-                        return Entry.objects.get(id=part)
-                    except (Entry.DoesNotExist, ValueError):
+                        entry = Entry.objects.get(id=part)
+                        print(f"DEBUG: Found entry by ID extraction: {entry.title}")
+                        return entry
+                    except (Entry.DoesNotExist, ValueError) as e:
+                        print(f"DEBUG: No entry found with ID {part}: {e}")
                         continue
 
             # Try matching by URL containing the entry ID
+            print(f"DEBUG: Trying URL contains matching for entry...")
             for part in reversed(path_parts):
                 if part and part != "entries":
+                    print(f"DEBUG: Trying to find entry with URL containing: {part}")
                     try:
-                        return Entry.objects.get(url__icontains=part)
+                        entry = Entry.objects.get(url__icontains=part)
+                        print(f"DEBUG: Found entry by URL contains: {entry.title}")
+                        return entry
                     except Entry.DoesNotExist:
+                        print(f"DEBUG: No entry found with URL containing: {part}")
                         continue
 
         except Exception as e:
+            print(f"DEBUG: Critical error finding entry: {e}")
+            import traceback
+
+            print(f"DEBUG: Entry search traceback: {traceback.format_exc()}")
             logger.error(f"Error finding entry: {e}")
 
         # Try to find as comment
         try:
+            print(f"DEBUG: Trying to find comment...")
             # Try exact match
             try:
-                return Comment.objects.get(url=object_url)
+                comment = Comment.objects.get(url=object_url)
+                print(
+                    f"DEBUG: Found comment by exact URL match: {comment.content[:50]}..."
+                )
+                return comment
             except Comment.DoesNotExist:
+                print(f"DEBUG: No exact URL match for comment")
                 pass
 
             # Try partial match by extracting ID from URL
+            print(f"DEBUG: Trying partial URL matching for comment...")
             parsed_url = urlparse(object_url)
             path_parts = parsed_url.path.strip("/").split("/")
 
             # Look for comment ID in the path
             for part in reversed(path_parts):
                 if part and part != "comments":
+                    print(f"DEBUG: Trying to find comment with ID: {part}")
                     try:
-                        return Comment.objects.get(id=part)
-                    except (Comment.DoesNotExist, ValueError):
+                        comment = Comment.objects.get(id=part)
+                        print(
+                            f"DEBUG: Found comment by ID extraction: {comment.content[:50]}..."
+                        )
+                        return comment
+                    except (Comment.DoesNotExist, ValueError) as e:
+                        print(f"DEBUG: No comment found with ID {part}: {e}")
                         continue
 
         except Exception as e:
+            print(f"DEBUG: Critical error finding comment: {e}")
+            import traceback
+
+            print(f"DEBUG: Comment search traceback: {traceback.format_exc()}")
             logger.error(f"Error finding comment: {e}")
 
+        print(f"DEBUG: No liked object found for URL: {object_url}")
         return None
 
 
