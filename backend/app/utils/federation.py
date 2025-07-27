@@ -599,8 +599,20 @@ class FederationService:
             client = RemoteNodeClient(author.node)
             entry_data = FederationService._prepare_entry_data(entry)
 
+            # Extract the correct author ID for the inbox endpoint
+            # Import the helper from RemoteActivitySender
+            from app.utils.remote import RemoteActivitySender
+
+            author_id = RemoteActivitySender._extract_author_id_from_url(
+                author.url, author.id
+            )
+
+            logger.info(
+                f"Sending entry to author inbox: /api/authors/{author_id}/inbox/"
+            )
+
             # Send to specific author's inbox
-            response = client.post(f"/api/authors/{author.id}/inbox/", entry_data)
+            response = client.post(f"/api/authors/{author_id}/inbox/", entry_data)
             logger.info(f"Entry sent to author {author.url}: {response.status_code}")
 
         except Exception as e:

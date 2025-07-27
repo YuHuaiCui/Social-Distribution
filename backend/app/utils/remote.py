@@ -205,6 +205,49 @@ class RemoteActivitySender:
     """Send activities to remote nodes"""
 
     @staticmethod
+    def _extract_author_id_from_url(author_url, fallback_id):
+        """
+        Extract author ID from author URL for inbox endpoints.
+
+        For remote authors, we need to use the ID from their URL, not the local database ID.
+
+        Args:
+            author_url: The author's URL (e.g., http://host/api/authors/{id}/)
+            fallback_id: The local database ID to use as fallback
+
+        Returns:
+            str: The extracted author ID or fallback_id
+        """
+        if not author_url:
+            return fallback_id
+
+        try:
+            from urllib.parse import urlparse
+
+            parsed_url = urlparse(author_url)
+            path_parts = parsed_url.path.strip("/").split("/")
+
+            # Look for the author ID in the path
+            if "authors" in path_parts:
+                author_index = path_parts.index("authors")
+                if author_index + 1 < len(path_parts):
+                    extracted_id = path_parts[author_index + 1]
+                    print(
+                        f"[DEBUG] Extracted author ID from URL {author_url}: {extracted_id}"
+                    )
+                    return extracted_id
+
+            print(
+                f"[DEBUG] Could not extract author ID from URL {author_url}, using fallback: {fallback_id}"
+            )
+            return fallback_id
+
+        except Exception as e:
+            print(f"[DEBUG] Error extracting author ID from URL {author_url}: {e}")
+            print(f"[DEBUG] Using fallback ID: {fallback_id}")
+            return fallback_id
+
+    @staticmethod
     def send_follow_request(follower, followed):
         """Send follow request to remote node"""
         if not followed.node:
@@ -244,8 +287,19 @@ class RemoteActivitySender:
                 },
             }
 
+            # Extract the correct author ID for the inbox endpoint
+            followed_author_id = RemoteActivitySender._extract_author_id_from_url(
+                followed.url, followed.id
+            )
+
+            print(
+                f"[DEBUG] Sending follow request to: /api/authors/{followed_author_id}/inbox/"
+            )
+
             # Send to remote author's inbox
-            response = client.post(f"/api/authors/{followed.id}/inbox/", follow_data)
+            response = client.post(
+                f"/api/authors/{followed_author_id}/inbox/", follow_data
+            )
             logger.info(
                 f"Follow request sent to {followed.url}: {response.status_code}"
             )
@@ -385,10 +439,18 @@ class RemoteActivitySender:
             }
 
             print(f"[DEBUG] Like data prepared: {like_data}")
-            print(f"[DEBUG] Sending to: /api/authors/{target_author.id}/inbox/")
 
-            # Send to target author's inbox
-            response = client.post(f"/api/authors/{target_author.id}/inbox/", like_data)
+            # Extract the correct author ID from the target author's URL
+            # For remote authors, we need to use the ID from their URL, not the local database ID
+            target_author_id = RemoteActivitySender._extract_author_id_from_url(
+                target_author.url, target_author.id
+            )
+
+            print(f"[DEBUG] Final target author ID for inbox: {target_author_id}")
+            print(f"[DEBUG] Sending to: /api/authors/{target_author_id}/inbox/")
+
+            # Send to target author's inbox using the correct ID
+            response = client.post(f"/api/authors/{target_author_id}/inbox/", like_data)
             logger.info(f"Like sent to {target_author.url}: {response.status_code}")
             print(f"[DEBUG] Response status: {response.status_code}")
             return True
@@ -439,9 +501,16 @@ class RemoteActivitySender:
                 },
             }
 
+            # Extract the correct author ID for the inbox endpoint
+            entry_author_id = RemoteActivitySender._extract_author_id_from_url(
+                comment.entry.author.url, comment.entry.author.id
+            )
+
+            print(f"[DEBUG] Sending comment to: /api/authors/{entry_author_id}/inbox/")
+
             # Send to entry author's inbox
             response = client.post(
-                f"/api/authors/{comment.entry.author.id}/inbox/", comment_data
+                f"/api/authors/{entry_author_id}/inbox/", comment_data
             )
             logger.info(
                 f"Comment sent to {comment.entry.author.url}: {response.status_code}"
@@ -506,8 +575,15 @@ class RemoteActivitySender:
 
             entry_data = RemoteActivitySender._prepare_entry_data(entry)
 
+            # Extract the correct author ID for the inbox endpoint
+            author_id = RemoteActivitySender._extract_author_id_from_url(
+                author.url, author.id
+            )
+
+            print(f"[DEBUG] Sending entry to: /api/authors/{author_id}/inbox/")
+
             # Send to specific author's inbox
-            response = client.post(f"/api/authors/{author.id}/inbox/", entry_data)
+            response = client.post(f"/api/authors/{author_id}/inbox/", entry_data)
             logger.info(f"Entry sent to author {author.url}: {response.status_code}")
 
         except Exception as e:
@@ -602,4 +678,3 @@ def get_or_create_remote_author(author_data, source_node):
     except Exception as e:
         logger.error(f"Failed to create remote author: {e}")
         return None
-
