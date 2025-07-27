@@ -17,6 +17,7 @@ from app.models.author import Author
 from app.models.node import Node
 from app.serializers.inbox import InboxItemSerializer, InboxStatsSerializer
 from rest_framework.permissions import IsAuthenticated
+from app.utils.remote import entry_is_remote
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -582,6 +583,13 @@ class InboxReceiveView(APIView):
                     comment=liked_object if object_type == "comment" else None,
                     defaults={"url": temp_url},
                 )
+
+                if entry_is_remote(entry) or author_is_remote(like.author):
+                    logger.debug(f"Federating Like to remote inbox for entry: {entry.url}")
+                    FederationService.send_like(like)
+
+                serializer = LikeSerializer(like, context={"request": request})
+                return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
                 # Update URL with the actual like ID if it was created
                 if created:

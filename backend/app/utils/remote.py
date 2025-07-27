@@ -716,3 +716,14 @@ def get_or_create_remote_author(author_data, source_node):
     except Exception as e:
         logger.error(f"Failed to create remote author: {e}")
         return None
+
+def entry_is_remote(entry):
+    """
+    Determines if an Entry is remote by comparing its host to the local host.
+    """
+    if not entry:
+        return False
+    entry_url = entry.fqid or entry.url
+    parsed_host = urlparse(entry_url).netloc
+    local_host = urlparse(settings.HOST_URL).netloc
+    return parsed_host != local_host
