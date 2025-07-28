@@ -114,7 +114,15 @@ class InboxCreateSerializer(serializers.ModelSerializer):
         # Handle federated Like
         if raw_data and isinstance(raw_data, dict):
             item_type = raw_data.get("type", "").lower()
+            print("Inbox create: raw_data =", raw_data)
+            print("Inbox create: type =", item_type)
+
             if item_type == "like":
+
+                print("Processing Like...")
+                print("Object URL:", object_url)
+                print("Actor data:", actor_data)
+                
                 from app.models.entry import Entry
                 from app.models.like import Like
                 from app.utils.federation import _get_or_create_remote_author
