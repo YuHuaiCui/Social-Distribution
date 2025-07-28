@@ -791,7 +791,7 @@ class FederationService:
                     entry=entry,
                     author=author,
                     defaults={
-                        "url": like_data.get("id"),  # Important!
+                        "url": like_data.get("id") or like_data.get("url"),  # Important!
                         "summary": like_data.get("summary", f"{author.display_name} liked your post"),
                         "object": object_url,
                     },
