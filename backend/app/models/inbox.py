@@ -80,3 +80,6 @@ class Inbox(models.Model):
         """
         # Customize logic here if needed
         return self.is_read  # or: return self.created_at is not None, etc.
+    
+
+    
