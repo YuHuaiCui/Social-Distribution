@@ -102,6 +102,7 @@ class InboxCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         recipient_url = validated_data.pop("recipient_url")
+        raw_data = validated_data.get("raw_data", {})
 
         try:
             recipient = Author.objects.get(url=recipient_url)
@@ -109,7 +110,41 @@ class InboxCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"recipient_url": "Recipient not found"})
 
         validated_data["recipient"] = recipient
-        return super().create(validated_data)
+
+        # Handle federated Like
+        if raw_data and isinstance(raw_data, dict):
+            item_type = raw_data.get("type", "").lower()
+            if item_type == "like":
+                from app.models.entry import Entry
+                from app.models.like import Like
+                from app.utils.federation import _get_or_create_remote_author
+
+                object_url = raw_data.get("object")
+                actor_data = raw_data.get("author") or raw_data.get("actor")
+
+                if not object_url or not actor_data:
+                    raise serializers.ValidationError("Like activity missing 'object' or 'author' fields")
+
+                # Resolve or create remote author
+                author = _get_or_create_remote_author(actor_data)
+
+                # Resolve target entry by URL or fqid
+                entry = Entry.objects.filter(url=object_url).first()
+                if not entry:
+                    # Try by fqid if applicable
+                    entry = Entry.objects.filter(fqid=object_url).first()
+
+                if not entry:
+                    raise serializers.ValidationError(f"Target entry not found: {object_url}")
+
+                # Create or fetch Like
+                like, _ = Like.objects.get_or_create(author=author, entry=entry)
+
+                # Attach to inbox
+                validated_data["like"] = like
+                validated_data["item_type"] = "like"
+
+        return super().create(validated_data)    
 
 
 class InboxStatsSerializer(serializers.Serializer):
