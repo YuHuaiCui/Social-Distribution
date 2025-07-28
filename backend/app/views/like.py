@@ -11,6 +11,7 @@ from app.models import Node
 from app.serializers.like import LikeSerializer
 import requests
 from app.utils.remote import RemoteActivitySender
+from app.utils.remote import entry_is_remote
 
 
 def send_like_to_remote_inbox(like):

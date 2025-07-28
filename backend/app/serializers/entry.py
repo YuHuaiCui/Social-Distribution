@@ -59,7 +59,8 @@ class EntrySerializer(serializers.ModelSerializer):
     
     def get_likes_count(self, obj):
         """Get the number of likes for this entry"""
-        return obj.likes.count()
+        from app.models import Like
+        return Like.objects.filter(entry=obj.url).count()
     
     def get_image(self, obj):
         """Get the image data as base64 for image posts"""
@@ -164,7 +165,7 @@ class EntrySerializer(serializers.ModelSerializer):
                 "created_at": data.get("created_at"),
                 "updated_at": data.get("updated_at"),
                 "comments_count": comments_count,
-                "likes_count": likes_count,
+                "likes_count": self.get_likes_count(instance),
                 "image": data.get("image"),
                 "is_liked": data.get("is_liked"),
                 "is_saved": data.get("is_saved"),

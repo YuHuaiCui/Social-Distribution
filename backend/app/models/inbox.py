@@ -72,3 +72,10 @@ class Inbox(models.Model):
             str: A human-readable string showing the inbox recipient and item type
         """
         return f"Inbox item for {self.recipient}: {self.item_type}"
+    
+    @property
+    def processed_status(self):
+        return self.is_read
+
+
+
