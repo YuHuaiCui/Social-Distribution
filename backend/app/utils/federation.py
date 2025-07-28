@@ -791,8 +791,9 @@ class FederationService:
                     entry=entry,
                     author=author,
                     defaults={
-                        "url": like_url,  # ✅ REQUIRED FIELD
+                        "url": like_data.get("id"),  # Important!
                         "summary": like_data.get("summary", f"{author.display_name} liked your post"),
+                        "object": object_url,
                     },
                 )
                 if created:
