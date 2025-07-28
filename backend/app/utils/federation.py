@@ -761,106 +761,53 @@ class FederationService:
             return False
 
     @staticmethod
-    def _process_like(
-        recipient: Author, data: Dict[str, Any], remote_node: Node
-    ) -> bool:
-        """Process an incoming like."""
-        try:
-            print(f"Processing like for recipient: {recipient.username}")
+    def _process_like(like_data, recipient: Author, remote_node: Node):
+        from app.models import Like, Entry
 
-            # Extract like data - handle both 'actor' and 'author' fields for compatibility
-            actor_data = data.get("actor", data.get("author", {}))
-            object_data = data.get("object", {})
+        actor = like_data.get("author") or like_data.get("actor")
+        if not actor:
+            print(f"[ERROR] No actor in Like object: {like_data}")
+            return
 
-            print(
-                f"Actor data keys: {list(actor_data.keys() if isinstance(actor_data, dict) else 'Not a dict')}"
-            )
-            print(f"Object data: {object_data}")
+        # Ensure the actor exists as a remote author
+        author, _ = FederationService._get_or_create_remote_author(actor, remote_node)
 
-            # Get or create the remote author
+        # Save raw like payload in inbox
+        Inbox.objects.create(
+            recipient=recipient,
+            sender=author,
+            type="Like",
+            content=like_data,
+        )
+
+        # Attempt to link this like to a local entry
+        object_url = like_data.get("object")
+        like_url = like_data.get("id")  # ✅ Required for remote Like
+
+        if object_url and like_url:
             try:
-                remoteauthor,  = FederationService._get_or_create_remote_author(
-                    actor_data, remote_node
+                entry = Entry.objects.get(url=object_url)
+                like_obj, created = Like.objects.get_or_create(
+                    entry=entry,
+                    author=author,
+                    defaults={
+                        "url": like_url,  # ✅ REQUIRED FIELD
+                        "summary": like_data.get("summary", f"{author.display_name} liked your post"),
+                    },
                 )
-                print(f"Remote author: {remote_author.username}")
-            except Exception as e:
-                print(f"Failed to get/create remote author: {e}")
-                return False
-
-            # Find the liked object
-            object_url = (
-                object_data.get("id") if isinstance(object_data, dict) else object_data
-            )
-            print(f"Looking for object with URL: {object_url}")
-            if not object_url or not isinstance(object_url, str):
-                print("Invalid or missing object URL for Like.")
-                return False
-            if not object_url.startswith("http"):
-                print("Object URL must be a full HTTP URL.")
-                return False
-
-
-            try:
-                liked_object = FederationService._find_liked_object(object_url)
-                if not liked_object:
-                    print(f"Liked object not found: {object_url}")
-                    return False
-                print(f"Found liked object: {liked_object}")
-            except Exception as e:
-                print(f"Error finding liked object: {e}")
-                return False
-
-            try:
-                if isinstance(liked_object, Entry):
-                    like, created = Like.objects.get_or_create(
-                        author=remote_author,
-                        entry=liked_object,
-                        defaults={
-                            "url": f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"
-                        },
-                    )
-                elif isinstance(liked_object, Comment):
-                    like, created = Like.objects.get_or_create(
-                        author=remote_author,
-                        comment=liked_object,
-                        defaults={
-                            "url": f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/temp"
-                        },
-                    )
-                else:
-                    print(f"Unsupported liked_object type: {type(liked_object)}")
-                    return False
-
                 if created:
-                    like.url = f"{settings.SITE_URL}/api/authors/{remote_author.id}/liked/{like.id}"
-                    like.save(update_fields=["url"])
-                    print(f"Created new like: {like.id}")
+                    print(f"[LIKE] Created Like on entry '{entry.title}' by {author.username}")
                 else:
-                    print(f"Like already exists: {like.id}")
-            except Exception as e:
-                print(f"Error creating like: {e}")
-                return False
+                    print(f"[LIKE] Like already existed for '{entry.title}' by {author.username}")
+            except Entry.DoesNotExist:
+                print(f"[WARN] No local entry found for Like target: {object_url}")
+        else:
+            if not like_url:
+                print(f"[ERROR] Remote Like missing required 'id': {like_data}")
+            if not object_url:
+                print(f"[ERROR] Remote Like missing 'object' field: {like_data}")
 
-            # Create inbox item
-            try:
-                Inbox.objects.create(
-                    recipient=recipient,
-                    item_type=Inbox.LIKE,
-                    like=like,
-                    raw_data=data,
-                )
-                print(f"Created inbox item for like")
-            except Exception as e:
-                print(f"Error creating inbox item: {e}")
-                # Non-fatal
 
-            return True
-
-        except Exception as e:
-            print(f"Failed to process like: {e}")
-            import traceback
-            print(traceback.format_exc())
-            return False
             
     @staticmethod
     def _process_comment(
@@ -1086,7 +1033,7 @@ class FederationService:
                 if not remote_node:
                     print(f"WARNING: Could not determine node for author: {actor_url}")
 
-            print(f"DEBUG: actor_url extracted: {actor_url}")
+                    print(f"DEBUG: actor_url extracted: {actor_url}")
             if not actor_url:
                 print(f"DEBUG: No actor URL found in data")
                 print("Actor URL not found in data")
