@@ -74,12 +74,8 @@ class Inbox(models.Model):
         return f"Inbox item for {self.recipient}: {self.item_type}"
     
     @property
-    def is_processed(self):
-        """
-        Dynamically computed — not stored in DB.
-        """
-        # Customize logic here if needed
-        return self.is_read  # or: return self.created_at is not None, etc.
-    
+    def processed_status(self):
+        return self.is_read
 
-    
+
+
