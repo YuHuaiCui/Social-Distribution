@@ -51,6 +51,8 @@ class Inbox(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
 
+    is_processed = models.BooleanField(default=False)
+
     class Meta:
         ordering = ["-created_at"]
         indexes = [
@@ -62,6 +64,7 @@ class Inbox(models.Model):
             models.Index(fields=["is_read"]),
             models.Index(fields=["-created_at"]),  # For default ordering
             models.Index(fields=["recipient"]),
+            models.Index(fields=["is_processed"]),
         ]
 
     def __str__(self):
