@@ -101,6 +101,11 @@ class InboxCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
+        from urllib.parse import urlparse
+        from app.models.entry import Entry
+        from app.models.like import Like
+        from app.utils.federation import _get_or_create_remote_author, extract_uuid_from_url
+
         recipient_url = validated_data.pop("recipient_url")
         raw_data = validated_data.get("raw_data", {})
 
@@ -111,48 +116,38 @@ class InboxCreateSerializer(serializers.ModelSerializer):
 
         validated_data["recipient"] = recipient
 
-        # Handle federated Like
         if raw_data and isinstance(raw_data, dict):
             item_type = raw_data.get("type", "").lower()
-            print("Inbox create: raw_data =", raw_data)
-            print("Inbox create: type =", item_type)
 
             if item_type == "like":
-
-                print("Processing Like...")
-                print("Object URL:", object_url)
-                print("Actor data:", actor_data)
-                
-                from app.models.entry import Entry
-                from app.models.like import Like
-                from app.utils.federation import _get_or_create_remote_author
-
-                object_url = raw_data.get("object")
+                object_url = raw_data.get("object", "").rstrip("/")  # normalize trailing slash
                 actor_data = raw_data.get("author") or raw_data.get("actor")
 
                 if not object_url or not actor_data:
                     raise serializers.ValidationError("Like activity missing 'object' or 'author' fields")
 
-                # Resolve or create remote author
+                # Resolve remote author
                 author = _get_or_create_remote_author(actor_data)
 
-                # Resolve target entry by URL or fqid
+                # Try resolving by full URL
                 entry = Entry.objects.filter(url=object_url).first()
+
+                # If not found, try by extracted UUID
                 if not entry:
-                    # Try by fqid if applicable
-                    entry = Entry.objects.filter(fqid=object_url).first()
+                    entry_uuid = extract_uuid_from_url(object_url)
+                    entry = Entry.objects.filter(id=entry_uuid).first()
 
                 if not entry:
                     raise serializers.ValidationError(f"Target entry not found: {object_url}")
 
-                # Create or fetch Like
+                # Create or get like
                 like, _ = Like.objects.get_or_create(author=author, entry=entry)
 
-                # Attach to inbox
                 validated_data["like"] = like
                 validated_data["item_type"] = "like"
 
-        return super().create(validated_data)    
+        return super().create(validated_data)
+
 
 
 class InboxStatsSerializer(serializers.Serializer):
