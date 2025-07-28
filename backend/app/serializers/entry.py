@@ -60,7 +60,7 @@ class EntrySerializer(serializers.ModelSerializer):
     def get_likes_count(self, obj):
         """Get the number of likes for this entry"""
         from app.models import Like
-        return Like.objects.filter(entry__url=obj).count()
+        return Like.objects.filter(entry=obj.url).count()
     
     def get_image(self, obj):
         """Get the image data as base64 for image posts"""
