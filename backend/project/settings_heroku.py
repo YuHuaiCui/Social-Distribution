@@ -14,7 +14,6 @@ LOGOUT_REDIRECT_URL = os.environ.get("LOGOUT_REDIRECT_URL")
 DEBUG = False
 ALLOWED_HOSTS = [
     ".herokuapp.com",
-    "project-black-ej-53285e19ae0a.herokuapp.com",
     "cmp404-black-prod-melrita-66c4dd1f85d5.herokuapp.com",
     "s25-black-yangwang-4d3e16ddc539.herokuapp.com",
     os.environ.get("HEROKU_APP_NAME", "") + ".herokuapp.com",
@@ -44,7 +43,7 @@ if os.environ.get("HEROKU_APP_NAME"):
     SITE_URL = f"https://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com"
 elif not os.environ.get("SITE_URL"):
     # Default production URL if no environment variable is set
-    SITE_URL = "https://project-black-ej-53285e19ae0a.herokuapp.com"
+    SITE_URL = "https://your-app.herokuapp.com"
 
 # Database
 DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
