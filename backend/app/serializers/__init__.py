@@ -6,7 +6,6 @@ from .node import (
     NodeCreateSerializer,
     NodeUpdateSerializer,
 )
-from .inbox import InboxItemSerializer, InboxCreateSerializer, InboxStatsSerializer
 from .entry import EntrySerializer
 from .comment import CommentSerializer
 from .like import LikeSerializer
@@ -20,9 +19,6 @@ __all__ = [
     "NodeWithAuthenticationSerializer",
     "NodeCreateSerializer",
     "NodeUpdateSerializer",
-    "InboxItemSerializer",
-    "InboxCreateSerializer",
-    "InboxStatsSerializer",
     "EntrySerializer",
     "CommentSerializer",
     "LikeSerializer",

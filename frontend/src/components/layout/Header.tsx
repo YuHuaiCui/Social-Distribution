@@ -141,12 +141,6 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
               >
                 Explore
               </Link>
-              <Link
-                to="/inbox"
-                className="text-text-2 hover:text-text-1 transition-colors font-medium"
-              >
-                Inbox
-              </Link>
             </nav>
           )}
 
@@ -220,7 +214,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                     markAsRead([notif.id]);
                                   }
                                   if (notif.item_type === "follow") {
-                                    navigate("/inbox");
+                                    // Removed inbox navigation
                                   } else if (
                                     notif.item_type === "comment" ||
                                     notif.item_type === "like"
@@ -325,13 +319,6 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                               </motion.div>
                             );
                           })}
-                          <Link
-                            to="/inbox"
-                            className="block px-4 py-2 text-center text-sm text-[var(--primary-purple)] hover:bg-glass-low transition-colors"
-                            onClick={() => setShowNotifications(false)}
-                          >
-                            View all in inbox
-                          </Link>
                         </div>
                       ) : (
                         <div className="px-4 py-8 text-center text-text-2">

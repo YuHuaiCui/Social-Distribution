@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from app.models import Author, Node, Entry, Comment, Like, Follow, Friendship, Inbox
+from app.models import Author, Node, Entry, Comment, Like, Follow, Friendship
 
 
 @admin.register(Author)
@@ -133,11 +133,3 @@ class FriendshipAdmin(admin.ModelAdmin):
     ordering = ["-created_at"]
 
 
-@admin.register(Inbox)
-class InboxAdmin(admin.ModelAdmin):
-    """Admin configuration for Inbox model"""
-
-    list_display = ["recipient", "item_type", "is_read", "created_at"]
-    list_filter = ["item_type", "is_read", "created_at"]
-    search_fields = ["recipient__username"]
-    ordering = ["-created_at"]

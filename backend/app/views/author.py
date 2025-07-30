@@ -572,58 +572,14 @@ class AuthorViewSet(viewsets.ModelViewSet):
     def post_to_inbox(self, request, pk=None):
         """
         Post an item to an author's inbox for federation support.
-
-        This endpoint supports the ActivityPub-style inbox pattern where
-        remote instances can deliver activities (follows, likes, comments, etc.)
-        to local users.
-
-        Expected data format:
-        {
-            "content_type": "entry" | "comment" | "like" | "follow" | "report",
-            "content_id": "id of the content",
-            "content_data": { ... additional data ... }
-        }
+        
+        Note: Inbox functionality has been removed from the system.
+        This endpoint now returns a 410 Gone status.
         """
-        from app.models import Inbox
-        from app.serializers.inbox import InboxItemSerializer
-
-        try:
-            # Get the recipient author
-            recipient = self.get_object()
-
-            # Extract content information from request
-            content_type = request.data.get("content_type")
-            content_id = request.data.get("content_id")
-            content_data = request.data.get("content_data", {})
-
-            # Validate content type
-            valid_types = ["entry", "comment", "like", "follow", "report"]
-            if content_type not in valid_types:
-                return Response(
-                    {
-                        "error": f"Invalid content_type. Must be one of: {', '.join(valid_types)}"
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Create inbox item with the provided data
-            inbox_item = Inbox.objects.create(
-                recipient=recipient,
-                item_type=content_type,
-                raw_data={
-                    "content_type": content_type,
-                    "content_id": content_id,
-                    **content_data,
-                },
-            )
-
-            serializer = InboxItemSerializer(inbox_item)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        return Response(
+            {"error": "Inbox functionality has been removed"},
+            status=status.HTTP_410_GONE
+        )
 
     # CMPUT 404 Compliant API Endpoints
 

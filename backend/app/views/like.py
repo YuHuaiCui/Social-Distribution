@@ -10,8 +10,6 @@ from app.models import Like, Entry, Comment, Node
 from app.serializers.like import LikeSerializer, LikesCollectionSerializer
 from requests.auth import HTTPBasicAuth
 import requests
-from app.utils.remote import RemoteActivitySender
-from app.utils.remote import entry_is_remote
 
 
 @api_view(["GET"])
@@ -37,9 +35,8 @@ def received_likes(request):
 
 
 def send_like_to_remote_inbox(like):
-    # DEPRECATED: Use RemoteActivitySender.send_like instead
-    # TODO: Remove this function
-    RemoteActivitySender.send_like(like)
+    # Remote functionality removed
+    pass
 
 
 class EntryLikeView(APIView):
@@ -181,19 +178,7 @@ class EntryLikeView(APIView):
         )
         print(f"[DEBUG] About to call RemoteActivitySender.send_like")
 
-        # Send like to remote nodes (but don't fail if this doesn't work)
-        try:
-            RemoteActivitySender.send_like(like)
-            print(f"[DEBUG] RemoteActivitySender.send_like completed successfully")
-        except Exception as e:
-            print(f"[DEBUG] Error in RemoteActivitySender.send_like: {e}")
-            print(f"[DEBUG] Exception type: {type(e)}")
-            import traceback
-
-            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
-            # Don't fail the like operation if federation fails
-            # The like was still created successfully locally
-            print(f"[DEBUG] Continuing with like creation despite federation error")
+        # Remote functionality removed
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -449,13 +434,7 @@ class CommentLikeView(APIView):
         like = Like.objects.create(author=author, comment=comment)
         serializer = LikeSerializer(like)
 
-        # Send like to remote nodes (but don't fail if this doesn't work)
-        try:
-            RemoteActivitySender.send_like(like)
-        except Exception as e:
-            print(f"[DEBUG] Error in RemoteActivitySender.send_like for comment: {e}")
-            # Don't fail the like operation if federation fails
-            # The like was still created successfully locally
+        # Remote functionality removed
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

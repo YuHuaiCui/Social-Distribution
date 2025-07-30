@@ -2,7 +2,6 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from app.models import Follow, Author
-from app.models.inbox import Inbox
 from app.serializers.follow import FollowSerializer, FollowCreateSerializer
 from rest_framework.decorators import api_view
 from django.db import IntegrityError
@@ -87,37 +86,7 @@ class FollowViewSet(viewsets.ModelViewSet):
         try:
             follow = serializer.save()
 
-            # Only create inbox item for LOCAL authors (so they can see the request)
-            # Remote authors will receive the request via their node's inbox API
-            if follow.followed.is_local:
-                Inbox.objects.create(
-                    recipient=follow.followed,
-                    item_type=Inbox.FOLLOW,
-                    follow=follow,
-                    raw_data={
-                        "type": "Follow",
-                        "actor": {
-                            "id": follow.follower.url,
-                            "display_name": follow.follower.displayName,
-                            "username": follow.follower.username,
-                            "profile_image": (
-                                follow.follower.profile_image.url
-                                if follow.follower.profile_image
-                                else None
-                            ),
-                        },
-                        "object": {
-                            "id": follow.followed.url,
-                            "display_name": follow.followed.displayName,
-                            "username": follow.followed.username,
-                            "profile_image": (
-                                follow.followed.profile_image.url
-                                if follow.followed.profile_image
-                                else None
-                            ),
-                        },
-                    },
-                )
+            # Note: Inbox functionality has been removed from the system
 
             # If following a remote author, send the follow request to their node
             if follow.followed.is_remote:

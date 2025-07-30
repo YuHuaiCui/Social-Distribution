@@ -26,7 +26,6 @@ import AnimatedButton from "./ui/AnimatedButton";
 import Card from "./ui/Card";
 import { api } from "../services/api";
 import { socialService } from "../services/social";
-import { inboxService } from "../services/inbox";
 import { useAuth } from "./context/AuthContext";
 import { triggerNotificationUpdate } from "./context/NotificationContext";
 import { useToast } from "./context/ToastContext";
@@ -225,16 +224,8 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         return;
       }
 
-      // Send report to all admin inboxes
-      await Promise.all(
-        admins.map((admin) =>
-          inboxService
-            .sendToInbox(extractUUID(admin.id), reportData)
-            .catch((err) => {
-              console.error(`Failed to send report to admin ${admin.id}:`, err);
-            })
-        )
-      );
+      // Inbox functionality removed - reports are no longer sent to admin inboxes
+      console.log('Report would be sent to admins:', admins.map(a => a.id));
 
       showSuccess("User has been reported to administrators");
     } catch (error) {
