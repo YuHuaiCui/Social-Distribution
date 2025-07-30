@@ -178,7 +178,7 @@ class Author(AbstractUser):
         from .follow import Follow
 
         return Follow.objects.filter(
-            follower=other_author, followed=self, status=Follow.PENDING
+            follower=other_author, followed=self, status=Follow.REQUESTING
         ).exists()
 
     def has_sent_follow_request_to(self, other_author):
@@ -187,7 +187,7 @@ class Author(AbstractUser):
         from .follow import Follow
 
         return Follow.objects.filter(
-            follower=self, followed=other_author, status=Follow.PENDING
+            follower=self, followed=other_author, status=Follow.REQUESTING
         ).exists()
 
     def save(self, *args, **kwargs):

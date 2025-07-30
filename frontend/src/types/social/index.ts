@@ -16,7 +16,7 @@ export interface Follow extends TimestampedModel {
   id: string;
   follower: Author | string; // Can be URL reference
   followed: Author | string; // Can be URL reference
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'requesting' | 'accepted' | 'rejected';
 }
 
 export interface Friendship extends TimestampedModel {
@@ -38,5 +38,5 @@ export interface FriendshipStats {
   followers_count: number;
   following_count: number;
   friends_count: number;
-  pending_requests_count: number;
+  requesting_requests_count: number;
 }

@@ -14,7 +14,7 @@ from .author import AuthorSerializer as BaseAuthorSerializer
 class CompliantAuthorSerializer(serializers.ModelSerializer):
     """
     CMPUT 404 Compliant Author Serializer
-    
+
     Returns author objects in the required format:
     {
         "type": "author",
@@ -26,13 +26,17 @@ class CompliantAuthorSerializer(serializers.ModelSerializer):
         "web": "http://nodeaaaa/authors/greg"
     }
     """
-    
+
     type = serializers.CharField(default="author", read_only=True)
     id = serializers.CharField(source="url", read_only=True)
     host = serializers.SerializerMethodField()
     displayName = serializers.CharField(source="display_name")
-    github = serializers.URLField(source="github_url", required=False, allow_blank=True, allow_null=True)
-    profileImage = serializers.URLField(source="profile_image", required=False, allow_blank=True, allow_null=True)
+    github = serializers.URLField(
+        source="github_url", required=False, allow_blank=True, allow_null=True
+    )
+    profileImage = serializers.URLField(
+        source="profile_image", required=False, allow_blank=True, allow_null=True
+    )
     web = serializers.SerializerMethodField()
 
     class Meta:
@@ -51,7 +55,7 @@ class CompliantAuthorSerializer(serializers.ModelSerializer):
 class CompliantFollowSerializer(serializers.ModelSerializer):
     """
     CMPUT 404 Compliant Follow Request Serializer
-    
+
     Returns follow objects in the required format:
     {
         "type": "follow",
@@ -60,25 +64,28 @@ class CompliantFollowSerializer(serializers.ModelSerializer):
         "object": { author object }
     }
     """
-    
+
     type = serializers.CharField(default="follow", read_only=True)
     summary = serializers.SerializerMethodField()
     actor = CompliantAuthorSerializer(source="follower", read_only=True)
     object = CompliantAuthorSerializer(source="followed", read_only=True)
+    status = serializers.CharField(read_only=True)
 
     class Meta:
         model = Follow
-        fields = ["type", "summary", "actor", "object"]
+        fields = ["type", "summary", "actor", "object", "status"]
 
     def get_summary(self, obj):
         """Generate the summary text"""
-        return f"{obj.follower.display_name} wants to follow {obj.followed.display_name}"
+        return (
+            f"{obj.follower.display_name} wants to follow {obj.followed.display_name}"
+        )
 
 
 class CompliantLikeSerializer(serializers.ModelSerializer):
     """
     CMPUT 404 Compliant Like Serializer
-    
+
     Returns like objects in the required format:
     {
         "type": "like",
@@ -88,7 +95,7 @@ class CompliantLikeSerializer(serializers.ModelSerializer):
         "object": "http://nodebbbb/api/authors/222/entries/249"
     }
     """
-    
+
     type = serializers.CharField(default="like", read_only=True)
     author = CompliantAuthorSerializer(read_only=True)
     published = serializers.DateTimeField(source="created_at", read_only=True)
@@ -111,7 +118,7 @@ class CompliantLikeSerializer(serializers.ModelSerializer):
 class CompliantLikesSerializer(serializers.Serializer):
     """
     CMPUT 404 Compliant Likes Collection Serializer
-    
+
     Returns likes collections in the required format:
     {
         "type": "likes",
@@ -123,7 +130,7 @@ class CompliantLikesSerializer(serializers.Serializer):
         "src": [...]
     }
     """
-    
+
     type = serializers.CharField(default="likes", read_only=True)
     web = serializers.CharField()
     id = serializers.CharField()
@@ -142,7 +149,7 @@ class CompliantLikesSerializer(serializers.Serializer):
 class CompliantCommentSerializer(serializers.ModelSerializer):
     """
     CMPUT 404 Compliant Comment Serializer
-    
+
     Returns comment objects in the required format:
     {
         "type": "comment",
@@ -156,7 +163,7 @@ class CompliantCommentSerializer(serializers.ModelSerializer):
         "likes": { likes object }
     }
     """
-    
+
     type = serializers.CharField(default="comment", read_only=True)
     author = CompliantAuthorSerializer(read_only=True)
     comment = serializers.CharField(source="content")
@@ -169,7 +176,17 @@ class CompliantCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ["type", "author", "comment", "contentType", "published", "id", "entry", "web", "likes"]
+        fields = [
+            "type",
+            "author",
+            "comment",
+            "contentType",
+            "published",
+            "id",
+            "entry",
+            "web",
+            "likes",
+        ]
 
     def get_web(self, obj):
         """Return the web URL for this comment"""
@@ -187,14 +204,14 @@ class CompliantCommentSerializer(serializers.ModelSerializer):
             "page_number": 1,
             "size": 50,
             "count": likes_count,
-            "src": []
+            "src": [],
         }
 
 
 class CompliantCommentsSerializer(serializers.Serializer):
     """
     CMPUT 404 Compliant Comments Collection Serializer
-    
+
     Returns comments collections in the required format:
     {
         "type": "comments",
@@ -206,7 +223,7 @@ class CompliantCommentsSerializer(serializers.Serializer):
         "src": [...]
     }
     """
-    
+
     type = serializers.CharField(default="comments", read_only=True)
     web = serializers.CharField()
     id = serializers.CharField()
@@ -219,7 +236,7 @@ class CompliantCommentsSerializer(serializers.Serializer):
 class CompliantEntrySerializer(serializers.ModelSerializer):
     """
     CMPUT 404 Compliant Entry Serializer
-    
+
     Returns entry objects in the required format:
     {
         "type": "entry",
@@ -236,7 +253,7 @@ class CompliantEntrySerializer(serializers.ModelSerializer):
         "visibility": "PUBLIC"
     }
     """
-    
+
     type = serializers.CharField(default="entry", read_only=True)
     title = serializers.CharField()
     id = serializers.CharField(source="url", read_only=True)
@@ -253,8 +270,18 @@ class CompliantEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Entry
         fields = [
-            "type", "title", "id", "web", "description", "contentType", 
-            "content", "author", "comments", "likes", "published", "visibility"
+            "type",
+            "title",
+            "id",
+            "web",
+            "description",
+            "contentType",
+            "content",
+            "author",
+            "comments",
+            "likes",
+            "published",
+            "visibility",
         ]
 
     def get_web(self, obj):
@@ -271,7 +298,7 @@ class CompliantEntrySerializer(serializers.ModelSerializer):
             "page_number": 1,
             "size": 5,
             "count": comments_count,
-            "src": []
+            "src": [],
         }
 
     def get_likes(self, obj):
@@ -284,14 +311,14 @@ class CompliantEntrySerializer(serializers.ModelSerializer):
             "page_number": 1,
             "size": 50,
             "count": likes_count,
-            "src": []
+            "src": [],
         }
 
 
 class CompliantEntriesSerializer(serializers.Serializer):
     """
     CMPUT 404 Compliant Entries Collection Serializer
-    
+
     Returns entries collections in the required format:
     {
         "type": "entries",
@@ -301,7 +328,7 @@ class CompliantEntriesSerializer(serializers.Serializer):
         "src": [...]
     }
     """
-    
+
     type = serializers.CharField(default="entries", read_only=True)
     page_number = serializers.IntegerField(default=1)
     size = serializers.IntegerField(default=10)
@@ -312,14 +339,14 @@ class CompliantEntriesSerializer(serializers.Serializer):
 class CompliantAuthorsSerializer(serializers.Serializer):
     """
     CMPUT 404 Compliant Authors Collection Serializer
-    
+
     Returns authors collections in the required format:
     {
         "type": "authors",
         "authors": [...]
     }
     """
-    
+
     type = serializers.CharField(default="authors", read_only=True)
     authors = CompliantAuthorSerializer(many=True)
 
@@ -327,13 +354,13 @@ class CompliantAuthorsSerializer(serializers.Serializer):
 class CompliantFollowersSerializer(serializers.Serializer):
     """
     CMPUT 404 Compliant Followers Collection Serializer
-    
+
     Returns followers collections in the required format:
     {
         "type": "followers",
         "followers": [...]
     }
     """
-    
+
     type = serializers.CharField(default="followers", read_only=True)
     followers = CompliantAuthorSerializer(many=True)

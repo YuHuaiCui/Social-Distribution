@@ -51,7 +51,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
           api.getFriends(authorId ?? currentUser.id),
           api.getFollowing(authorId ?? currentUser.id),
           api.getFollowers(authorId ?? currentUser.id),
-          socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
+          socialService.getRequestingFollowRequests({ page: 1, page_size: 1 }),
         ]);
 
       setFriendsCount(friends.length);

@@ -32,7 +32,7 @@ class InboxTest(TestCase):
         """Test that accepting a follow request deletes the inbox notification"""
         # Create a follow request
         follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # Create inbox notification
@@ -63,7 +63,7 @@ class InboxTest(TestCase):
         """Test that rejecting a follow request deletes the inbox notification"""
         # Create a follow request
         follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # Create inbox notification
@@ -94,7 +94,7 @@ class InboxTest(TestCase):
         """Test that only the recipient can accept a follow request"""
         # Create a follow request
         follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # Create inbox notification
@@ -113,7 +113,7 @@ class InboxTest(TestCase):
 
         # Verify follow status was not changed
         follow.refresh_from_db()
-        self.assertEqual(follow.status, Follow.PENDING)
+        self.assertEqual(follow.status, Follow.REQUESTING)
 
         # Verify inbox item still exists
         self.assertTrue(Inbox.objects.filter(id=inbox_item.id).exists())
@@ -149,7 +149,7 @@ class InboxTest(TestCase):
         """Test retrieving inbox items"""
         # Create a follow request with inbox notification
         follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         inbox_item = Inbox.objects.create(
@@ -168,19 +168,11 @@ class InboxTest(TestCase):
         self.assertEqual(response.data["results"][0]["id"], inbox_item.id)
         self.assertEqual(response.data["results"][0]["content_type"], "follow")
 
-    def test_inbox_stats_includes_pending_follows(self):
-        """Test that inbox stats correctly count pending follow requests"""
-        # Create a follow request
-        follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
-        )
-
-        # Create inbox notification
-        Inbox.objects.create(
-            recipient=self.author_b,
-            item_type=Inbox.FOLLOW,
-            follow=follow,
-            raw_data={"type": "Follow", "actor": {"id": self.author_a.url}},
+    def test_inbox_stats_includes_requesting_follows(self):
+        """Test that inbox stats correctly count requesting follow requests"""
+        # Create requesting follow (should be in requesting)
+        Follow.objects.create(
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # Create another author and follow request

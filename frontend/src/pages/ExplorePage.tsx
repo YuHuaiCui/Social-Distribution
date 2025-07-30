@@ -31,7 +31,7 @@ interface TrendingAuthor extends Author {
   follower_count?: number;
   post_count?: number;
   is_following?: boolean;
-  follow_status?: "none" | "pending" | "accepted" | "rejected";
+  follow_status?: "none" | "requesting" | "accepted" | "rejected";
 }
 
 interface Category {
@@ -62,7 +62,7 @@ export const ExplorePage: React.FC = () => {
     switch (followStatus) {
       case "accepted":
         return { text: "Following", variant: "secondary" as const };
-      case "pending":
+      case "requesting":
         return { text: "Requested", variant: "secondary" as const };
       case "rejected":
       case "none":
@@ -145,11 +145,11 @@ export const ExplorePage: React.FC = () => {
                 return {
                   ...author,
                   is_following: status.is_following,
-                  follow_status: (status.follow_status || "none") as
-                    | "none"
-                    | "pending"
-                    | "accepted"
-                    | "rejected",
+                                  follow_status: (status.follow_status || "none") as
+                  | "none"
+                  | "requesting"
+                  | "accepted"
+                  | "rejected",
                 };
               } catch (error) {
                 console.error(
@@ -269,13 +269,13 @@ export const ExplorePage: React.FC = () => {
               ? {
                   ...author,
                   is_following: true, // Show as following for now
-                  follow_status: "pending", // Assume pending until confirmed
+                  follow_status: "requesting", // Assume requesting until confirmed
                   follower_count: (author.follower_count || 0) + 1,
                 }
               : author
           )
         );
-      } else if (followStatus === "pending") {
+              } else if (followStatus === "requesting") {
         // If already pending, don't do anything
         console.log("Follow request already pending");
         return;

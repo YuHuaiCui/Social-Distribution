@@ -148,9 +148,9 @@ export class SocialService extends BaseApiService {
   }
 
   /**
-   * Get pending follow requests for current user
+   * Get requesting follow requests for current user
    */
-  async getPendingFollowRequests(params?: {
+  async getRequestingFollowRequests(params?: {
     page?: number;
     page_size?: number;
   }): Promise<PaginatedResponse<Follow>> {
@@ -215,11 +215,27 @@ export class SocialService extends BaseApiService {
     is_following: boolean;
     is_followed_by: boolean;
     is_friends: boolean;
-    follow_status?: "pending" | "accepted" | "rejected";
+    follow_status?: "requesting" | "accepted" | "rejected" | "none";
   }> {
-    return this.request(
-      `/api/follows/status/?follower=${followerId}&followed=${followedId}`
+    const response = await this.request<{
+      follower: string;
+      followed: string;
+      status: string;
+      created_at?: string;
+    }>(
+      `/api/follows/status/?follower_url=${followerId}&followed_url=${followedId}`
     );
+
+    // Map backend response to frontend expected format
+    const isFollowing = response.status === "accepted";
+    const followStatus = response.status === "not_following" ? "none" : response.status;
+
+    return {
+      is_following: isFollowing,
+      is_followed_by: false, // This endpoint doesn't return this info
+      is_friends: false, // This endpoint doesn't return this info
+      follow_status: followStatus as "requesting" | "accepted" | "rejected" | "none",
+    };
   }
 
   /**

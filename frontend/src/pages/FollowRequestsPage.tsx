@@ -35,7 +35,7 @@ export const FollowRequestsPage: React.FC = () => {
 
     try {
       setIsLoadingMore(append);
-      const response = await socialService.getPendingFollowRequests({
+      const response = await socialService.getRequestingFollowRequests({
         page: pageNum,
         page_size: 10,
       });

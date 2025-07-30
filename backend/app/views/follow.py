@@ -38,7 +38,7 @@ class FollowViewSet(viewsets.ModelViewSet):
     - POST /api/follows/<id>/reject - Reject an incoming follow request
     - DELETE /api/follows/<id>/ - Unfollow/delete a follow relationship
     - GET /api/follows/status/ - Check follow status between two authors
-    - GET /api/follows/requests/ - Get pending follow requests
+    - GET /api/follows/requests/ - Get requesting follow requests
     """
 
     queryset = Follow.objects.all()
@@ -54,16 +54,18 @@ class FollowViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Filter queryset based on query parameters
-        Returns only pending follow requests for the authenticated user by default
+        Returns only requesting follow requests for the authenticated user by default
         """
         user_url = self.request.user.url
 
-        # If this is the requests action, return pending requests
+        # If this is the requests action, return requesting requests
         if self.action == "requests":
-            return Follow.objects.filter(followed__url=user_url, status=Follow.PENDING)
+            return Follow.objects.filter(
+                followed__url=user_url, status=Follow.REQUESTING
+            )
 
         # Default behavior - incoming follow requests
-        return Follow.objects.filter(followed__url=user_url, status=Follow.PENDING)
+        return Follow.objects.filter(followed__url=user_url, status=Follow.REQUESTING)
 
     def list(self, request, *args, **kwargs):
         """
@@ -120,7 +122,8 @@ class FollowViewSet(viewsets.ModelViewSet):
                 self._send_follow_to_remote_node(follow)
 
             return Response(
-                {"message": "Follow request sent successfully"}, status=status.HTTP_201_CREATED
+                {"message": "Follow request sent successfully"},
+                status=status.HTTP_201_CREATED,
             )
 
         except IntegrityError:
@@ -136,7 +139,7 @@ class FollowViewSet(viewsets.ModelViewSet):
 
     def _send_follow_to_remote_node(self, follow):
         """
-        Send a follow request to a remote node
+        Send a follow request to a remote node using the compliant format
         """
         try:
             remote_author = follow.followed
@@ -145,31 +148,32 @@ class FollowViewSet(viewsets.ModelViewSet):
 
             # Get the remote node credentials
             remote_node = remote_author.node
-            
-            # Prepare the follow request data
-            follow_data = {
-                "@context": "https://www.w3.org/ns/activitystreams",
-                "type": "Follow",
-                "actor": follow.follower.url,
-                "object": remote_author.url
-            }
+
+            # Use the updated follow serializer to get the proper format
+            follow_data = FollowSerializer(follow).data
 
             # Send to remote node's inbox
             # Extract author ID from the URL properly
-            author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
+            author_id = (
+                remote_author.id.split("/")[-1]
+                if remote_author.id.endswith("/")
+                else remote_author.id.split("/")[-1]
+            )
             inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
-            
+
             response = requests.post(
                 inbox_url,
                 json=follow_data,
                 auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                headers={'Content-Type': 'application/activity+json'},
-                timeout=5
+                headers={"Content-Type": "application/activity+json"},
+                timeout=5,
             )
-            
+
             if response.status_code not in [200, 201, 202]:
-                print(f"Failed to send follow request to {inbox_url}: {response.status_code}")
-                
+                print(
+                    f"Failed to send follow request to {inbox_url}: {response.status_code}"
+                )
+
         except Exception as e:
             print(f"Error sending follow request to remote node: {str(e)}")
 
@@ -238,13 +242,13 @@ class FollowViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def requests(self, request):
         """
-        Get pending follow requests for the authenticated user
+        Get requesting follow requests for the authenticated user
         """
-        pending_requests = Follow.objects.filter(
-            followed__url=request.user.url, status=Follow.PENDING
+        requesting_requests = Follow.objects.filter(
+            followed__url=request.user.url, status=Follow.REQUESTING
         ).select_related("follower")
 
-        serializer = self.get_serializer(pending_requests, many=True)
+        serializer = self.get_serializer(requesting_requests, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
@@ -293,7 +297,7 @@ class FollowViewSet(viewsets.ModelViewSet):
 
     def _send_follow_response(self, follow, response_type):
         """
-        Send follow response (Accept/Reject) to remote node
+        Send follow response (Accept/Reject) to remote node using compliant format
         """
         try:
             remote_author = follow.follower
@@ -302,34 +306,43 @@ class FollowViewSet(viewsets.ModelViewSet):
 
             # Get the remote node credentials
             remote_node = remote_author.node
-            
-            # Prepare the response data
-            response_data = {
-                "@context": "https://www.w3.org/ns/activitystreams",
-                "type": response_type,
-                "actor": follow.followed.url,
-                "object": {
-                    "type": "Follow",
-                    "actor": follow.follower.url,
-                    "object": follow.followed.url
-                }
-            }
+
+            # Create a follow object with the updated status for the response
+            from app.models.follow import Follow
+
+            # Update the follow status for the response
+            if response_type == "Accept":
+                follow.status = Follow.ACCEPTED
+            elif response_type == "Reject":
+                follow.status = Follow.REJECTED
+
+            # Use the follow serializer to get the proper format
+            response_data = FollowSerializer(follow).data
+
+            # Add the response type to indicate this is an accept/reject
+            response_data["response_type"] = response_type
 
             # Send to remote node's inbox
             # Extract author ID from the URL properly
-            author_id = remote_author.id.split('/')[-1] if remote_author.id.endswith('/') else remote_author.id.split('/')[-1]
+            author_id = (
+                remote_author.id.split("/")[-1]
+                if remote_author.id.endswith("/")
+                else remote_author.id.split("/")[-1]
+            )
             inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
-            
+
             response = requests.post(
                 inbox_url,
                 json=response_data,
                 auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                headers={'Content-Type': 'application/activity+json'},
-                timeout=5
+                headers={"Content-Type": "application/activity+json"},
+                timeout=5,
             )
-            
+
             if response.status_code not in [200, 201, 202]:
-                print(f"Failed to send follow response to {inbox_url}: {response.status_code}")
-                
+                print(
+                    f"Failed to send follow response to {inbox_url}: {response.status_code}"
+                )
+
         except Exception as e:
             print(f"Error sending follow response: {str(e)}")

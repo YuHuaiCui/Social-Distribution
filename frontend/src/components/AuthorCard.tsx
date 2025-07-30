@@ -63,7 +63,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   const { showSuccess, showError } = useToast();
   const [isFollowing, setIsFollowing] = useState(author.is_following || false);
   const [followStatus, setFollowStatus] = useState<
-    "none" | "pending" | "accepted" | "rejected"
+    "none" | "requesting" | "accepted" | "rejected"
   >("none");
   const [isLoading, setIsLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -158,12 +158,12 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       } else if (followStatus === "none" || followStatus === "rejected") {
         // Send follow request
         await socialService.followAuthor(extractUUID(author.id));
-        setFollowStatus("pending");
+        setFollowStatus("requesting");
         onFollow?.(false);
         // Dispatch event for other components
         window.dispatchEvent(new Event("follow-update"));
       }
-      // If status is 'pending', clicking doesn't do anything
+      // If status is 'requesting', clicking doesn't do anything
     } catch (error) {
       console.error("Error following/unfollowing:", error);
       console.error("Author ID:", author.id);
@@ -216,8 +216,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       // For now, we'll use a hardcoded approach - in production, you'd want an endpoint to get admin IDs
       // or have the backend handle routing reports to admins
       const adminsResponse = await api.getAuthors({
-        is_staff: true,
-        page_size: 100,
+        page: 1,
       });
       const admins = adminsResponse.results || [];
 
@@ -313,7 +312,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
           <AnimatedButton
             size="sm"
             variant={
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "secondary"
                 : isFollowing || followStatus === "accepted"
                 ? "secondary"
@@ -321,15 +320,15 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             }
             onClick={handleFollow}
             loading={isLoading}
-            disabled={followStatus === "pending"}
-            icon={followStatus === "pending" ? <Clock size={14} /> : null}
+            disabled={followStatus === "requesting"}
+            icon={followStatus === "requesting" ? <Clock size={14} /> : null}
             className={
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "opacity-60 bg-glass-low border border-glass-high"
                 : ""
             }
           >
-            {followStatus === "pending"
+            {followStatus === "requesting"
               ? "Requested"
               : isFollowing || followStatus === "accepted"
               ? "Followed"
@@ -543,7 +542,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {showActions && !isOwnProfile && (
           <AnimatedButton
             variant={
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "secondary"
                 : isFollowing || followStatus === "accepted"
                 ? "secondary"
@@ -551,9 +550,9 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             }
             onClick={handleFollow}
             loading={isLoading}
-            disabled={followStatus === "pending"}
+            disabled={followStatus === "requesting"}
             icon={
-              followStatus === "pending" ? (
+              followStatus === "requesting" ? (
                 <Clock size={16} />
               ) : isFollowing || followStatus === "accepted" ? (
                 <UserMinus size={16} />
@@ -562,12 +561,12 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
               )
             }
             className={`w-full ${
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "opacity-60 bg-glass-low border border-glass-high"
                 : ""
             }`}
           >
-            {followStatus === "pending"
+            {followStatus === "requesting"
               ? "Requested"
               : isFollowing || followStatus === "accepted"
               ? "Followed"

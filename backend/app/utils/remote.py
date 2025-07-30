@@ -280,44 +280,23 @@ class RemoteActivitySender:
 
     @staticmethod
     def send_follow_request(follower, followed):
-        """Send follow request to remote node"""
+        """Send follow request to remote node using compliant format"""
         if not followed.node:
             return False
 
         try:
             client = RemoteNodeClient(followed.node)
 
-            follow_data = {
-                "type": "follow",
-                "content_type": "follow",
-                "summary": f"{follower.display_name} wants to follow {followed.display_name}",
-                "actor": {
-                    "type": "author",
-                    "id": follower.url,
-                    "host": f"{settings.SITE_URL}/api/",
-                    "displayName": follower.display_name,
-                    "github": (
-                        f"https://github.com/{follower.github_username}"
-                        if follower.github_username
-                        else ""
-                    ),
-                    "profileImage": follower.profile_image,
-                    "web": f"{settings.SITE_URL}/authors/{follower.id}",
-                },
-                "object": {
-                    "type": "author",
-                    "id": followed.url,
-                    "host": followed.host,
-                    "displayName": followed.display_name,
-                    "github": (
-                        f"https://github.com/{followed.github_username}"
-                        if followed.github_username
-                        else ""
-                    ),
-                    "profileImage": followed.profile_image,
-                    "web": followed.web,
-                },
-            }
+            # Create a temporary follow object to use with the follow serializer
+            from app.models.follow import Follow
+            from app.serializers.follow import FollowSerializer
+
+            temp_follow = Follow(
+                follower=follower, followed=followed, status=Follow.REQUESTING
+            )
+
+            # Use the follow serializer to get the proper format
+            follow_data = FollowSerializer(temp_follow).data
 
             # Extract the correct author ID for the inbox endpoint
             followed_author_id = RemoteActivitySender._extract_author_id_from_url(
@@ -332,83 +311,55 @@ class RemoteActivitySender:
             response = client.post(
                 f"/api/authors/{followed_author_id}/inbox/", follow_data
             )
-            logger.info(
-                f"Follow request sent to {followed.url}: {response.status_code}"
-            )
-            return True
+
+            if response and response.status_code in [200, 201, 202]:
+                print(f"[SUCCESS] Follow request sent successfully")
+                return True
+            else:
+                print(f"[ERROR] Failed to send follow request: {response}")
+                return False
 
         except Exception as e:
-            logger.error(f"Failed to send follow request to {followed.url}: {e}")
+            print(f"[ERROR] Exception in send_follow_request: {e}")
             return False
 
     @staticmethod
     def send_follow_response(follow, response_type):
-        """Send follow response (accept/reject) to remote node"""
+        """Send follow response (accept/reject) to remote node using FollowSerializer"""
         if not follow.follower.node:
             return False
 
         try:
             client = RemoteNodeClient(follow.follower.node)
 
-            response_data = {
-                "type": response_type,  # "accept" or "reject"
-                "summary": f"{follow.followed.display_name} {response_type}ed follow request from {follow.follower.display_name}",
-                "actor": {
-                    "type": "author",
-                    "id": follow.followed.url,
-                    "host": f"{settings.SITE_URL}/api/",
-                    "displayName": follow.followed.display_name,
-                    "github": (
-                        f"https://github.com/{follow.followed.github_username}"
-                        if follow.followed.github_username
-                        else ""
-                    ),
-                    "profileImage": follow.followed.profile_image,
-                    "web": f"{settings.SITE_URL}/authors/{follow.followed.id}",
-                },
-                "object": {
-                    "type": "follow",
-                    "actor": {
-                        "type": "author",
-                        "id": follow.follower.url,
-                        "host": follow.follower.host,
-                        "displayName": follow.follower.display_name,
-                        "github": (
-                            f"https://github.com/{follow.follower.github_username}"
-                            if follow.follower.github_username
-                            else ""
-                        ),
-                        "profileImage": follow.follower.profile_image,
-                        "web": follow.follower.web,
-                    },
-                    "object": {
-                        "type": "author",
-                        "id": follow.followed.url,
-                        "host": f"{settings.SITE_URL}/api/",
-                        "displayName": follow.followed.display_name,
-                        "github": (
-                            f"https://github.com/{follow.followed.github_username}"
-                            if follow.followed.github_username
-                            else ""
-                        ),
-                        "profileImage": follow.followed.profile_image,
-                        "web": f"{settings.SITE_URL}/authors/{follow.followed.id}",
-                    },
-                },
-            }
+            # Update follow status for response
+            from app.models.follow import Follow
+
+            if response_type.lower() == "accept":
+                follow.status = Follow.ACCEPTED
+            elif response_type.lower() == "reject":
+                follow.status = Follow.REJECTED
+
+            # Use FollowSerializer to get the follow object data
+            from app.serializers.follow import FollowSerializer
+
+            follow_data = FollowSerializer(follow).data
+
+            # Add response type to indicate this is an accept/reject
+            follow_data["response_type"] = response_type
 
             # Send to remote follower's inbox
             response = client.post(
-                f"/api/authors/{follow.follower.id}/inbox/", response_data
+                f"/api/authors/{follow.follower.id}/inbox/", follow_data
             )
-            logger.info(
-                f"Follow {response_type} sent to {follow.follower.url}: {response.status_code}"
+            print(
+                f"[INFO] Follow {response_type} sent to {follow.follower.url}: {response.status_code if response else 'No response'}"
             )
             return True
 
         except Exception as e:
-            logger.error(
-                f"Failed to send follow {response_type} to {follow.follower.url}: {e}"
+            print(
+                f"[ERROR] Failed to send follow {response_type} to {follow.follower.url}: {e}"
             )
             return False
 
@@ -479,14 +430,13 @@ class RemoteActivitySender:
 
             # Extract the correct author ID from the target author's URL
             # For remote authors, we need to use the ID from their URL, not the local database ID
-            #target_author_id = RemoteActivitySender._extract_author_id_from_url(
+            # target_author_id = RemoteActivitySender._extract_author_id_from_url(
             #    target_author.url, target_author.id
-            #)
+            # )
             target_author_id = RemoteActivitySender._extract_author_id_from_url(
                 target_author.url, target_author.id
             )
             response = client.post(f"/api/authors/{target_author_id}/inbox/", like_data)
-
 
             print(f"[DEBUG] Final target author ID for inbox: {target_author_id}")
             print(f"[DEBUG] Sending to: /api/authors/{target_author_id}/inbox/")
@@ -722,6 +672,7 @@ def get_or_create_remote_author(author_data, source_node):
     except Exception as e:
         logger.error(f"Failed to create remote author: {e}")
         return None
+
 
 def entry_is_remote(entry):
     """

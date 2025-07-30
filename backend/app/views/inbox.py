@@ -307,13 +307,13 @@ class InboxReceiveView(APIView):
 
         if existing_follow:
             # Update existing follow request
-            existing_follow.status = Follow.PENDING
+            existing_follow.status = Follow.REQUESTING
             existing_follow.save()
             follow = existing_follow
         else:
             # Create new follow request
             follow = Follow.objects.create(
-                follower=remote_author, followed=recipient, status=Follow.PENDING
+                follower=remote_author, followed=recipient, status=Follow.REQUESTING
             )
 
         # Create inbox item
@@ -585,11 +585,16 @@ class InboxReceiveView(APIView):
                 )
 
                 if entry_is_remote(entry) or author_is_remote(like.author):
-                    logger.debug(f"Federating Like to remote inbox for entry: {entry.url}")
+                    logger.debug(
+                        f"Federating Like to remote inbox for entry: {entry.url}"
+                    )
                     FederationService.send_like(like)
 
                 serializer = LikeSerializer(like, context={"request": request})
-                return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+                return Response(
+                    serializer.data,
+                    status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+                )
 
                 # Update URL with the actual like ID if it was created
                 if created:
@@ -1055,7 +1060,7 @@ class InboxViewSet(viewsets.ModelViewSet):
 
     def _send_follow_response(self, follow, response_type):
         """
-        Send follow response (Accept/Reject) to remote node
+        Send follow response (Accept/Reject) to remote node using compliant format
         """
         try:
             remote_author = follow.follower
@@ -1065,17 +1070,21 @@ class InboxViewSet(viewsets.ModelViewSet):
             # Get the remote node credentials
             remote_node = remote_author.node
 
-            # Prepare the response data
-            response_data = {
-                "@context": "https://www.w3.org/ns/activitystreams",
-                "type": response_type,
-                "actor": follow.followed.url,
-                "object": {
-                    "type": "Follow",
-                    "actor": follow.follower.url,
-                    "object": follow.followed.url,
-                },
-            }
+            # Create a follow object with the updated status for the response
+            from app.models.follow import Follow
+            from app.serializers.follow import FollowSerializer
+
+            # Update the follow status for the response
+            if response_type == "Accept":
+                follow.status = Follow.ACCEPTED
+            elif response_type == "Reject":
+                follow.status = Follow.REJECTED
+
+            # Use the follow serializer to get the proper format
+            response_data = FollowSerializer(follow).data
+
+            # Add the response type to indicate this is an accept/reject
+            response_data["response_type"] = response_type
 
             # Send to remote node's inbox
             # Extract author ID from the URL properly

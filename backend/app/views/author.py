@@ -342,10 +342,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         {"error": "Already following this user"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                # If pending, return error
-                elif existing_follow.status == Follow.PENDING:
+                # If requesting, return error
+                elif existing_follow.status == Follow.REQUESTING:
                     return Response(
-                        {"error": "Follow request already pending"},
+                        {"error": "Follow request already requesting"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 # If rejected, delete the old one and create a new one
@@ -354,7 +354,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
             # Create follow request
             follow = Follow.objects.create(
-                follower=current_user, followed=author_to_follow, status=Follow.PENDING
+                follower=current_user,
+                followed=author_to_follow,
+                status=Follow.REQUESTING,
             )
 
             # If following a remote author, send follow request using centralized service
@@ -368,8 +370,8 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     print(
                         f"Warning: Failed to send follow request to {author_to_follow.username}"
                     )
-                    # Still create the local follow record, but mark it as pending
-                    follow.status = Follow.PENDING
+                    # Still create the local follow record, but mark it as requesting
+                    follow.status = Follow.REQUESTING
                     follow.save()
 
             # Create inbox item for the followed user (for local authors)
@@ -832,9 +834,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     {"error": "Already following this user"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            elif existing_follow.status == Follow.PENDING:
+            elif existing_follow.status == Follow.REQUESTING:
                 return Response(
-                    {"error": "Follow request already pending"},
+                    {"error": "Follow request already requesting"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             elif existing_follow.status == Follow.REJECTED:
@@ -842,7 +844,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
         # Create follow request
         follow = Follow.objects.create(
-            follower=current_user, followed=remote_author, status=Follow.PENDING
+            follower=current_user, followed=remote_author, status=Follow.REQUESTING
         )
 
         # Create inbox item for the followed user
@@ -880,24 +882,15 @@ class AuthorViewSet(viewsets.ModelViewSet):
         )
 
     def _send_follow_to_remote(self, follow, remote_author, node):
-        """Send follow request to remote node"""
+        """Send follow request to remote node using compliant format"""
         import requests
         from requests.auth import HTTPBasicAuth
 
         try:
-            # Prepare follow request data
-            follow_data = {
-                "type": "Follow",
-                "actor": {
-                    "id": follow.follower.url,
-                    "url": follow.follower.url,
-                    "host": follow.follower.host,
-                    "displayName": follow.follower.display_name,
-                    "username": follow.follower.username,
-                    "profileImage": follow.follower.profile_image,
-                },
-                "object": remote_author.url,
-            }
+            # Use the follow serializer to get the proper format
+            from app.serializers.follow import FollowSerializer
+
+            follow_data = FollowSerializer(follow).data
 
             # Send to remote author's inbox
             inbox_url = f"{node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"

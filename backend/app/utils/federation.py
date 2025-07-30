@@ -791,15 +791,22 @@ class FederationService:
                     entry=entry,
                     author=author,
                     defaults={
-                        "url": like_data.get("id") or like_data.get("url"),  # Important!
-                        "summary": like_data.get("summary", f"{author.display_name} liked your post"),
+                        "url": like_data.get("id")
+                        or like_data.get("url"),  # Important!
+                        "summary": like_data.get(
+                            "summary", f"{author.display_name} liked your post"
+                        ),
                         "object": object_url,
                     },
                 )
                 if created:
-                    print(f"[LIKE] Created Like on entry '{entry.title}' by {author.username}")
+                    print(
+                        f"[LIKE] Created Like on entry '{entry.title}' by {author.username}"
+                    )
                 else:
-                    print(f"[LIKE] Like already existed for '{entry.title}' by {author.username}")
+                    print(
+                        f"[LIKE] Like already existed for '{entry.title}' by {author.username}"
+                    )
             except Entry.DoesNotExist:
                 print(f"[WARN] No local entry found for Like target: {object_url}")
         else:
@@ -808,8 +815,6 @@ class FederationService:
             if not object_url:
                 print(f"[ERROR] Remote Like missing 'object' field: {like_data}")
 
-
-            
     @staticmethod
     def _process_comment(
         recipient: Author, data: Dict[str, Any], remote_node: Node
@@ -929,7 +934,7 @@ class FederationService:
             follow, created = Follow.objects.get_or_create(
                 follower=remote_author,
                 followed=recipient,
-                defaults={"status": Follow.PENDING},
+                defaults={"status": Follow.REQUESTING},
             )
 
             # Create inbox item
@@ -1030,6 +1035,7 @@ class FederationService:
             actor_url = actor_data.get("id")
             if not remote_node:
                 from app.utils.federation import FederationService
+
                 remote_node = FederationService.get_node_for_url(actor_url)
                 if not remote_node:
                     print(f"WARNING: Could not determine node for author: {actor_url}")
