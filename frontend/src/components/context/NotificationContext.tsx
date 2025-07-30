@@ -61,3 +61,8 @@ export const useNotifications = (): NotificationContextType => {
   }
   return context;
 };
+
+// Export a no-op function for backward compatibility
+export const triggerNotificationUpdate = () => {
+  // No-op - inbox functionality removed
+};
