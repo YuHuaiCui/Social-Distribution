@@ -110,10 +110,33 @@ class EntryViewSet(viewsets.ModelViewSet):
                     return obj
                 raise PermissionDenied("You cannot edit this post.")
 
-            # For GET/read operations, enforce visibility
-            if obj in Entry.objects.visible_to_author(user_author):
-                return obj
-            raise PermissionDenied("You do not have permission to view this post.")
+            # For GET/read operations
+            if request.method in ["GET", "HEAD", "OPTIONS"]:
+                if obj.visibility == Entry.PUBLIC:
+                    return obj
+
+                if obj.visibility == Entry.UNLISTED:
+                    return obj  # Anyone with the link can view
+
+                # FRIENDS_ONLY or UNLISTED (if not author) require relationship
+                if user.is_authenticated:
+                    is_author = obj.author == user_author
+                    from app.models import Friendship, Follow
+                    is_friend = Friendship.objects.filter(
+                        Q(author1=obj.author, author2=user_author)
+                        | Q(author1=user_author, author2=obj.author)
+                    ).exists()
+                    is_follower = Follow.objects.filter(
+                        follower=user_author, followed=obj.author, status=Follow.ACCEPTED
+                    ).exists()
+
+                    if obj.visibility == Entry.UNLISTED and (is_author or is_friend or is_follower):
+                        return obj
+
+                    if obj.visibility == Entry.FRIENDS_ONLY and (is_author or is_friend):
+                        return obj
+
+                raise PermissionDenied("You do not have permission to view this post.")
 
         # Remote functionality removed
 
