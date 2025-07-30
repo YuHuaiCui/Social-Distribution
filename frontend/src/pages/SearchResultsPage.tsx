@@ -67,7 +67,7 @@ export const SearchResultsPage: React.FC = () => {
 
           const authorsResponse = await api.getAuthors({
           search: searchQuery,
-          is_active: true,
+          // Don't filter by is_active to include remote authors (they have is_active=False)
           ...(isAdmin
             ? showUnapprovedOnly
               ? { is_approved: false }
