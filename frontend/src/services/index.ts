@@ -42,6 +42,15 @@ export const api = {
   getCurrentAuthor: authorService.getCurrentAuthor.bind(authorService),
   updateCurrentAuthor: authorService.updateCurrentAuthor.bind(authorService),
   uploadProfileImage: authorService.uploadProfileImage.bind(authorService),
+  changePassword: authorService.changePassword.bind(authorService),
+  getAuthorEntries: authorService.getAuthorEntries.bind(authorService),
+  
+  // Admin methods
+  approveAuthor: authorService.approveAuthor.bind(authorService),
+  deactivateAuthor: authorService.deactivateAuthor.bind(authorService),
+  activateAuthor: authorService.activateAuthor.bind(authorService),
+  deleteAuthor: authorService.deleteAuthor.bind(authorService),
+  promoteToAdmin: authorService.promoteToAdmin.bind(authorService),
 
   // Entry methods
   getEntries: entryService.getEntries.bind(entryService),

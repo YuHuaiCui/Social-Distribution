@@ -57,7 +57,6 @@ export const SettingsPage: React.FC = () => {
 
   // Profile settings
   const [displayName, setDisplayName] = useState(user?.displayName || user?.display_name || "");
-  const [website, setWebsite] = useState(user?.website || "");
   const [githubUsername, setGithubUsername] = useState(user?.github_username || "");
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(
     null
@@ -102,7 +101,6 @@ export const SettingsPage: React.FC = () => {
     // Update form fields when user data changes
     if (user) {
       setDisplayName(user.displayName || user.display_name || "");
-      setWebsite(user.website || "");
       setGithubUsername(user.github_username || "");
     }
   }, [user]);
@@ -198,19 +196,16 @@ export const SettingsPage: React.FC = () => {
         updatedUser = await api.uploadProfileImage(profileImageFile);
         // Then update other profile fields if needed
         if (displayName !== (user?.displayName || user?.display_name) || 
-            website !== user?.website || 
             githubUsername !== user?.github_username) {
           updatedUser = await api.updateCurrentAuthor({
             displayName: displayName,
-            website: website,
             github_username: githubUsername,
           });
         }
       } else {
         // Update other profile fields
         updatedUser = await api.updateCurrentAuthor({
-          display_name: displayName,
-          website: website,
+          displayName: displayName,
           github_username: githubUsername,
         });
       }
@@ -509,19 +504,6 @@ export const SettingsPage: React.FC = () => {
                 </div>
 
 
-
-                {/* Website */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-text-2 mb-2">
-                    Website
-                  </label>
-                  <Input
-                    type="url"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="Your website"
-                  />
-                </div>
 
                 {/* GitHub Username */}
                 <div className="mb-6">

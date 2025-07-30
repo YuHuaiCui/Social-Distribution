@@ -47,7 +47,6 @@ export interface AuthorUpdateData {
   github_username?: string;
   bio?: string;
   location?: string;
-  website?: string;
   profileImage?: string;
   email?: string;
 }
