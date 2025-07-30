@@ -33,7 +33,7 @@ class AuthorAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         (
             "Profile Information",
-            {"fields": ("displayName", "github_username", "profileImage", "bio")},
+            {"fields": ("displayName", "github_username", "profileImage")},
         ),
         ("Federation", {"fields": ("url", "node", "is_approved")}),
         (

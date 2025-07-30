@@ -68,7 +68,6 @@ class Author(AbstractUser):
     profileImage = models.TextField(
         blank=True, help_text="Profile image as data URL or regular URL"
     )
-    bio = models.TextField(blank=True)
 
     # Federation: null for local authors, set for remote authors
     node = models.ForeignKey(

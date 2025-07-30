@@ -56,7 +56,6 @@ class GitHubValidationView(APIView):
                     'username': user_data.get('login'),
                     'name': user_data.get('name'),
                     'avatar_url': user_data.get('avatar_url'),
-                    'bio': user_data.get('bio'),
                     'public_repos': user_data.get('public_repos'),
                     'followers': user_data.get('followers'),
                     'following': user_data.get('following'),
