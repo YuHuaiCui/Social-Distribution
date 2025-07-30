@@ -27,7 +27,6 @@ import Card from "./ui/Card";
 import { api } from "../services/api";
 import { socialService } from "../services/social";
 import { useAuth } from "./context/AuthContext";
-import { triggerNotificationUpdate } from "./context/NotificationContext";
 import { useToast } from "./context/ToastContext";
 import { extractUUID } from "../utils/extractId";
 

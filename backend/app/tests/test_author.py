@@ -163,7 +163,6 @@ class AuthorAPITest(BaseAPITestCase):
             "password_confirm": "newpass123",
             "displayName": "New Author",
             "github_username": "newauthor",
-            "bio": "Test bio",
             "location": "Test location",
             "website": "https://test.com",
             "is_active": True,
@@ -188,7 +187,6 @@ class AuthorAPITest(BaseAPITestCase):
         self.assertTrue(author.check_password("newpass123"))
         self.assertEqual(author.displayName, "New Author")
         self.assertEqual(author.github_username, "newauthor")
-        self.assertEqual(author.bio, "Test bio")
         # self.assertEqual(author.location, 'Test location') in the model but not in serializer
         # self.assertEqual(author.website, 'https://test.com') in the model but not in serializer
         self.assertFalse(author.is_approved)  # Should be unapproved by default
@@ -314,7 +312,6 @@ class AuthorAPITest(BaseAPITestCase):
         self.assertEqual(response.data["username"], "anotheruser")
         self.assertEqual(response.data["displayName"], "Another User")
         self.assertIn("created_at", response.data)
-        self.assertIn("bio", response.data)
 
         # Profile should include all necessary public information
         expected_fields = [
@@ -324,7 +321,6 @@ class AuthorAPITest(BaseAPITestCase):
             "displayName",
             "github",
             "profileImage",
-            "bio",
             "is_approved",
             "is_active",
             "created_at",
@@ -369,7 +365,6 @@ class AuthorAPITest(BaseAPITestCase):
             "id": "https://remote.example.com/api/authors/123/",
             "username": "remoteuser",
             "displayName": "Updated Remote User",  # Different from local cache
-            "bio": "Fresh bio from remote",
             "github": "https://github.com/remoteuser",
             "profileImage": "https://remote.example.com/images/profile.jpg",
             "host": "https://remote.example.com/api/",

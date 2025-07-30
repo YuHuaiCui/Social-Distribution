@@ -734,7 +734,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     displayName=author_data.get("displayName", ""),
                     github_username=author_data.get("github", ""),
                     profile_image=author_data.get("profileImage", ""),
-                    bio=author_data.get("bio", ""),
                     host=author_data.get("host", node.host),
                     web=author_data.get("page", ""),
                     node=node,

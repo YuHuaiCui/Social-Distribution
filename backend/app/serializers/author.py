@@ -37,7 +37,6 @@ class AuthorSerializer(serializers.ModelSerializer):
             "displayName",
             "github_username",
             "profileImage",
-            "bio",
             "node",
             "node_id",
             "is_remote",

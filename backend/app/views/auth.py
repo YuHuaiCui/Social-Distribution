@@ -97,7 +97,6 @@ def signup(request):
             password=data["password"],
             displayName=data.get("displayName", data["username"]),
             github_username=data.get("github_username", ""),
-            bio=data.get("bio", ""),
             # Check if new users should be auto-approved
             is_approved=getattr(settings, "AUTO_APPROVE_NEW_USERS", False),
             is_active=True,

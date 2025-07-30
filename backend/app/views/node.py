@@ -10,6 +10,8 @@ from django.core.validators import URLValidator
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.decorators import permission_classes
 from urllib.parse import urlparse
 from ..models import Node, Follow, Author
 from ..serializers import (
@@ -24,7 +26,22 @@ import random
 import os
 
 
+class IsAdminUser(BasePermission):
+    """
+    Custom permission to only allow admin users to access node management.
+    """
+    
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            (request.user.is_staff or request.user.is_superuser)
+        )
+
+
 class GetNodesView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Fetch the list of Nodes.",
         description="Fetch a list of all nodes (Node entries), including their host, username, password, and authentication status.",
@@ -63,6 +80,8 @@ class GetNodesView(APIView):
 
 
 class AddNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Adds a new Node.",
         description="Create a new Node object by providing the `host`, `username`, and `password`. The `is_active` status defaults to True.",
@@ -129,6 +148,13 @@ class AddNodeView(APIView):
             # Create the node
             node = serializer.save()
 
+            # Fetch and store all authors from the remote node
+            try:
+                self._fetch_and_store_remote_authors(node)
+            except Exception as e:
+                # Log the error but don't fail the node creation
+                print(f"Warning: Failed to fetch authors from new node {host}: {str(e)}")
+
             return Response(
                 {"message": "Node added successfully"}, status=status.HTTP_201_CREATED
             )
@@ -143,8 +169,150 @@ class AddNodeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+    def _fetch_and_store_remote_authors(self, node):
+        """
+        Fetch all authors from a remote node and store them locally.
+        
+        Args:
+            node: The Node object representing the remote node
+        """
+        try:
+            page = 1
+            authors_stored = 0
+            
+            while True:
+                # Fetch authors from remote node with pagination
+                response = requests.get(
+                    f"{node.host.rstrip('/')}/api/authors/",
+                    auth=HTTPBasicAuth(node.username, node.password),
+                    params={"page": page, "size": 50},  # Fetch 50 at a time
+                    timeout=10,
+                )
+                
+                if response.status_code != 200:
+                    print(f"Failed to fetch authors from {node.host}: {response.status_code}")
+                    break
+                
+                data = response.json()
+                authors = data.get("authors", [])
+                
+                if not authors:
+                    break  # No more authors to fetch
+                
+                # Store each author locally
+                for author_data in authors:
+                    try:
+                        self._store_remote_author(author_data, node)
+                        authors_stored += 1
+                    except Exception as e:
+                        print(f"Failed to store author {author_data.get('id', 'unknown')}: {str(e)}")
+                        continue
+                
+                # Check if there are more pages
+                if len(authors) < 50:
+                    break  # Last page
+                
+                page += 1
+            
+            print(f"Successfully stored {authors_stored} authors from {node.host}")
+            
+        except requests.RequestException as e:
+            print(f"Network error fetching authors from {node.host}: {str(e)}")
+            raise
+        except Exception as e:
+            print(f"Unexpected error fetching authors from {node.host}: {str(e)}")
+            raise
+
+    def _store_remote_author(self, author_data, node):
+        """
+        Store a single remote author locally.
+        
+        Args:
+            author_data: Dictionary containing author information from remote node
+            node: The Node object representing the remote node
+        """
+        from uuid import UUID
+        
+        try:
+            # Extract author ID from the URL
+            author_url = author_data.get("id", "")
+            if not author_url:
+                print(f"Author data missing ID: {author_data}")
+                return
+            
+            # Try to parse UUID from the URL
+            author_id_str = author_url.split("/")[-1].rstrip("/")
+            try:
+                author_id = UUID(author_id_str)
+            except ValueError:
+                print(f"Invalid UUID in author URL: {author_url}")
+                return
+            
+            # Check if author already exists
+            existing_author = Author.objects.filter(id=author_id).first()
+            
+            if existing_author:
+                # Update existing remote author
+                existing_author.url = author_url
+                existing_author.displayName = author_data.get("displayName", "")
+                existing_author.github_username = self._extract_github_username(author_data.get("github", ""))
+                existing_author.profileImage = author_data.get("profileImage", "")
+                existing_author.host = author_data.get("host", node.host)
+                existing_author.web = author_data.get("web", "")
+                existing_author.node = node
+                existing_author.is_approved = True  # Remote authors are auto-approved
+                existing_author.save()
+                print(f"Updated existing remote author: {existing_author.displayName}")
+            else:
+                # Create new remote author (bypass create_user to avoid password requirement)
+                remote_author = Author(
+                    id=author_id,
+                    url=author_url,
+                    username=author_data.get("displayName", f"remote_user_{author_id_str[:8]}"),
+                    displayName=author_data.get("displayName", ""),
+                    github_username=self._extract_github_username(author_data.get("github", "")),
+                    profileImage=author_data.get("profileImage", ""),
+                    host=author_data.get("host", node.host),
+                    web=author_data.get("web", ""),
+                    node=node,
+                    is_approved=True,  # Remote authors are auto-approved
+                    is_active=False,  # Remote authors can't log in
+                    password="!",  # Unusable password
+                )
+                remote_author.save()
+                print(f"Created new remote author: {remote_author.displayName}")
+                
+        except Exception as e:
+            print(f"Error storing remote author: {str(e)}")
+            raise
+
+    def _extract_github_username(self, github_url):
+        """
+        Extract GitHub username from GitHub URL.
+        
+        Args:
+            github_url: GitHub URL or username
+            
+        Returns:
+            str: GitHub username or empty string
+        """
+        if not github_url:
+            return ""
+        
+        # If it's already just a username, return it
+        if "/" not in github_url:
+            return github_url
+        
+        # Extract username from GitHub URL
+        if "github.com/" in github_url:
+            return github_url.split("github.com/")[-1].rstrip("/")
+        
+        return ""
+
 
 class UpdateNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Update details of a Node.",
         description="Update an existing Node object by providing the `host`, `username`, `password`, and `is_active` fields.",
@@ -256,6 +424,8 @@ class UpdateNodeView(APIView):
 
 
 class DeleteNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Delete a Node.",
         description="Remove a Node object from the system by providing the `username` of the node to be deleted.",
@@ -479,7 +649,7 @@ class RemoteAuthorsView(APIView):
         Use BasicAuth to call remote endpoints with the given credentials.
         """
         try:
-            base_host = url_parser.get_base_host(host)
+            base_host = url_utils.get_base_host(host)
 
             # Send a GET request to the remote node's authors endpoint
             response = requests.get(

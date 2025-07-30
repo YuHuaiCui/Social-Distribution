@@ -18,7 +18,6 @@ import {
 import { useAuth } from "../components/context/AuthContext";
 import { useToast } from "../components/context/ToastContext";
 import { useCreatePost } from "../components/context/CreatePostContext";
-import { triggerNotificationUpdate } from "../components/context/NotificationContext";
 import type { Entry, Comment, Author } from "../types/models";
 import AnimatedButton from "../components/ui/AnimatedButton";
 import Card from "../components/ui/Card";
@@ -365,8 +364,6 @@ export const PostDetailPage: React.FC = () => {
           })
         );
 
-        // Trigger notification update in case the post author receives a notification
-        triggerNotificationUpdate();
       }
     } catch (err) {
       console.error("Error submitting comment:", err);

@@ -34,7 +34,6 @@ class AuthAPITest(BaseAPITestCase):
             "password": "newpass123",
             "display_name": "New User",
             "github_username": "newuser",
-            "bio": "Test bio",
             "location": "Test location",
             "website": "https://test.com",
         }
@@ -208,14 +207,12 @@ class AuthAPITest(BaseAPITestCase):
         # Test profile update
         data = {
             "display_name": "Updated Name",
-            "bio": "Updated bio",
             "location": "Updated location",
             "website": "https://updated.com",
         }
         response = self.user_client.patch(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["display_name"], "Updated Name")
-        self.assertEqual(response.data["bio"], "Updated bio")
 
         # Test invalid update
         data = {"email": "invalid-email"}

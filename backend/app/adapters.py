@@ -37,9 +37,6 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
         if github_data.get('avatar_url'):
             user.profileImage = github_data.get('avatar_url')
             
-        # Update bio if available
-        if github_data.get('bio'):
-            user.bio = github_data.get('bio')
             
         # Auto-approve GitHub users
         user.is_approved = True
