@@ -7,7 +7,7 @@ import { api } from "../services/api";
 import AnimatedGradient from "./ui/AnimatedGradient";
 import type { Entry, Author, Comment } from "../types/models";
 import { useAuth } from "./context/AuthContext"; // adjust path as needed
-import { extractUUID, getAuthorUrl } from "../utils/extractId";
+import { extractUUID, getAuthorUrl, isRemoteAuthor } from "../utils/extractId";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -312,7 +312,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                                   <div className="flex-1 min-w-0">
                                     <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors flex items-center gap-1">
                                       {author.displayName || author.display_name || "Unknown Author"}
-                                      {(author.node || author.is_remote) && (
+                                      {isRemoteAuthor(author) && (
                                         <Globe size={12} className="text-blue-400 shrink-0" title="Remote Author" />
                                       )}
                                     </h4>

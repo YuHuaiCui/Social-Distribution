@@ -208,6 +208,7 @@ class AuthorListSerializer(serializers.ModelSerializer):
             "followers_count",
             "following_count",
             "is_following",
+            "node",
             "node_id",
             "is_remote",
         ]

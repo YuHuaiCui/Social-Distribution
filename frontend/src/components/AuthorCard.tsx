@@ -29,7 +29,7 @@ import { api } from "../services/api";
 import { socialService } from "../services/social";
 import { useAuth } from "./context/AuthContext";
 import { useToast } from "./context/ToastContext";
-import { extractUUID, getAuthorUrl } from "../utils/extractId";
+import { extractUUID, getAuthorUrl, isRemoteAuthor } from "../utils/extractId";
 
 interface AuthorCardProps {
   author: Author & {
@@ -294,7 +294,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
           >
             <h4 className="font-medium text-text-1 truncate flex items-center gap-1">
               {author.displayName || author.display_name || "Unknown"}
-              {(author.node || author.is_remote) && (
+              {isRemoteAuthor(author) && (
                 <Globe size={10} className="text-blue-500 shrink-0" title="Remote Author" />
               )}
             </h4>
@@ -357,7 +357,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             <div>
               <h3 className="text-lg font-semibold text-text-1 hover:underline flex items-center gap-2">
                 {author.displayName || author.display_name || "Unknown"}
-                {(author.node || author.is_remote) && (
+                {isRemoteAuthor(author) && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" title="Remote Author">
                     <Globe size={12} className="mr-1" />
                     Remote
