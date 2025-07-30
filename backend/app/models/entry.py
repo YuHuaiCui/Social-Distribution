@@ -16,7 +16,7 @@ class EntryManager(models.Manager):
 
         Visibility logic:
         - PUBLIC: Visible to everyone (including anonymous users)
-        - UNLISTED: Visible to the author, their followers, and friends
+        - UNLISTED: Visible to the author, their followers, and friends (including anonymous users with the link)
         - FRIENDS_ONLY: Visible only to the author and their friends
         - DELETED: Not visible to anyone (soft-deleted entries)
 
@@ -35,7 +35,7 @@ class EntryManager(models.Manager):
         # Anonymous users: only show PUBLIC and UNLISTED entries
         if viewing_author is None:
             return self.filter(
-                Q(visibility=Entry.PUBLIC) | Q(visibility=Entry.UNLISTED)
+                Q(visibility=Entry.PUBLIC)
             ).exclude(visibility=Entry.DELETED)
 
         # Use EXISTS subqueries for better performance on large datasets
@@ -52,14 +52,11 @@ class EntryManager(models.Manager):
 
         queryset = self.filter(
             Q(visibility=Entry.PUBLIC)  # Public entries visible to all
+            | Q(visibility=Entry.UNLISTED) # Unlisted entries are also visible to anyone with the link
             | Q(visibility=Entry.UNLISTED, author=viewing_author)  # Own unlisted posts
             | Q(visibility=Entry.UNLISTED)
-            & (
-                Exists(follower_exists) | Exists(friendship_exists)
-            )  # Unlisted posts visible to followers and friends
-            | Q(
-                visibility=Entry.FRIENDS_ONLY, author=viewing_author
-            )  # Own friends-only posts
+            & (Exists(follower_exists) | Exists(friendship_exists))  # Unlisted posts visible to followers and friends
+            | Q(visibility=Entry.FRIENDS_ONLY, author=viewing_author)  # Own friends-only posts
             | Q(visibility=Entry.FRIENDS_ONLY)
             & Exists(friendship_exists)  # Friends-only posts from friends
         ).exclude(visibility=Entry.DELETED)
