@@ -72,7 +72,6 @@ export const CreatePostPage: React.FC = () => {
     };
 
     try {
-
       const response = await entryService.createEntry(entryData);
 
       // Mock success
