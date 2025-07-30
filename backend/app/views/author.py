@@ -11,7 +11,6 @@ from app.models import Author, Entry, Follow
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
 from app.serializers.follow import FollowSerializer
-from app.serializers.collections import AuthorsSerializer, FollowersSerializer
 
 from django.http import HttpResponse
 import base64

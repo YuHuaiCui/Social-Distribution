@@ -26,12 +26,12 @@ class Node(models.Model):
     def __str__(self):
         """
         String representation of the node.
-        
+
         Returns:
             str: A human-readable string showing the node name and host URL
         """
         return f"{self.name} ({self.host})"
-    
+
     def deactivate(self):
         """
         Deactivate this node to stop sharing with it.

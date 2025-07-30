@@ -7,7 +7,6 @@ from .comment import Comment
 from .like import Like
 from .inbox import Inbox
 from .friendship import Friendship
-from .saved_entry import SavedEntry
 
 # Import utility functions
 from .utils import (
