@@ -272,6 +272,13 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         # Save the entry with the user's author
         entry = serializer.save(author=user_author)
+        
+        # Refresh entry from database to ensure all fields are populated
+        entry.refresh_from_db()
+        
+        # Log entry details immediately after save and refresh
+        logger.info(f"Entry created - ID: {entry.id}, URL: '{entry.url}', Title: '{entry.title}'")
+        logger.info(f"Entry author details - ID: {entry.author.id}, URL: '{entry.author.url}', is_local: {entry.author.is_local}")
 
         # Send to remote nodes based on visibility
         self._send_to_remote_nodes(entry)
@@ -283,8 +290,12 @@ class EntryViewSet(viewsets.ModelViewSet):
         - UNLISTED: Send to remote authors that follow the entry author  
         - FRIENDS: Send to remote authors that are friends with the entry author
         """
+        logger.info(f"Starting _send_to_remote_nodes for entry {entry.id}")
+        logger.info(f"Entry details - ID: {entry.id}, URL: '{entry.url}', Title: '{entry.title}', Author: {entry.author.username}")
+        
         if not entry.author.is_local:
             # Only federate entries from local authors
+            logger.info(f"Entry author {entry.author.username} is not local, skipping federation")
             return
             
         # Get remote authors based on visibility
@@ -294,8 +305,15 @@ class EntryViewSet(viewsets.ModelViewSet):
             logger.info(f"No remote authors to send entry {entry.id} to")
             return
             
+        logger.info(f"Found {len(remote_authors)} remote authors to send entry to")
+        
         # Prepare the entry data according to the inbox spec
-        entry_data = self._serialize_entry_for_inbox(entry)
+        try:
+            entry_data = self._serialize_entry_for_inbox(entry)
+            logger.info(f"Successfully serialized entry data, ID field: '{entry_data.get('id')}'")
+        except Exception as e:
+            logger.error(f"Failed to serialize entry for inbox: {str(e)}")
+            return
         
         # Group authors by their node to batch requests
         authors_by_node = {}
@@ -306,11 +324,16 @@ class EntryViewSet(viewsets.ModelViewSet):
                 authors_by_node[author.node].append(author)
         
         # Send to each node
+        successful_sends = 0
         for node, authors in authors_by_node.items():
             for author in authors:
-                self._send_entry_to_author_inbox(entry_data, author, node)
+                try:
+                    self._send_entry_to_author_inbox(entry_data, author, node)
+                    successful_sends += 1
+                except Exception as e:
+                    logger.error(f"Failed to send entry to {author.displayName} at {node.name}: {str(e)}")
                 
-        logger.info(f"Sent entry {entry.id} to {len(remote_authors)} remote authors")
+        logger.info(f"Successfully sent entry {entry.id} to {successful_sends}/{len(remote_authors)} remote authors")
 
     def _get_remote_authors_for_entry(self, entry):
         """Get list of remote authors who should receive this entry."""
@@ -376,6 +399,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             author_id = f"{settings.SITE_URL}/api/authors/{entry.author.id}/"
         
         # Log what we're working with
+        logger.debug(f"SITE_URL setting: '{settings.SITE_URL}'")
         logger.debug(f"Entry serialization - entry.url: '{entry.url}', entry.id: '{entry.id}', generated entry_id: '{entry_id}'")
         logger.debug(f"Author serialization - author.url: '{entry.author.url}', author.id: '{entry.author.id}', generated author_id: '{author_id}'")
         
@@ -417,12 +441,20 @@ class EntryViewSet(viewsets.ModelViewSet):
             raise ValueError("Cannot send entry with missing author id")
         
         # Final safety check - ensure ID is not None/empty string
-        if not entry_data['id'] or entry_data['id'] == 'None':
+        if not entry_data['id'] or entry_data['id'] == 'None' or 'None' in str(entry_data['id']):
             logger.error(f"Invalid entry ID: '{entry_data['id']}'")
-            raise ValueError(f"Entry ID is invalid: '{entry_data['id']}'")
+            logger.error(f"Raw entry data - ID: {entry.id}, URL: '{entry.url}'")
+            # Instead of raising an error, try to fix it by regenerating the URL
+            fixed_id = f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}/"
+            logger.warning(f"Attempting to fix invalid ID by generating: '{fixed_id}'")
+            entry_data['id'] = fixed_id
+            
+            # If it's still invalid, then raise an error
+            if not entry_data['id'] or 'None' in str(entry_data['id']):
+                raise ValueError(f"Cannot generate valid entry ID: '{entry_data['id']}'")
         
         # Log the serialized data for debugging
-        logger.debug(f"Serialized entry for inbox: {json.dumps(entry_data, indent=2)}")
+        logger.debug(f"Final serialized entry for inbox: {json.dumps(entry_data, indent=2)}")
         
         return entry_data
     
