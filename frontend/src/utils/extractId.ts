@@ -35,7 +35,7 @@ export function isValidUUID(str: string): boolean {
 }
 
 /**
- * Check if an author is remote by comparing their host with the current node's backend URL
+ * Check if an author is remote by comparing their host with the current node's host
  * Remote authors have a different host than the current node
  */
 export function isRemoteAuthor(author: { id: string; host?: string; node?: any; is_remote?: boolean }): boolean {
@@ -49,13 +49,20 @@ export function isRemoteAuthor(author: { id: string; host?: string; node?: any; 
     return true;
   }
   
-  // Compare author's host with current node's backend URL
+  // Compare author's host with current node's host
   if (author.host) {
-    const currentBackendUrl = `${window.location.origin}/api`;
-    const authorHost = author.host.replace(/\/$/, ''); // Remove trailing slash
-    const currentHost = currentBackendUrl.replace(/\/$/, ''); // Remove trailing slash
+    // Get current node's host from window location
+    const currentNodeHost = window.location.origin;
     
-    return authorHost !== currentHost;
+    // Normalize both URLs for comparison
+    // Author host: "http://192.168.1.72:8000/api/" -> "http://192.168.1.72:8000"
+    // Node host: "http://192.168.1.72:8000" -> "http://192.168.1.72:8000"
+    const normalizeHost = (host: string) => host.replace(/\/api\/?$/, '').replace(/\/$/, '');
+    
+    const authorBaseHost = normalizeHost(author.host);
+    const currentBaseHost = normalizeHost(currentNodeHost);
+    
+    return authorBaseHost !== currentBaseHost;
   }
   
   return false;
