@@ -10,6 +10,8 @@ from django.core.validators import URLValidator
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.decorators import permission_classes
 from urllib.parse import urlparse
 from ..models import Node, Follow, Author
 from ..serializers import (
@@ -24,7 +26,22 @@ import random
 import os
 
 
+class IsAdminUser(BasePermission):
+    """
+    Custom permission to only allow admin users to access node management.
+    """
+    
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            (request.user.is_staff or request.user.is_superuser)
+        )
+
+
 class GetNodesView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Fetch the list of Nodes.",
         description="Fetch a list of all nodes (Node entries), including their host, username, password, and authentication status.",
@@ -63,6 +80,8 @@ class GetNodesView(APIView):
 
 
 class AddNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Adds a new Node.",
         description="Create a new Node object by providing the `host`, `username`, and `password`. The `is_active` status defaults to True.",
@@ -292,6 +311,8 @@ class AddNodeView(APIView):
 
 
 class UpdateNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Update details of a Node.",
         description="Update an existing Node object by providing the `host`, `username`, `password`, and `is_active` fields.",
@@ -403,6 +424,8 @@ class UpdateNodeView(APIView):
 
 
 class DeleteNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
     @extend_schema(
         summary="Delete a Node.",
         description="Remove a Node object from the system by providing the `username` of the node to be deleted.",

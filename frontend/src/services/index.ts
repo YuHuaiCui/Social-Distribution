@@ -8,12 +8,14 @@ export { authService } from './auth';
 export { authorService } from './author';
 export { entryService } from './entry';
 export { socialService } from './social';
+export { nodeService } from './node';
 
 // Export service classes for custom instances
 export { default as AuthService } from './auth';
 export { default as AuthorService } from './author';
 export { default as EntryService } from './entry';
 export { default as SocialService } from './social';
+export { default as NodeService } from './node';
 export { default as BaseApiService } from './base';
 
 // Legacy api export for backwards compatibility
@@ -21,6 +23,7 @@ import { authService } from './auth';
 import { authorService } from './author';
 import { entryService } from './entry';
 import { socialService } from './social';
+import { nodeService } from './node';
 
 /**
  * Legacy API object for backwards compatibility
@@ -69,5 +72,11 @@ export const api = {
   unfollowAuthor: socialService.unfollowAuthor.bind(socialService),
   getFollowers: socialService.getFollowers.bind(socialService),
   getFollowing: socialService.getFollowing.bind(socialService),
+
+  // Node management methods (admin only)
+  getNodes: nodeService.getNodes.bind(nodeService),
+  addNode: nodeService.addNode.bind(nodeService),
+  updateNode: nodeService.updateNode.bind(nodeService),
+  deleteNode: nodeService.deleteNode.bind(nodeService),
 
 };
