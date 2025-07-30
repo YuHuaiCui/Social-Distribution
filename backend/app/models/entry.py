@@ -52,7 +52,6 @@ class EntryManager(models.Manager):
 
         queryset = self.filter(
             Q(visibility=Entry.PUBLIC)  # Public entries visible to all
-            | Q(visibility=Entry.UNLISTED) # Unlisted entries are also visible to anyone with the link
             | Q(visibility=Entry.UNLISTED, author=viewing_author)  # Own unlisted posts
             | Q(visibility=Entry.UNLISTED)
             & (Exists(follower_exists) | Exists(friendship_exists))  # Unlisted posts visible to followers and friends
