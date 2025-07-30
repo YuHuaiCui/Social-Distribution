@@ -48,10 +48,29 @@ export class AuthorService extends BaseApiService {
   }
 
   /**
-   * Get a specific author by ID
+   * Get a specific author by ID (UUID) or FQID (full URL)
    */
   async getAuthor(id: string): Promise<Author> {
-    // Extract ID from URL if full URL is passed
+    // Check if this is a full URL (FQID) or just a UUID
+    if (id.includes("http") || (id.includes("/") && id.split("/").length > 2)) {
+      // This is a FQID - use the by-fqid endpoint which fetches fresh remote data
+      try {
+        const encodedFqid = encodeURIComponent(id);
+        return await this.request<Author>(`/api/authors/${encodedFqid}/`);
+      } catch (error) {
+        console.warn("Failed to fetch author by FQID, trying fallback methods:", error);
+        // Fallback: try the by-url endpoint
+        try {
+          const encodedUrl = encodeURIComponent(id);
+          return await this.request<Author>(`/api/authors/by-url/${encodedUrl}/`);
+        } catch (fallbackError) {
+          console.warn("Fallback fetch also failed:", fallbackError);
+          throw error;
+        }
+      }
+    }
+
+    // This is a UUID - use the standard approach
     const authorId = id.includes("/")
       ? id.split("/").filter(Boolean).pop()
       : id;

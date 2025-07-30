@@ -33,3 +33,21 @@ export function isValidUUID(str: string): boolean {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
 }
+
+/**
+ * Generate the correct author URL for routing
+ * For remote authors: use FQID (full URL)
+ * For local authors: use UUID
+ */
+export function getAuthorUrl(author: { id: string; url?: string; node?: any; is_remote?: boolean }): string {
+  // Check if this is a remote author
+  if (author.node || author.is_remote) {
+    // For remote authors, use their full URL (FQID) 
+    const fqid = author.url || author.id;
+    return `/authors/${encodeURIComponent(fqid)}`;
+  } else {
+    // For local authors, use UUID
+    const uuid = extractUUID(author.id);
+    return `/authors/${uuid}`;
+  }
+}

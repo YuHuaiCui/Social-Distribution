@@ -7,7 +7,7 @@ import { api } from "../services/api";
 import AnimatedGradient from "./ui/AnimatedGradient";
 import type { Entry, Author, Comment } from "../types/models";
 import { useAuth } from "./context/AuthContext"; // adjust path as needed
-import { extractUUID } from "../utils/extractId";
+import { extractUUID, getAuthorUrl } from "../utils/extractId";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -112,7 +112,15 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         navigate(`/posts/${id}`);
         break;
       case "author":
-        navigate(`/authors/${extractUUID(id)}`);
+        // For author navigation, we need the author object to determine the correct URL
+        // Find the author from the current results
+        const author = results?.authors.find(a => a.id === id);
+        if (author) {
+          navigate(getAuthorUrl(author));
+        } else {
+          // Fallback to UUID extraction for backwards compatibility
+          navigate(`/authors/${extractUUID(id)}`);
+        }
         break;
       case "tag":
         navigate(`/explore?tag=${id}`);
