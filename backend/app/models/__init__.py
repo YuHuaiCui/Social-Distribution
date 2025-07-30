@@ -6,6 +6,7 @@ from .entry import Entry, EntryManager, InboxDelivery
 from .comment import Comment
 from .like import Like
 from .friendship import Friendship
+from .inbox import Inbox
 
 # Import utility functions
 from .utils import (
@@ -28,6 +29,7 @@ __all__ = [
     "Comment",
     "Like",
     "Friendship",
+    "Inbox",
     "get_author_stream",
     "get_mutual_friends",
     "has_liked_entry",

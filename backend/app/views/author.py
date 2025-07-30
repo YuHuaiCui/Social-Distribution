@@ -7,14 +7,19 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404
 from urllib.parse import unquote
 
-from app.models import Author, Entry, Follow
+from app.models import Author, Entry, Follow, Like, Comment, Inbox
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
 from app.serializers.follow import FollowSerializer
+from app.serializers.inbox import ActivitySerializer
 
 from django.http import HttpResponse
 import base64
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
@@ -576,15 +581,291 @@ class AuthorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="inbox")
     def post_to_inbox(self, request, pk=None):
         """
-        Post an item to an author's inbox for federation support.
+        POST [remote]: send an activity to the author's inbox
         
-        Note: Inbox functionality has been removed from the system.
-        This endpoint now returns a 410 Gone status.
+        The inbox receives activities from remote nodes:
+        - if the type is "entry" then add that entry to AUTHOR_SERIAL's inbox
+        - if the type is "follow" then add that follow to AUTHOR_SERIAL's inbox to approve later
+        - if the type is "Like" then add that like to AUTHOR_SERIAL's inbox  
+        - if the type is "comment" then add that comment to AUTHOR_SERIAL's inbox
+        
+        URL: /api/authors/{AUTHOR_SERIAL}/inbox
         """
-        return Response(
-            {"error": "Inbox functionality has been removed"},
-            status=status.HTTP_410_GONE
-        )
+        try:
+            # Get the recipient author
+            author = self.get_object()
+            
+            # Validate the incoming activity
+            serializer = ActivitySerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response(
+                    {"errors": serializer.errors}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            activity_data = serializer.validated_data
+            activity_type = activity_data.get('type', '')
+            
+            # Process the activity based on its type
+            content_object = None
+            
+            if activity_type == 'entry':
+                content_object = self._process_entry_activity(activity_data, author)
+            elif activity_type == 'follow':
+                content_object = self._process_follow_activity(activity_data, author)
+            elif activity_type == 'like':
+                content_object = self._process_like_activity(activity_data, author)
+            elif activity_type == 'comment':
+                content_object = self._process_comment_activity(activity_data, author)
+            
+            if content_object is None:
+                return Response(
+                    {"error": f"Failed to process {activity_type} activity"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create inbox entry
+            content_type = ContentType.objects.get_for_model(content_object)
+            
+            inbox_item, created = Inbox.objects.get_or_create(
+                recipient=author,
+                content_type=content_type,
+                object_id=content_object.id,
+                defaults={
+                    'activity_type': activity_type,
+                    'raw_data': request.data
+                }
+            )
+            
+            if created:
+                logger.info(f"Added {activity_type} to {author.username}'s inbox")
+                return Response({"message": "Activity added to inbox"}, status=status.HTTP_201_CREATED)
+            else:
+                logger.info(f"Duplicate {activity_type} for {author.username}'s inbox - ignored")
+                return Response({"message": "Activity already in inbox"}, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            logger.error(f"Error processing inbox activity: {str(e)}")
+            return Response(
+                {"error": "Failed to process inbox activity"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _process_entry_activity(self, activity_data, recipient):
+        """Process an entry activity and create/update the entry per spec."""
+        try:
+            # Get or create the entry author
+            author_data = activity_data.get('author', {})
+            author_url = author_data.get('id')
+            
+            if not author_url:
+                logger.error("Entry activity missing author id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = author_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            author, _ = Author.objects.get_or_create(
+                url=author_url,
+                defaults={
+                    'username': username,
+                    'displayName': author_data.get('displayName', ''),
+                    'profileImage': author_data.get('profileImage', ''),
+                    'host': author_data.get('host', ''),
+                    'web': author_data.get('web', ''),
+                }
+            )
+            
+            # Create or update the entry
+            entry_url = activity_data.get('id')
+            entry, _ = Entry.objects.get_or_create(
+                url=entry_url,
+                defaults={
+                    'author': author,
+                    'title': activity_data.get('title', ''),
+                    'description': activity_data.get('description', ''),
+                    'content': activity_data.get('content', ''),
+                    'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                    'visibility': activity_data.get('visibility', Entry.PUBLIC),
+                    'source': activity_data.get('source', ''),
+                    'origin': activity_data.get('origin', ''),
+                    'web': activity_data.get('web', ''),
+                    'published': activity_data.get('published'),
+                }
+            )
+            
+            return entry
+            
+        except Exception as e:
+            logger.error(f"Error processing entry activity: {str(e)}")
+            return None
+
+    def _process_follow_activity(self, activity_data, recipient):
+        """Process a follow activity and create the follow request per spec."""
+        try:
+            # Get follower information from actor
+            actor_data = activity_data.get('actor', {})
+            actor_url = actor_data.get('id')
+            
+            if not actor_url:
+                logger.error("Follow activity missing actor id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = actor_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            follower, _ = Author.objects.get_or_create(
+                url=actor_url,
+                defaults={
+                    'username': username,
+                    'displayName': actor_data.get('displayName', ''),
+                    'profileImage': actor_data.get('profileImage', ''),
+                    'host': actor_data.get('host', ''),
+                    'web': actor_data.get('web', ''),
+                }
+            )
+            
+            # Verify the object matches the recipient
+            object_data = activity_data.get('object', {})
+            object_url = object_data.get('id')
+            
+            if object_url != recipient.url:
+                logger.warning(f"Follow object {object_url} doesn't match recipient {recipient.url}")
+            
+            # Create the follow request
+            follow, _ = Follow.objects.get_or_create(
+                follower=follower,
+                followed=recipient,
+                defaults={
+                    'status': Follow.REQUESTING
+                }
+            )
+            
+            return follow
+            
+        except Exception as e:
+            logger.error(f"Error processing follow activity: {str(e)}")
+            return None
+
+    def _process_like_activity(self, activity_data, recipient):
+        """Process a like activity and create the like per spec."""
+        try:
+            # Get liker information
+            author_data = activity_data.get('author', {})
+            author_url = author_data.get('id')
+            
+            if not author_url:
+                logger.error("Like activity missing author id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = author_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            liker, _ = Author.objects.get_or_create(
+                url=author_url,
+                defaults={
+                    'username': username,
+                    'displayName': author_data.get('displayName', ''),
+                    'profileImage': author_data.get('profileImage', ''),
+                    'host': author_data.get('host', ''),
+                    'web': author_data.get('web', ''),
+                }
+            )
+            
+            # Get the liked object URL
+            object_url = activity_data.get('object')
+            if not object_url:
+                logger.error("Like activity missing object URL")
+                return None
+            
+            # Try to find the entry or comment being liked
+            entry = None
+            comment = None
+            
+            try:
+                entry = Entry.objects.get(url=object_url)
+            except Entry.DoesNotExist:
+                try:
+                    comment = Comment.objects.get(url=object_url)
+                except Comment.DoesNotExist:
+                    logger.error(f"Like object not found: {object_url}")
+                    return None
+            
+            # Create the like
+            like_url = activity_data.get('id')
+            like, _ = Like.objects.get_or_create(
+                url=like_url,
+                defaults={
+                    'author': liker,
+                    'entry': entry,
+                    'comment': comment,
+                }
+            )
+            
+            return like
+            
+        except Exception as e:
+            logger.error(f"Error processing like activity: {str(e)}")
+            return None
+
+    def _process_comment_activity(self, activity_data, recipient):
+        """Process a comment activity and create the comment per spec."""
+        try:
+            # Get commenter information
+            author_data = activity_data.get('author', {})
+            author_url = author_data.get('id')
+            
+            if not author_url:
+                logger.error("Comment activity missing author id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = author_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            commenter, _ = Author.objects.get_or_create(
+                url=author_url,
+                defaults={
+                    'username': username,
+                    'displayName': author_data.get('displayName', ''),
+                    'profileImage': author_data.get('profileImage', ''),
+                    'host': author_data.get('host', ''),
+                    'web': author_data.get('web', ''),
+                }
+            )
+            
+            # Get the entry being commented on (from 'entry' field per spec)
+            entry_url = activity_data.get('entry')
+            if not entry_url:
+                logger.error("Comment activity missing entry URL")
+                return None
+            
+            try:
+                entry = Entry.objects.get(url=entry_url)
+            except Entry.DoesNotExist:
+                logger.error(f"Comment target entry not found: {entry_url}")
+                return None
+            
+            # Create the comment
+            comment_url = activity_data.get('id')
+            comment, _ = Comment.objects.get_or_create(
+                url=comment_url,
+                defaults={
+                    'author': commenter,
+                    'entry': entry,
+                    'content': activity_data.get('comment', ''),
+                    'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                }
+            )
+            
+            return comment
+            
+        except Exception as e:
+            logger.error(f"Error processing comment activity: {str(e)}")
+            return None
 
     # CMPUT 404 Compliant API Endpoints
 

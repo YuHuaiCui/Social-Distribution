@@ -12,6 +12,9 @@ from requests.auth import HTTPBasicAuth
 from app.models import Node
 from app.serializers.comment import CommentSerializer
 from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
@@ -58,25 +61,51 @@ def received_comments(request):
 
 
 def send_comment_to_remote_inbox(comment):
-    """Send comment to remote inbox using centralized federation service."""
-    if not comment.entry or not comment.entry.author or comment.entry.author.is_local:
-        return  # Skip local targets
-
+    """Send comment to remote author's inbox using the spec format."""
     try:
-        from app.utils.federation import FederationService
-
-        success = FederationService.send_comment(comment)
-
-        if success:
-            print(
-                f"[Federation] Comment sent successfully to {comment.entry.author.username}"
-            )
+        # Only send if the entry author is remote
+        if not comment.entry or not comment.entry.author.is_remote or not comment.entry.author.node:
+            return
+            
+        remote_author = comment.entry.author
+        remote_node = remote_author.node
+        
+        # Create comment data in the spec format
+        comment_data = {
+            "type": "comment",
+            "id": comment.url,
+            "author": {
+                "type": "author",
+                "id": comment.author.url,
+                "host": comment.author.host,
+                "displayName": comment.author.displayName,
+                "web": comment.author.web,
+                "profileImage": comment.author.profileImage,
+            },
+            "comment": comment.content,
+            "contentType": comment.content_type,
+            "published": comment.created_at.isoformat() if hasattr(comment, 'created_at') else None,
+            "entry": comment.entry.url,
+        }
+        
+        # Construct inbox URL
+        inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox"
+        
+        response = requests.post(
+            inbox_url,
+            json=comment_data,
+            auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        
+        if response.status_code in [200, 201]:
+            logger.info(f"Successfully sent comment to {remote_author.displayName}")
         else:
-            print(
-                f"[Federation] Failed to send comment to {comment.entry.author.username}"
-            )
+            logger.warning(f"Failed to send comment to {inbox_url}: {response.status_code}")
+            
     except Exception as e:
-        print(f"[Federation] Error sending comment: {e}")
+        logger.error(f"Error sending comment to remote inbox: {str(e)}")
 
 
 class CommentListCreateView(generics.ListCreateAPIView):

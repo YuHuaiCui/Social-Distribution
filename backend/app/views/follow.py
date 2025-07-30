@@ -110,40 +110,53 @@ class FollowViewSet(viewsets.ModelViewSet):
 
     def _send_follow_to_remote_node(self, follow):
         """
-        Send a follow request to a remote node using the compliant format
+        Send a follow request to a remote node's inbox using the spec format
         """
         try:
             remote_author = follow.followed
             if not remote_author.is_remote or not remote_author.node:
                 return
 
-            # Get the remote node credentials
+            # Get the remote node
             remote_node = remote_author.node
 
-            # Use the updated follow serializer to get the proper format
-            follow_data = FollowSerializer(follow).data
+            # Create follow data in the spec format
+            follow_data = {
+                "type": "follow",
+                "summary": f"{follow.follower.displayName} wants to follow {follow.followed.displayName}",
+                "actor": {
+                    "type": "author",
+                    "id": follow.follower.url,
+                    "host": follow.follower.host,
+                    "displayName": follow.follower.displayName,
+                    "web": follow.follower.web,
+                    "profileImage": follow.follower.profileImage,
+                },
+                "object": {
+                    "type": "author", 
+                    "id": follow.followed.url,
+                    "host": follow.followed.host,
+                    "displayName": follow.followed.displayName,
+                    "web": follow.followed.web,
+                    "profileImage": follow.followed.profileImage,
+                }
+            }
 
-            # Send to remote node's inbox
-            # Extract author ID from the URL properly
-            author_id = (
-                remote_author.id.split("/")[-1]
-                if remote_author.id.endswith("/")
-                else remote_author.id.split("/")[-1]
-            )
-            inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
+            # Construct proper inbox URL
+            inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox"
 
             response = requests.post(
                 inbox_url,
                 json=follow_data,
                 auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                headers={"Content-Type": "application/activity+json"},
-                timeout=5,
+                headers={"Content-Type": "application/json"},
+                timeout=10,
             )
 
-            if response.status_code not in [200, 201, 202]:
-                print(
-                    f"Failed to send follow request to {inbox_url}: {response.status_code}"
-                )
+            if response.status_code in [200, 201]:
+                print(f"Successfully sent follow request to {remote_author.displayName}")
+            else:
+                print(f"Failed to send follow request to {inbox_url}: {response.status_code}")
 
         except Exception as e:
             print(f"Error sending follow request to remote node: {str(e)}")

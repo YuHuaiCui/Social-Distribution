@@ -6,12 +6,15 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import models
 from django.db.models import Q
-from app.models import Entry, Author
+from app.models import Entry, Author, Node, Follow, Friendship
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
 import uuid
 import os
 import logging
+import requests
+from django.conf import settings
+import json
 from app.models import Like, InboxDelivery
 from django.db.models import Count, F
 from django.utils import timezone
@@ -269,13 +272,146 @@ class EntryViewSet(viewsets.ModelViewSet):
         # Save the entry with the user's author
         entry = serializer.save(author=user_author)
 
-        # Remote functionality removed
+        # Send to remote nodes based on visibility
+        self._send_to_remote_nodes(entry)
 
     def _send_to_remote_nodes(self, entry):
         """
-        Remote functionality removed.
+        Send entry to remote nodes' inboxes based on visibility rules:
+        - PUBLIC: Send to all remote authors
+        - UNLISTED: Send to remote authors that follow the entry author  
+        - FRIENDS: Send to remote authors that are friends with the entry author
         """
-        pass
+        if not entry.author.is_local:
+            # Only federate entries from local authors
+            return
+            
+        # Get remote authors based on visibility
+        remote_authors = self._get_remote_authors_for_entry(entry)
+        
+        if not remote_authors:
+            logger.info(f"No remote authors to send entry {entry.id} to")
+            return
+            
+        # Prepare the entry data according to the inbox spec
+        entry_data = self._serialize_entry_for_inbox(entry)
+        
+        # Group authors by their node to batch requests
+        authors_by_node = {}
+        for author in remote_authors:
+            if author.node and author.node.is_active:
+                if author.node not in authors_by_node:
+                    authors_by_node[author.node] = []
+                authors_by_node[author.node].append(author)
+        
+        # Send to each node
+        for node, authors in authors_by_node.items():
+            for author in authors:
+                self._send_entry_to_author_inbox(entry_data, author, node)
+                
+        logger.info(f"Sent entry {entry.id} to {len(remote_authors)} remote authors")
+
+    def _get_remote_authors_for_entry(self, entry):
+        """Get list of remote authors who should receive this entry."""
+        remote_authors = []
+        
+        if entry.visibility == Entry.PUBLIC:
+            # Send to all remote authors
+            remote_authors = Author.objects.filter(node__isnull=False, node__is_active=True)
+            
+        elif entry.visibility == Entry.UNLISTED:
+            # Send to remote authors that follow the entry author
+            follower_ids = Follow.objects.filter(
+                followed=entry.author,
+                status=Follow.ACCEPTED
+            ).values_list('follower__url', flat=True)
+            
+            remote_authors = Author.objects.filter(
+                url__in=follower_ids,
+                node__isnull=False,
+                node__is_active=True
+            )
+            
+        elif entry.visibility == Entry.FRIENDS_ONLY:
+            # Send to remote authors that are friends with the entry author
+            # Friends are mutual followers
+            friend_ids = Friendship.objects.filter(
+                Q(author1=entry.author) | Q(author2=entry.author)
+            ).values_list('author1__url', 'author2__url')
+            
+            # Flatten the friend IDs and exclude the entry author
+            all_friend_ids = []
+            for author1_url, author2_url in friend_ids:
+                if author1_url != entry.author.url:
+                    all_friend_ids.append(author1_url)
+                if author2_url != entry.author.url:
+                    all_friend_ids.append(author2_url)
+            
+            remote_authors = Author.objects.filter(
+                url__in=all_friend_ids,
+                node__isnull=False,
+                node__is_active=True
+            )
+        
+        return remote_authors
+    
+    def _serialize_entry_for_inbox(self, entry):
+        """Serialize entry in the format expected by remote inboxes."""
+        return {
+            "type": "entry",
+            "id": entry.url,
+            "web": entry.web,
+            "title": entry.title,
+            "description": entry.description,
+            "content": entry.content,
+            "contentType": entry.content_type,
+            "visibility": entry.visibility,
+            "source": entry.source,
+            "origin": entry.origin,
+            "published": entry.published.isoformat() if entry.published else None,
+            "author": {
+                "type": "author",
+                "id": entry.author.url,
+                "web": entry.author.web,
+                "host": entry.author.host,
+                "displayName": entry.author.displayName,
+                "profileImage": entry.author.profileImage,
+            }
+        }
+    
+    def _send_entry_to_author_inbox(self, entry_data, author, node):
+        """Send entry data to a specific author's inbox on a remote node."""
+        try:
+            # Construct the inbox URL
+            inbox_url = f"{node.host.rstrip('/')}/api/authors/{author.id}/inbox"
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': f'social-distribution-node/{settings.SITE_URL}'
+            }
+            
+            # Use basic auth if credentials are provided
+            auth = None
+            if node.username and node.password:
+                auth = (node.username, node.password)
+            
+            response = requests.post(
+                inbox_url,
+                json=entry_data,
+                headers=headers,
+                auth=auth,
+                timeout=10
+            )
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"Successfully sent entry to {author.displayName} at {node.name}")
+            else:
+                logger.warning(f"Failed to send entry to {author.displayName} at {node.name}: {response.status_code}")
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error sending entry to {author.displayName} at {node.name}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error sending entry to {author.displayName} at {node.name}: {str(e)}")
 
     def _broadcast_to_node(self, entry, node):
         """

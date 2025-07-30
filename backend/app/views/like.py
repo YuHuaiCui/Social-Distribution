@@ -10,6 +10,9 @@ from app.models import Like, Entry, Comment, Node
 from app.serializers.like import LikeSerializer, LikesCollectionSerializer
 from requests.auth import HTTPBasicAuth
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
@@ -35,8 +38,67 @@ def received_likes(request):
 
 
 def send_like_to_remote_inbox(like):
-    # Remote functionality removed
-    pass
+    """
+    Send like to remote author's inbox using the spec format.
+    Handles both entry and comment likes.
+    """
+    try:
+        # Determine if it's an entry or comment like
+        if like.entry:
+            # Entry like
+            target = like.entry
+            target_author = like.entry.author
+            target_url = like.entry.url
+        elif like.comment:
+            # Comment like
+            target = like.comment
+            target_author = like.comment.author
+            target_url = like.comment.url
+        else:
+            logger.error("Like has neither entry nor comment")
+            return
+            
+        # Only send if the target author is remote
+        if not target_author.is_remote or not target_author.node:
+            return
+            
+        remote_author = target_author
+        remote_node = remote_author.node
+        
+        # Create like data in the spec format
+        like_data = {
+            "type": "like",
+            "id": like.url,
+            "author": {
+                "type": "author",
+                "id": like.author.url,
+                "host": like.author.host,
+                "displayName": like.author.displayName,
+                "web": like.author.web,
+                "profileImage": like.author.profileImage,
+            },
+            "object": target_url,
+            "published": like.created_at.isoformat() if hasattr(like, 'created_at') else None,
+        }
+        
+        # Construct inbox URL
+        inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox"
+        
+        response = requests.post(
+            inbox_url,
+            json=like_data,
+            auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        
+        if response.status_code in [200, 201]:
+            logger.info(f"Successfully sent like to {remote_author.displayName}")
+        else:
+            logger.warning(f"Failed to send like to {inbox_url}: {response.status_code}")
+            
+    except Exception as e:
+        logger.error(f"Error sending like to remote inbox: {str(e)}")
 
 
 class EntryLikeView(APIView):
@@ -178,7 +240,8 @@ class EntryLikeView(APIView):
         )
         print(f"[DEBUG] About to call RemoteActivitySender.send_like")
 
-        # Remote functionality removed
+        # Send like to remote node if entry author is remote
+        send_like_to_remote_inbox(like)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -434,7 +497,8 @@ class CommentLikeView(APIView):
         like = Like.objects.create(author=author, comment=comment)
         serializer = LikeSerializer(like)
 
-        # Remote functionality removed
+        # Send like to remote node if comment author is remote
+        send_like_to_remote_inbox(like)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
