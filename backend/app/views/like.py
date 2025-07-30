@@ -40,7 +40,7 @@ def received_likes(request):
                 "author": {
                     "id": like.author.id,
                     "url": like.author.url,
-                    "display_name": like.author.display_name,
+                    "display_name": like.author.displayName,
                     "username": like.author.username,
                     "profile_image": like.author.profile_image,
                 },

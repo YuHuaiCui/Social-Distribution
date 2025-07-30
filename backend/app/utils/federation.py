@@ -270,11 +270,11 @@ class FederationService:
                             defaults={
                                 "url": author_url,
                                 "username": author_data.get("username", ""),
-                                "display_name": author_data.get(
+                                "displayName": author_data.get(
                                     "displayName", author_data.get("display_name", "")
                                 ),
                                 "github_username": author_data.get("github", ""),
-                                "profile_image": author_data.get(
+                                "profileImage": author_data.get(
                                     "profileImage", author_data.get("profile_image", "")
                                 ),
                                 "bio": author_data.get("bio", ""),
@@ -297,16 +297,16 @@ class FederationService:
                             author.username = author_data.get(
                                 "username", author.username
                             )
-                            author.display_name = author_data.get(
+                            author.displayName = author_data.get(
                                 "displayName",
-                                author_data.get("display_name", author.display_name),
+                                author_data.get("display_name", author.displayName),
                             )
                             author.github_username = author_data.get(
                                 "github", author.github_username
                             )
-                            author.profile_image = author_data.get(
+                            author.profileImage = author_data.get(
                                 "profileImage",
-                                author_data.get("profile_image", author.profile_image),
+                                author_data.get("profile_image", author.profileImage),
                             )
                             author.bio = author_data.get("bio", author.bio)
                             author.location = author_data.get(
@@ -398,11 +398,11 @@ class FederationService:
                             defaults={
                                 "url": author_url,
                                 "username": author_data.get("username", ""),
-                                "display_name": author_data.get(
+                                "displayName": author_data.get(
                                     "displayName", author_data.get("display_name", "")
                                 ),
                                 "github_username": author_data.get("github", ""),
-                                "profile_image": author_data.get(
+                                "profileImage": author_data.get(
                                     "profileImage", author_data.get("profile_image", "")
                                 ),
                                 "host": author_data.get("host", node.host),
@@ -626,13 +626,13 @@ class FederationService:
                 "type": "author",
                 "id": entry.author.url,
                 "host": f"{settings.SITE_URL}/api/",
-                "displayName": entry.author.display_name,
+                "displayName": entry.author.displayName,
                 "github": (
                     f"https://github.com/{entry.author.github_username}"
                     if entry.author.github_username
                     else ""
                 ),
-                "profileImage": entry.author.profile_image,
+                "profileImage": entry.author.profileImage,
                 "web": f"{settings.SITE_URL}/authors/{entry.author.id}",
             },
             "comments": {
@@ -794,7 +794,7 @@ class FederationService:
                         "url": like_data.get("id")
                         or like_data.get("url"),  # Important!
                         "summary": like_data.get(
-                            "summary", f"{author.display_name} liked your post"
+                            "summary", f"{author.displayName} liked your post"
                         ),
                         "object": object_url,
                     },
@@ -1080,9 +1080,9 @@ class FederationService:
                 remote_author = Author.objects.create(
                     url=actor_url,
                     username=actor_data.get("username", ""),
-                    display_name=actor_data.get("displayName", ""),
+                    displayName=actor_data.get("displayName", ""),
                     github_username=actor_data.get("github", ""),
-                    profile_image=actor_data.get("profileImage", ""),
+                    profileImage=actor_data.get("profileImage", ""),
                     bio=actor_data.get("bio", ""),
                     location=actor_data.get("location", ""),
                     website=actor_data.get("website", ""),

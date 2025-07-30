@@ -360,7 +360,7 @@ class InboxReceiveView(APIView):
         remote_author = Author.objects.create(
             url=actor_url,
             username=actor_data.get("username", ""),
-            display_name=actor_data.get("displayName", ""),
+            displayName=actor_data.get("displayName", ""),
             github_username=actor_data.get("github", ""),
             profile_image=actor_data.get("profileImage", ""),
             bio=actor_data.get("bio", ""),

@@ -268,7 +268,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                     "id": author_id,
                     "username": author_data.get("username", f"{author_id}@{node.host}"),
                     "display_name": author_data.get(
-                        "displayName", author_data.get("display_name", "")
+                        "displayName", author_data.get("displayName", "")
                     ),
                     "github_username": author_data.get("github", ""),
                     "profile_image": author_data.get("profileImage", ""),
@@ -539,7 +539,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                 "id": entry.author.url,
                 "url": entry.author.url,
                 "host": entry.author.host,
-                "displayName": entry.author.display_name,
+                "displayName": entry.author.displayName,
                 "username": entry.author.username,
                 "github": (
                     entry.author.github_username if entry.author.github_username else ""

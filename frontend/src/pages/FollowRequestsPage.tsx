@@ -255,12 +255,12 @@ export const FollowRequestsPage: React.FC = () => {
                             <Avatar
                               imgSrc={
                                 isAuthorObject(follower)
-                                  ? follower.profile_image
+                                  ? follower.profileImage || follower.profile_image
                                   : undefined
                               }
                               alt={
                                 isAuthorObject(follower)
-                                  ? follower.display_name
+                                  ? follower.displayName || follower.display_name
                                   : "User"
                               }
                               size="lg"

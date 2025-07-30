@@ -93,14 +93,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         # If no type filter is specified, include both local and remote authors
         # Remote authors are already in the database from inbox processing
 
-        # Search by username, display name, github username, or email
+        # Search by username, display name, or github username
         search = self.request.query_params.get("search", None)
         if search:
             queryset = queryset.filter(
                 Q(username__icontains=search)
-                | Q(display_name__icontains=search)
+                | Q(displayName__icontains=search)
                 | Q(github_username__icontains=search)
-                | Q(email__icontains=search)
             )
 
         return queryset
@@ -776,12 +775,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     id=author_id,
                     url=author_url,
                     username=author_data.get("username", ""),
-                    display_name=author_data.get("displayName", ""),
+                    displayName=author_data.get("displayName", ""),
                     github_username=author_data.get("github", ""),
                     profile_image=author_data.get("profileImage", ""),
                     bio=author_data.get("bio", ""),
-                    location=author_data.get("location", ""),
-                    website=author_data.get("website", ""),
                     host=author_data.get("host", node.host),
                     web=author_data.get("page", ""),
                     node=node,

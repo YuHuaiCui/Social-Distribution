@@ -98,7 +98,7 @@ class FollowViewSet(viewsets.ModelViewSet):
                         "type": "Follow",
                         "actor": {
                             "id": follow.follower.url,
-                            "display_name": follow.follower.display_name,
+                            "display_name": follow.follower.displayName,
                             "username": follow.follower.username,
                             "profile_image": (
                                 follow.follower.profile_image.url
@@ -108,7 +108,7 @@ class FollowViewSet(viewsets.ModelViewSet):
                         },
                         "object": {
                             "id": follow.followed.url,
-                            "display_name": follow.followed.display_name,
+                            "display_name": follow.followed.displayName,
                             "username": follow.followed.username,
                             "profile_image": (
                                 follow.followed.profile_image.url

@@ -47,6 +47,9 @@ class Author(AbstractUser):
     # Use UUID as primary key for better federation support
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     url = models.URLField(unique=True, help_text="Full URL identifier (FQID)")
+    
+    # Override email field from AbstractUser to make it not required
+    email = models.EmailField(blank=True, null=True)
 
     # ActivityPub/Federation compliance fields
     type = models.CharField(
@@ -60,14 +63,12 @@ class Author(AbstractUser):
     )
 
     # Profile information
-    display_name = models.CharField(max_length=255, blank=True)
+    displayName = models.CharField(max_length=255, blank=True)
     github_username = models.CharField(max_length=255, blank=True)
-    profile_image = models.TextField(
+    profileImage = models.TextField(
         blank=True, help_text="Profile image as data URL or regular URL"
     )
     bio = models.TextField(blank=True)
-    location = models.CharField(max_length=255, blank=True)
-    website = models.URLField(max_length=200, blank=True)
 
     # Federation: null for local authors, set for remote authors
     node = models.ForeignKey(
@@ -94,7 +95,7 @@ class Author(AbstractUser):
             models.Index(fields=["is_approved"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["updated_at"]),
-            models.Index(fields=["display_name"]),
+            models.Index(fields=["displayName"]),
             models.Index(fields=["github_username"]),
             # Compound index for efficient queries of remote approved authors
             models.Index(fields=["node", "is_approved"]),
@@ -242,4 +243,4 @@ class Author(AbstractUser):
         return self.node is not None
 
     def __str__(self):
-        return self.display_name or self.username
+        return self.displayName or self.username

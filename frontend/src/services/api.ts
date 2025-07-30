@@ -220,15 +220,15 @@ class ApiService {
   async updateCurrentAuthor(data: Partial<Author>): Promise<Author> {
     // Convert to snake_case for backend
     const backendData: any = {};
-    if (data.display_name !== undefined)
-      backendData.display_name = data.display_name;
+    if (data.displayName !== undefined)
+      backendData.displayName = data.displayName;
     if (data.github_username !== undefined)
       backendData.github_username = data.github_username;
     if (data.bio !== undefined) backendData.bio = data.bio;
     if (data.location !== undefined) backendData.location = data.location;
     if (data.website !== undefined) backendData.website = data.website;
-    if (data.profile_image !== undefined)
-      backendData.profile_image = data.profile_image;
+    if (data.profileImage !== undefined)
+      backendData.profileImage = data.profileImage;
     if (data.email !== undefined) backendData.email = data.email;
 
     return this.request<Author>("/api/authors/me/", {
@@ -249,7 +249,7 @@ class ApiService {
 
   async uploadProfileImage(file: File): Promise<Author> {
     const formData = new FormData();
-    formData.append("profile_image_file", file);
+    formData.append("profileImage_file", file);
 
     const csrfToken = document.cookie
       .split("; ")

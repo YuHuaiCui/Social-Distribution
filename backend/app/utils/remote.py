@@ -406,13 +406,13 @@ class RemoteActivitySender:
                 "type": "author",
                 "id": like.author.url,
                 "host": f"{settings.SITE_URL}/api/",
-                "displayName": like.author.display_name,
+                "displayName": like.author.displayName,
                 "github": (
                     f"https://github.com/{like.author.github_username}"
                     if like.author.github_username
                     else ""
                 ),
-                "profileImage": like.author.profile_image,
+                "profileImage": like.author.profileImage,
                 "web": f"{settings.SITE_URL}/authors/{like.author.id}",
             }
 
@@ -468,13 +468,13 @@ class RemoteActivitySender:
                     "type": "author",
                     "id": comment.author.url,
                     "host": f"{settings.SITE_URL}/api/",
-                    "displayName": comment.author.display_name,
+                    "displayName": comment.author.displayName,
                     "github": (
                         f"https://github.com/{comment.author.github_username}"
                         if comment.author.github_username
                         else ""
                     ),
-                    "profileImage": comment.author.profile_image,
+                    "profileImage": comment.author.profileImage,
                     "web": f"{settings.SITE_URL}/authors/{comment.author.id}",
                 },
                 "comment": comment.content,
@@ -600,13 +600,13 @@ class RemoteActivitySender:
                 "type": "author",
                 "id": entry.author.url,
                 "host": f"{settings.SITE_URL}/api/",
-                "displayName": entry.author.display_name,
+                "displayName": entry.author.displayName,
                 "github": (
                     f"https://github.com/{entry.author.github_username}"
                     if entry.author.github_username
                     else ""
                 ),
-                "profileImage": entry.author.profile_image,
+                "profileImage": entry.author.profileImage,
                 "web": f"{settings.SITE_URL}/authors/{entry.author.id}",
             },
             "comments": {
@@ -652,13 +652,13 @@ def get_or_create_remote_author(author_data, source_node):
             username=author_data.get("displayName", "").replace(" ", "_").lower()
             or f"remote_{hash(author_url) % 10000}",
             email=f"remote_{hash(author_url) % 10000}@{source_node.host}",
-            display_name=author_data.get("displayName", ""),
+            displayName=author_data.get("displayName", ""),
             github_username=(
                 author_data.get("github", "").split("/")[-1]
                 if author_data.get("github")
                 else ""
             ),
-            profile_image=author_data.get("profileImage", ""),
+            profileImage=author_data.get("profileImage", ""),
             host=author_data.get("host", ""),
             web=author_data.get("web", ""),
             node=source_node,

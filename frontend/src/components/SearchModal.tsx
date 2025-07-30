@@ -297,17 +297,14 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                               >
                                 <div className="flex items-center">
                                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary-purple)] to-[var(--primary-pink)] flex items-center justify-center text-white font-semibold text-sm mr-3 shrink-0">
-                                    {author.display_name
+                                    {(author.displayName || author.display_name)
                                       ?.charAt(0)
                                       .toUpperCase() || "U"}
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors">
-                                      {author.display_name || "Unknown Author"}
+                                      {author.displayName || author.display_name || "Unknown Author"}
                                     </h4>
-                                    <p className="text-xs text-[var(--search-results-secondary)] truncate">
-                                      @{author.username || "unknown"}
-                                    </p>
                                   </div>
                                   <ArrowRight
                                     size={14}
@@ -348,7 +345,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                                     </h4>
                                     <p className="text-xs text-[var(--search-results-secondary)] truncate">
                                       {typeof post.author === "object"
-                                        ? post.author.display_name
+                                        ? post.author.displayName || post.author.display_name
                                         : "Unknown Author"}
                                     </p>
                                   </div>

@@ -11,7 +11,7 @@ class AuthorAdmin(UserAdmin):
     list_display = [
         "username",
         "email",
-        "display_name",
+        "displayName",
         "is_approved",
         "is_active",
         "is_staff",
@@ -26,14 +26,14 @@ class AuthorAdmin(UserAdmin):
         "node",
         "created_at",
     ]
-    search_fields = ["username", "email", "display_name", "github_username"]
+    search_fields = ["username", "email", "displayName", "github_username"]
     ordering = ["-created_at"]
 
     # Add custom fields to the fieldsets
     fieldsets = UserAdmin.fieldsets + (
         (
             "Profile Information",
-            {"fields": ("display_name", "github_username", "profile_image", "bio")},
+            {"fields": ("displayName", "github_username", "profileImage", "bio")},
         ),
         ("Federation", {"fields": ("url", "node", "is_approved")}),
         (

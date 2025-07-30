@@ -151,11 +151,12 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   const author = useMemo(
     () => {
       if (typeof post.author === "string") {
-        return { display_name: "Unknown", id: "" } as Author;
+        return { displayName: "Unknown", display_name: "Unknown", id: "" } as Author;
       }
-      // Ensure display_name exists and isn't empty
-      if (!post.author.display_name) {
-        return { ...post.author, display_name: "Unknown User" };
+      // Ensure displayName exists and isn't empty
+      const displayName = post.author.displayName || post.author.display_name;
+      if (!displayName) {
+        return { ...post.author, displayName: "Unknown User", display_name: "Unknown User" };
       }
       return post.author;
     },
@@ -365,28 +366,28 @@ const PostCardComponent: React.FC<PostCardProps> = ({
               className="flex items-center"
             >
               <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
-                {author.profile_image ? (
+                {(author.profileImage || author.profile_image) ? (
                   <LoadingImage
-                    src={author.profile_image}
-                    alt={author.display_name}
+                    src={author.profileImage || author.profile_image}
+                    alt={author.displayName || author.display_name}
                     className="w-full h-full"
                     loaderSize={14}
                     aspectRatio="1/1"
                     fallback={
                       <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                        {author.display_name.charAt(0).toUpperCase()}
+                        {(author.displayName || author.display_name || "U").charAt(0).toUpperCase()}
                       </div>
                     }
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                    {author.display_name.charAt(0).toUpperCase()}
+                    {(author.displayName || author.display_name || "U").charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
               <div>
                 <h3 className="font-medium text-text-1">
-                  {author.display_name}
+                  {author.displayName || author.display_name}
                 </h3>
                 <div className="flex items-center text-xs text-text-2">
                   <span>{timeAgo}</span>

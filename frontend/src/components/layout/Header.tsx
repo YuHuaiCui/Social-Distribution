@@ -203,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                           {notifications.map((notif) => {
                             const senderName =
                               typeof notif.sender === "object" && notif.sender
-                                ? notif.sender.display_name
+                                ? notif.sender.displayName || notif.sender.display_name
                                 : "Someone";
 
                             const timeAgo = formatTimeAgo(notif.created_at);
@@ -397,18 +397,16 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-glass-low transition-colors cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full overflow-hidden neumorphism-sm">
-                    {user.profile_image ? (
+                    {user.profileImage || user.profile_image ? (
                       <LoadingImage
-                        src={user.profile_image}
-                        alt={user.display_name || "Unknown"}
+                        src={user.profileImage || user.profile_image}
+                        alt={user.displayName || user.display_name || "Unknown"}
                         className="w-full h-full"
                         loaderSize={16}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white">
-                        {user.display_name
-                          ? user.display_name.charAt(0).toUpperCase()
-                          : "U"}
+                        {(user.displayName || user.display_name)?.charAt(0).toUpperCase() || "U"}
                       </div>
                     )}
                   </div>

@@ -620,18 +620,15 @@ export const ExplorePage: React.FC = () => {
                                 className="mb-4"
                               >
                                 <Avatar
-                                  imgSrc={author.profile_image}
-                                  alt={author.display_name}
+                                  imgSrc={author.profileImage || author.profile_image}
+                                  alt={author.displayName || author.display_name}
                                   size="xl"
                                 />
                               </motion.div>
 
                               <h3 className="font-semibold text-lg text-text-1 mb-1 hover:underline">
-                                {author.display_name}
+                                {author.displayName || author.display_name}
                               </h3>
-                              <p className="text-sm text-text-2 mb-3">
-                                @{author.username}
-                              </p>
 
                               {author.bio && (
                                 <p className="text-sm text-text-2 mb-4 line-clamp-2">

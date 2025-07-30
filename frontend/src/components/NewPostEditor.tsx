@@ -177,22 +177,22 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
         {/* Author info */}
         <div className="flex items-center mb-4">
           <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
-            {user?.profile_image ? (
+            {user?.profileImage || user?.profile_image ? (
               <LoadingImage
-                src={user.profile_image}
-                alt={user.display_name}
+                src={user.profileImage || user.profile_image}
+                alt={user.displayName || user.display_name}
                 className="w-full h-full"
                 loaderSize={14}
                 aspectRatio="1/1"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                {user?.display_name.charAt(0).toUpperCase() || 'U'}
+                {user?.displayName || user?.display_name.charAt(0).toUpperCase() || 'U'}
               </div>
             )}
           </div>
           <div>
-            <h3 className="font-medium text-text-1">{user?.display_name || 'User'}</h3>
+            <h3 className="font-medium text-text-1">{user?.displayName || user?.display_name || 'User'}</h3>
             <div className="flex items-center space-x-3 text-sm">
               {/* Content Type Selector */}
               <button

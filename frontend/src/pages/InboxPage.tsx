@@ -29,9 +29,9 @@ interface FollowRequestItem {
   id: string;
   from_author: {
     id: string;
-    display_name: string;
+    displayName: string;
     username: string;
-    profile_image?: string;
+    profileImage?: string;
   };
   created_at: string;
   status: "requesting" | "accepted" | "rejected";
@@ -42,9 +42,9 @@ interface LikeItem {
   id: string;
   from_author: {
     id: string;
-    display_name: string;
+    displayName: string;
     username: string;
-    profile_image?: string;
+    profileImage?: string;
   };
   entry: {
     id: string;
@@ -59,9 +59,9 @@ interface CommentItem {
   id: string;
   from_author: {
     id: string;
-    display_name: string;
+    displayName: string;
     username: string;
-    profile_image?: string;
+    profileImage?: string;
   };
   entry: {
     id: string;
@@ -122,7 +122,7 @@ export const InboxPage: React.FC = () => {
             id: follow.id,
             from_author: {
               id: follow.actor.id,
-              display_name: follow.actor.displayName,
+              displayName: follow.actor.displayName,
               username: follow.actor.displayName, // Use displayName as fallback
               profile_image: follow.actor.profileImage,
             },
@@ -144,7 +144,7 @@ export const InboxPage: React.FC = () => {
             id: like.id,
             from_author: {
               id: like.author.id,
-              display_name: like.author.display_name,
+              displayName: like.author.displayName || like.author.display_name,
               username: like.author.username,
               profile_image: like.author.profile_image,
             },
@@ -166,7 +166,7 @@ export const InboxPage: React.FC = () => {
             id: comment.id,
             from_author: {
               id: comment.author.id,
-              display_name: comment.author.display_name,
+              displayName: comment.author.displayName || comment.author.display_name,
               username: comment.author.username,
               profile_image: comment.author.profile_image,
             },
@@ -349,8 +349,8 @@ export const InboxPage: React.FC = () => {
                       >
                         <Link to={`/authors/${extractUUID(item.from_author.id)}`}>
                           <Avatar
-                            imgSrc={item.from_author.profile_image}
-                            alt={item.from_author.display_name}
+                            imgSrc={item.from_author.profileImage}
+                            alt={item.from_author.displayName}
                           />
                         </Link>
                       </motion.div>
@@ -364,7 +364,7 @@ export const InboxPage: React.FC = () => {
                                 to={`/authors/${extractUUID(item.from_author.id)}`}
                                 className="font-semibold text-[var(--primary-purple)] hover:underline"
                               >
-                                {item.from_author.display_name}
+                                {item.from_author.displayName}
                               </Link>{" "}
                               <span className="text-text-2">
                                 {config.title}

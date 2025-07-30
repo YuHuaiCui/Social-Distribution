@@ -99,7 +99,7 @@ export const FollowList: React.FC<FollowListProps> = ({
     if (searchQuery) {
       filtered = filtered.filter(
         (user) =>
-          user.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.displayName || user.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (user.bio &&
             user.bio.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -363,8 +363,8 @@ export const MutualFollowers: React.FC<MutualFollowersProps> = ({
         web: "http://localhost:3000",
         username: `mutual${i}`,
         email: `mutual${i}@example.com`,
-        display_name: `Mutual Friend ${i}`,
-        profile_image: `https://i.pravatar.cc/150?u=mutual${i}`,
+        displayName: `Mutual Friend ${i}`,
+        profileImage: `https://i.pravatar.cc/150?u=mutual${i}`,
         is_approved: true,
         is_active: true,
         created_at: new Date().toISOString(),
@@ -404,10 +404,10 @@ export const MutualFollowers: React.FC<MutualFollowersProps> = ({
             className="relative"
           >
             <img
-              src={mutual.profile_image}
-              alt={mutual.display_name}
+              src={mutual.profileImage}
+              alt={mutual.displayName}
               className="w-8 h-8 rounded-full border-2 border-bg-1"
-              title={mutual.display_name}
+              title={mutual.displayName}
             />
           </motion.div>
         ))}

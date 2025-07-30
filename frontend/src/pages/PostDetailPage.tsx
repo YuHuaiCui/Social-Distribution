@@ -612,12 +612,12 @@ export const PostDetailPage: React.FC = () => {
               <Avatar
                 imgSrc={
                   isAuthorObject(post.author)
-                    ? post.author.profile_image
+                    ? post.author.profileImage || post.author.profile_image
                     : undefined
                 }
                 alt={
                   isAuthorObject(post.author)
-                    ? post.author.display_name
+                    ? post.author.displayName || post.author.display_name
                     : "Author"
                 }
                 size="lg"
@@ -626,7 +626,7 @@ export const PostDetailPage: React.FC = () => {
             <div className="flex-1">
               <h3 className="font-semibold text-text-1">
                 {isAuthorObject(post.author)
-                  ? post.author.display_name
+                  ? post.author.displayName || post.author.display_name
                   : "Unknown Author"}
               </h3>
               <div className="flex items-center space-x-3 text-sm text-text-2">
@@ -758,8 +758,8 @@ export const PostDetailPage: React.FC = () => {
 
               <div className="flex space-x-3">
                 <Avatar
-                  imgSrc={user?.profile_image}
-                  alt={user?.display_name || "User"}
+                  imgSrc={user?.profileImage || user?.profile_image}
+                  alt={user?.displayName || user?.display_name || "User"}
                   size="md"
                 />
                 <div className="flex-1">
@@ -841,12 +841,12 @@ export const PostDetailPage: React.FC = () => {
                   <Avatar
                     imgSrc={
                       isAuthorObject(comment.author)
-                        ? comment.author.profile_image
+                        ? comment.author.profileImage || comment.author.profile_image
                         : undefined
                     }
                     alt={
                       isAuthorObject(comment.author)
-                        ? comment.author.display_name
+                        ? comment.author.displayName || comment.author.display_name
                         : "Author"
                     }
                     size="md"
@@ -857,7 +857,7 @@ export const PostDetailPage: React.FC = () => {
                         <div>
                           <span className="font-medium text-text-1">
                             {isAuthorObject(comment.author)
-                              ? comment.author.display_name
+                              ? comment.author.displayName || comment.author.display_name
                               : "Unknown Author"}
                           </span>
                           <span className="text-sm text-text-2 ml-2">
@@ -937,12 +937,12 @@ export const PostDetailPage: React.FC = () => {
                             <Avatar
                               imgSrc={
                                 isAuthorObject(reply.author)
-                                  ? reply.author.profile_image
+                                  ? reply.author.profileImage || reply.author.profile_image
                                   : undefined
                               }
                               alt={
                                 isAuthorObject(reply.author)
-                                  ? reply.author.display_name
+                                  ? reply.author.displayName || reply.author.display_name
                                   : "Author"
                               }
                               size="sm"
@@ -951,7 +951,7 @@ export const PostDetailPage: React.FC = () => {
                               <div className="mb-1">
                                 <span className="font-medium text-sm text-text-1">
                                   {isAuthorObject(reply.author)
-                                    ? reply.author.display_name
+                                    ? reply.author.displayName || reply.author.display_name
                                     : "Unknown Author"}
                                 </span>
                                 <span className="text-xs text-text-2 ml-2">

@@ -270,9 +270,9 @@ export class SocialService extends BaseApiService {
       id: string;
       author: {
         id: string;
-        display_name: string;
+        displayName: string;
         username: string;
-        profile_image?: string;
+        profileImage?: string;
       };
       entry: {
         id: string;
@@ -294,9 +294,9 @@ export class SocialService extends BaseApiService {
       id: string;
       author: {
         id: string;
-        display_name: string;
+        displayName: string;
         username: string;
-        profile_image?: string;
+        profileImage?: string;
       };
       entry: {
         id: string;

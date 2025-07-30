@@ -56,7 +56,7 @@ const ShareModalComponent: React.FC<ShareModalProps> = ({
   const postId = extractUUID(post.id);
   const postUrl = shareUrl || `${window.location.origin}/posts/${postId}`;
   const shareText = `Check out "${post.title}" by ${
-    typeof post.author === 'object' ? post.author.display_name : 'Unknown'
+    typeof post.author === 'object' ? post.author.displayName || post.author.display_name : 'Unknown'
   }`;
 
   const searchUsers = useCallback(async (query: string) => {
@@ -276,7 +276,7 @@ const ShareModalComponent: React.FC<ShareModalProps> = ({
                 <h3 className="font-medium text-text-1 mb-2 line-clamp-2">{post.title}</h3>
                 <div className="flex items-center justify-between text-sm text-text-2">
                   <span>
-                    by {typeof post.author === 'object' ? post.author.display_name : 'Unknown'}
+                    by {typeof post.author === 'object' ? post.author.displayName || post.author.display_name : 'Unknown'}
                   </span>
                   <div className="flex items-center space-x-1">
                     <VisibilityIcon size={14} />
@@ -408,11 +408,11 @@ const ShareModalComponent: React.FC<ShareModalProps> = ({
                                 className="flex items-center space-x-2 px-3 py-1 rounded-full bg-[var(--primary-violet)]/20 text-sm"
                               >
                                 <Avatar
-                                  imgSrc={user.profile_image}
-                                  alt={user.display_name}
+                                  imgSrc={user.profileImage || user.profile_image}
+                                  alt={user.displayName || user.display_name}
                                   size="sm"
                                 />
-                                <span className="text-text-1">{user.display_name}</span>
+                                <span className="text-text-1">{user.displayName || user.display_name}</span>
                                 <button
                                   onClick={() => setSelectedUsers(prev => 
                                     prev.filter(id => id !== userId)
@@ -463,13 +463,12 @@ const ShareModalComponent: React.FC<ShareModalProps> = ({
                               }`}
                             >
                               <Avatar
-                                imgSrc={user.profile_image}
-                                alt={user.display_name}
+                                imgSrc={user.profileImage || user.profile_image}
+                                alt={user.displayName || user.display_name}
                                 size="md"
                               />
                               <div className="flex-1 text-left">
-                                <p className="text-sm font-medium text-text-1">{user.display_name}</p>
-                                <p className="text-xs text-text-2">@{user.username}</p>
+                                <p className="text-sm font-medium text-text-1">{user.displayName || user.display_name}</p>
                               </div>
                               {isSelected && (
                                 <UserCheck size={18} className="text-[var(--primary-violet)]" />

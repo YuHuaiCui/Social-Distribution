@@ -19,7 +19,7 @@ class FollowSerializer(serializers.ModelSerializer):
     def get_summary(self, obj):
         """Generate the summary text"""
         return (
-            f"{obj.follower.display_name} wants to follow {obj.followed.display_name}"
+            f"{obj.follower.displayName} wants to follow {obj.followed.displayName}"
         )
 
     def get_actor(self, obj):
@@ -29,13 +29,13 @@ class FollowSerializer(serializers.ModelSerializer):
             "type": "author",
             "id": follower.url,
             "host": follower.host,
-            "displayName": follower.display_name,
+            "displayName": follower.displayName,
             "github": (
                 f"https://github.com/{follower.github_username}"
                 if follower.github_username
                 else ""
             ),
-            "profileImage": follower.profile_image if follower.profile_image else "",
+            "profileImage": follower.profileImage if follower.profileImage else "",
             "web": (
                 follower.web
                 if follower.web
@@ -50,13 +50,13 @@ class FollowSerializer(serializers.ModelSerializer):
             "type": "author",
             "id": followed.url,
             "host": followed.host,
-            "displayName": followed.display_name,
+            "displayName": followed.displayName,
             "github": (
                 f"https://github.com/{followed.github_username}"
                 if followed.github_username
                 else ""
             ),
-            "profileImage": followed.profile_image if followed.profile_image else "",
+            "profileImage": followed.profileImage if followed.profileImage else "",
             "web": (
                 followed.web
                 if followed.web

@@ -166,15 +166,15 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                     >
                       <div className="relative">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-[var(--primary-pink)] to-[var(--primary-purple)]">
-                          {friend.profile_image ? (
+                          {friend.profileImage || friend.profile_image ? (
                             <img
-                              src={friend.profile_image}
-                              alt={friend.display_name}
+                              src={friend.profileImage || friend.profile_image}
+                              alt={friend.displayName || friend.display_name}
                               className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-white font-medium">
-                              {friend.display_name.charAt(0).toUpperCase()}
+                              {friend.displayName || friend.display_name.charAt(0).toUpperCase()}
                             </div>
                           )}
                         </div>
@@ -182,7 +182,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                       </div>
                       <div className="ml-3">
                         <div className="font-medium text-[color:var(--text-1)] text-sm">
-                          {friend.display_name}
+                          {friend.displayName || friend.display_name}
                         </div>
                         <div className="text-xs text-[color:var(--text-2)]">
                           Online

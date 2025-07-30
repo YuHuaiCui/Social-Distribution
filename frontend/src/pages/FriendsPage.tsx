@@ -105,8 +105,8 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
 
   const filteredAuthors = (authors || []).filter(
     (author) =>
-      author.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (author.displayName || author.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (author.username || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (author.github_username &&
         author.github_username
           .toLowerCase()
