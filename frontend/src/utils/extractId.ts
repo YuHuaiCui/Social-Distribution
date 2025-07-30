@@ -35,8 +35,20 @@ export function isValidUUID(str: string): boolean {
 }
 
 /**
- * Check if an author is remote by examining if their ID/URL is a FQID (Fully Qualified ID)
- * Remote authors have full URLs as IDs, local authors have UUIDs
+ * Extract IP address or hostname from a URL
+ */
+export function extractIPFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Check if an author is remote by examining if their ID/URL matches the backend IP address
+ * Local authors have IDs that match the backend IP, remote authors have different IPs
  */
 export function isRemoteAuthor(author: { id: string; url?: string; node?: any; is_remote?: boolean }): boolean {
   // First check explicit flags if available
@@ -49,24 +61,24 @@ export function isRemoteAuthor(author: { id: string; url?: string; node?: any; i
     return true;
   }
   
-  // Check if the author's ID or URL is a FQID (fully qualified URL)
-  // Local authors have UUIDs, remote authors have full URLs
+  // Get the backend IP address from environment or default to localhost
+  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const backendIP = extractIPFromUrl(backendUrl);
+  
+  // Check if the author's ID or URL matches the backend IP address
   const authorId = author.url || author.id;
   
   if (authorId) {
-    // If it contains %, it's URL-encoded, which means it's a FQID (remote)
-    if (authorId.includes('%')) {
-      return true;
-    }
-    
-    // If it starts with http/https, it's definitely a FQID (remote)
-    if (authorId.startsWith('http://') || authorId.startsWith('https://')) {
-      return true;
-    }
-    
     // If it's just a UUID, it's local
     if (isValidUUID(authorId)) {
       return false;
+    }
+    
+    // If it starts with http/https, check if the IP matches the backend IP
+    if (authorId.startsWith('http://') || authorId.startsWith('https://')) {
+      const authorIP = extractIPFromUrl(authorId);
+      // If the IP matches the backend IP, it's local; otherwise it's remote
+      return authorIP !== backendIP;
     }
   }
   
