@@ -116,11 +116,25 @@ class EntrySerializer(serializers.ModelSerializer):
 
         return {
             "type": "comments",
+            # this may or may not be the same as page for the entry,
+            # depending if there's a separate URL to just see the comments
             "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
             "id": f"{instance.url}/comments",
+            # comments.page, comments.size, comments.count,
+            # comments.src are only sent if:
+            # * public
+            # * unlisted
+            # * friends-only and sending it to a friend
+            # You should return ~ 5 comments per entry.
+            # should be sorted newest(first) to oldest(last)
+            # this is to reduce API call counts
+            # number of the first page of comments
             "page_number": 1,
+            # size of comment pages
             "size": 5,
+            # total number of comments for this entry
             "count": comments_count,
+            # the first page of comments
             "src": comments_src,
         }
 

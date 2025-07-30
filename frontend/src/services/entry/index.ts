@@ -71,7 +71,7 @@ export class EntryService extends BaseApiService {
    */
   async createEntry(data: CreateEntryData): Promise<Entry> {
     // Handle different content types including base64 images
-    if (data.image || data.contentType?.includes('base64')) {
+    if (data.image || data.contentType?.includes("base64")) {
       return this.createImageEntry(data);
     }
 
@@ -97,7 +97,10 @@ export class EntryService extends BaseApiService {
   /**
    * Create an entry for a specific author (using author-based endpoint)
    */
-  async createAuthorEntry(authorId: string, data: CreateEntryData): Promise<Entry> {
+  async createAuthorEntry(
+    authorId: string,
+    data: CreateEntryData
+  ): Promise<Entry> {
     // Use the new endpoint: /api/authors/{AUTHOR_SERIAL}/entries/
     const apiData = {
       type: "entry",
@@ -123,7 +126,7 @@ export class EntryService extends BaseApiService {
     if (data.image) {
       // Convert image file to base64
       const base64Content = await this.fileToBase64(data.image);
-      
+
       // Determine content type
       let contentType = data.contentType;
       if (!contentType) {
@@ -170,10 +173,10 @@ export class EntryService extends BaseApiService {
       reader.onload = () => {
         const result = reader.result as string;
         // Extract base64 data without the data:image/...;base64, prefix
-        const base64Data = result.split(',')[1];
+        const base64Data = result.split(",")[1];
         resolve(base64Data);
       };
-      reader.onerror = error => reject(error);
+      reader.onerror = (error) => reject(error);
     });
   }
 
@@ -185,7 +188,7 @@ export class EntryService extends BaseApiService {
     data: Partial<CreateEntryData>
   ): Promise<Entry> {
     // Handle image updates with base64 support
-    if (data.image || data.contentType?.includes('base64')) {
+    if (data.image || data.contentType?.includes("base64")) {
       return this.updateImageEntry(id, data);
     }
 
@@ -209,7 +212,7 @@ export class EntryService extends BaseApiService {
    * Update an entry using author and entry ID
    */
   async updateAuthorEntry(
-    authorId: string, 
+    authorId: string,
     entryId: string,
     data: Partial<CreateEntryData>
   ): Promise<Entry> {
@@ -237,7 +240,7 @@ export class EntryService extends BaseApiService {
     data: Partial<CreateEntryData>
   ): Promise<Entry> {
     const apiData: any = {};
-    
+
     // Handle non-image fields
     if (data.title !== undefined) apiData.title = data.title;
     if (data.description !== undefined) apiData.description = data.description;
@@ -248,7 +251,7 @@ export class EntryService extends BaseApiService {
     if (data.image) {
       const base64Content = await this.fileToBase64(data.image);
       apiData.content = base64Content;
-      
+
       // Determine content type
       let contentType = data.contentType;
       if (!contentType) {
@@ -264,7 +267,8 @@ export class EntryService extends BaseApiService {
       apiData.contentType = contentType;
     } else if (data.content !== undefined) {
       apiData.content = data.content;
-      if (data.contentType !== undefined) apiData.contentType = data.contentType;
+      if (data.contentType !== undefined)
+        apiData.contentType = data.contentType;
     }
 
     return this.request<Entry>(`/api/entries/${id}/`, {
@@ -354,9 +358,23 @@ export class EntryService extends BaseApiService {
     params?: { page?: number; page_size?: number }
   ): Promise<PaginatedResponse<Comment>> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Comment>>(
-      `/api/entries/${entryId}/comments/${queryString}`
-    );
+    const response = await this.request<{
+      type: "comments";
+      web: string;
+      id: string;
+      page_number: number;
+      size: number;
+      count: number;
+      src: Comment[];
+    }>(`/api/entries/${entryId}/comments/${queryString}`);
+
+    // Convert the API response format to the expected PaginatedResponse format
+    return {
+      count: response.count,
+      next: null, // The API doesn't provide next/previous URLs in this format
+      previous: null,
+      results: response.src,
+    };
   }
 
   /**
@@ -366,9 +384,9 @@ export class EntryService extends BaseApiService {
     entryId: string,
     data: CreateCommentData
   ): Promise<Comment> {
-    // Prepare data for API - use contentType (camelCase) as per spec
+    // Prepare data for API - use comment and contentType as per API spec
     const commentData = {
-      content: data.content,
+      comment: data.content,
       contentType: data.contentType || "text/plain",
     };
 
@@ -387,8 +405,9 @@ export class EntryService extends BaseApiService {
     data: Partial<CreateCommentData>
   ): Promise<Comment> {
     const commentData: any = {};
-    if (data.content !== undefined) commentData.content = data.content;
-    if (data.contentType !== undefined) commentData.contentType = data.contentType;
+    if (data.content !== undefined) commentData.comment = data.content;
+    if (data.contentType !== undefined)
+      commentData.contentType = data.contentType;
 
     return this.request<Comment>(
       `/api/entries/${entryId}/comments/${commentId}/`,
