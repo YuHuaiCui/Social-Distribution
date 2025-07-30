@@ -225,8 +225,9 @@ class AddNodeView(APIView):
                 # Store each author locally
                 for author_data in authors:
                     try:
-                        self._store_remote_author(author_data, node)
-                        authors_stored += 1
+                        stored = self._store_remote_author(author_data, node)
+                        if stored:
+                            authors_stored += 1
                     except Exception as e:
                         print(f"Failed to store author {author_data.get('id', 'unknown')}: {str(e)}")
                         continue
@@ -265,15 +266,23 @@ class AddNodeView(APIView):
             author_url = author_data.get("id", "")
             if not author_url:
                 print(f"Author data missing ID: {author_data}")
-                return
+                return False
             
             # Try to parse UUID from the URL
-            author_id_str = author_url.split("/")[-1].rstrip("/")
+            # Remove trailing slash and split
+            url_parts = author_url.rstrip("/").split("/")
+            author_id_str = url_parts[-1]
+            
+            print(f"Extracting UUID from URL: {author_url}")
+            print(f"Extracted ID string: {author_id_str}")
+            
             try:
                 author_id = UUID(author_id_str)
+                print(f"Successfully parsed UUID: {author_id}")
             except ValueError:
                 print(f"Invalid UUID in author URL: {author_url}")
-                return
+                print(f"Failed to parse: '{author_id_str}'")
+                return False
             
             # Check if author already exists
             existing_author = Author.objects.filter(id=author_id).first()
@@ -308,6 +317,8 @@ class AddNodeView(APIView):
                 )
                 remote_author.save()
                 print(f"Created new remote author: {remote_author.displayName}")
+            
+            return True
                 
         except Exception as e:
             print(f"Error storing remote author: {str(e)}")
