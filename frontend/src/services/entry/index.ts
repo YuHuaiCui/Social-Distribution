@@ -12,6 +12,7 @@ import type {
   Comment,
   CreateCommentData,
   PaginatedResponse,
+  EntriesResponse,
 } from "../../types";
 
 export class EntryService extends BaseApiService {
@@ -28,58 +29,145 @@ export class EntryService extends BaseApiService {
   }
 
   /**
+   * Get entries from a specific author
+   */
+  async getEntriesByAuthor(
+    authorId: string,
+    params?: Omit<EntrySearchParams, "author">
+  ): Promise<EntriesResponse> {
+    const queryString = this.buildQueryString(params || {});
+    // Use the new author-based endpoint: /api/authors/{AUTHOR_SERIAL}/entries/
+    return this.request<EntriesResponse>(
+      `/api/authors/${authorId}/entries/${queryString}`
+    );
+  }
+
+  /**
    * Get a specific entry by ID or URL
    */
   async getEntry(id: string): Promise<Entry> {
-    // If this looks like a full URL, use the by-url endpoint
+    // If this looks like a full URL, use the new FQID endpoint
     if (id.includes("http") || (id.includes("/") && id.split("/").length > 2)) {
+      // Use the new /api/entries/{ENTRY_FQID}/ endpoint
       const encodedUrl = encodeURIComponent(id);
-      return this.request<Entry>(`/api/entries/by-url/?url=${encodedUrl}`);
+      return this.request<Entry>(`/api/entries/${encodedUrl}/`);
     }
 
-    // Extract ID from URL if it's a path
+    // For UUID-based lookups, try to extract the UUID and use author-based endpoint if possible
     const entryId = id.includes("/") ? id.split("/").filter(Boolean).pop() : id;
     return this.request<Entry>(`/api/entries/${entryId}/`);
   }
 
   /**
-   * Create a new entry
-   */ async createEntry(data: CreateEntryData): Promise<Entry> {
-    if (data.image) {
-      // Handle image upload
-      const formData = new FormData();
-      formData.append("title", data.title);
-      formData.append("content", data.content);
+   * Get a specific entry by author and entry ID
+   */
+  async getAuthorEntry(authorId: string, entryId: string): Promise<Entry> {
+    // Use the new endpoint: /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/
+    return this.request<Entry>(`/api/authors/${authorId}/entries/${entryId}/`);
+  }
 
-      // Determine the correct content type based on the image file
-      let imageContentType = data.content_type;
-      if (data.content_type === "image" && data.image) {
-        // Map common image MIME types
+  /**
+   * Create a new entry
+   */
+  async createEntry(data: CreateEntryData): Promise<Entry> {
+    // Handle different content types including base64 images
+    if (data.image || data.contentType?.includes('base64')) {
+      return this.createImageEntry(data);
+    }
+
+    // Prepare data for API - convert to API format
+    const apiData = {
+      title: data.title,
+      description: data.description || "",
+      content: data.content,
+      contentType: data.contentType || "text/plain",
+      visibility: data.visibility,
+      categories: data.categories || [],
+    };
+
+    // Regular JSON request for text entries
+    return this.request<Entry>("/api/entries/", {
+      method: "POST",
+      body: JSON.stringify(apiData),
+    });
+  }
+
+  /**
+   * Create an entry for a specific author (using author-based endpoint)
+   */
+  async createAuthorEntry(authorId: string, data: CreateEntryData): Promise<Entry> {
+    // Use the new endpoint: /api/authors/{AUTHOR_SERIAL}/entries/
+    const apiData = {
+      title: data.title,
+      description: data.description || "",
+      content: data.content,
+      contentType: data.contentType || "text/plain",
+      visibility: data.visibility,
+      categories: data.categories || [],
+    };
+
+    return this.request<Entry>(`/api/authors/${authorId}/entries/`, {
+      method: "POST",
+      body: JSON.stringify(apiData),
+    });
+  }
+
+  /**
+   * Handle image entry creation with base64 support
+   */
+  private async createImageEntry(data: CreateEntryData): Promise<Entry> {
+    if (data.image) {
+      // Convert image file to base64
+      const base64Content = await this.fileToBase64(data.image);
+      
+      // Determine content type
+      let contentType = data.contentType;
+      if (!contentType) {
+        // Map common image MIME types to base64 content types
         const mimeType = data.image.type;
         if (mimeType === "image/png") {
-          imageContentType = "image/png";
+          contentType = "image/png;base64";
         } else if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
-          imageContentType = "image/jpeg";
+          contentType = "image/jpeg;base64";
         } else {
-          // Default to JPEG if we can't determine
-          imageContentType = "image/jpeg";
+          // Use application/base64 for other types
+          contentType = "application/base64";
         }
       }
 
-      formData.append("content_type", imageContentType);
-      formData.append("visibility", data.visibility);
-      if (data.categories) {
-        formData.append("categories", JSON.stringify(data.categories));
-      }
-      formData.append("image", data.image);
+      const apiData = {
+        title: data.title,
+        description: data.description || "",
+        content: base64Content,
+        contentType: contentType,
+        visibility: data.visibility,
+        categories: data.categories || [],
+      };
 
-      return this.requestFormData<Entry>("/api/entries/", formData);
+      return this.request<Entry>("/api/entries/", {
+        method: "POST",
+        body: JSON.stringify(apiData),
+      });
     }
 
-    // Regular JSON request
-    return this.request<Entry>("/api/entries/", {
-      method: "POST",
-      body: JSON.stringify(data),
+    // Fallback to regular creation
+    return this.createEntry(data);
+  }
+
+  /**
+   * Convert File to base64 string
+   */
+  private fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Extract base64 data without the data:image/...;base64, prefix
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = error => reject(error);
     });
   }
 
@@ -90,29 +178,92 @@ export class EntryService extends BaseApiService {
     id: string,
     data: Partial<CreateEntryData>
   ): Promise<Entry> {
-    if (data.image) {
-      // Handle image upload
-      const formData = new FormData();
-      Object.entries(data).forEach(([key, value]) => {
-        if (key === "categories" && Array.isArray(value)) {
-          formData.append("categories", JSON.stringify(value));
-        } else if (key !== "image" && value !== undefined) {
-          formData.append(key, String(value));
-        }
-      });
-      if (data.image) {
-        formData.append("image", data.image);
-      }
-
-      return this.requestFormData<Entry>(`/api/entries/${id}/`, formData, {
-        method: "PATCH",
-      });
+    // Handle image updates with base64 support
+    if (data.image || data.contentType?.includes('base64')) {
+      return this.updateImageEntry(id, data);
     }
+
+    // Prepare data for API
+    const apiData: any = {};
+    if (data.title !== undefined) apiData.title = data.title;
+    if (data.description !== undefined) apiData.description = data.description;
+    if (data.content !== undefined) apiData.content = data.content;
+    if (data.contentType !== undefined) apiData.contentType = data.contentType;
+    if (data.visibility !== undefined) apiData.visibility = data.visibility;
+    if (data.categories !== undefined) apiData.categories = data.categories;
 
     // Regular JSON request
     return this.request<Entry>(`/api/entries/${id}/`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
+      method: "PUT",
+      body: JSON.stringify(apiData),
+    });
+  }
+
+  /**
+   * Update an entry using author and entry ID
+   */
+  async updateAuthorEntry(
+    authorId: string, 
+    entryId: string,
+    data: Partial<CreateEntryData>
+  ): Promise<Entry> {
+    // Prepare data for API
+    const apiData: any = {};
+    if (data.title !== undefined) apiData.title = data.title;
+    if (data.description !== undefined) apiData.description = data.description;
+    if (data.content !== undefined) apiData.content = data.content;
+    if (data.contentType !== undefined) apiData.contentType = data.contentType;
+    if (data.visibility !== undefined) apiData.visibility = data.visibility;
+    if (data.categories !== undefined) apiData.categories = data.categories;
+
+    // Use the new endpoint: /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/
+    return this.request<Entry>(`/api/authors/${authorId}/entries/${entryId}/`, {
+      method: "PUT",
+      body: JSON.stringify(apiData),
+    });
+  }
+
+  /**
+   * Handle image entry updates with base64 support
+   */
+  private async updateImageEntry(
+    id: string,
+    data: Partial<CreateEntryData>
+  ): Promise<Entry> {
+    const apiData: any = {};
+    
+    // Handle non-image fields
+    if (data.title !== undefined) apiData.title = data.title;
+    if (data.description !== undefined) apiData.description = data.description;
+    if (data.visibility !== undefined) apiData.visibility = data.visibility;
+    if (data.categories !== undefined) apiData.categories = data.categories;
+
+    // Handle image content
+    if (data.image) {
+      const base64Content = await this.fileToBase64(data.image);
+      apiData.content = base64Content;
+      
+      // Determine content type
+      let contentType = data.contentType;
+      if (!contentType) {
+        const mimeType = data.image.type;
+        if (mimeType === "image/png") {
+          contentType = "image/png;base64";
+        } else if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
+          contentType = "image/jpeg;base64";
+        } else {
+          contentType = "application/base64";
+        }
+      }
+      apiData.contentType = contentType;
+    } else if (data.content !== undefined) {
+      apiData.content = data.content;
+      if (data.contentType !== undefined) apiData.contentType = data.contentType;
+    }
+
+    return this.request<Entry>(`/api/entries/${id}/`, {
+      method: "PUT",
+      body: JSON.stringify(apiData),
     });
   }
 
@@ -136,13 +287,19 @@ export class EntryService extends BaseApiService {
   }
 
   /**
-   * Get entries by author
+   * Delete an entry using author and entry ID
    */
-  async getEntriesByAuthor(
-    authorId: string,
-    params?: Omit<EntrySearchParams, "author">
-  ): Promise<PaginatedResponse<Entry>> {
-    return this.getEntries({ ...params, author: authorId });
+  async deleteAuthorEntry(authorId: string, entryId: string): Promise<boolean> {
+    try {
+      // Use the new endpoint: /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/
+      await this.request(`/api/authors/${authorId}/entries/${entryId}/`, {
+        method: "DELETE",
+      });
+      return true;
+    } catch (error) {
+      console.error("Failed to delete author entry:", error);
+      return false;
+    }
   }
 
   /**
@@ -184,8 +341,9 @@ export class EntryService extends BaseApiService {
   // Comment-related methods
 
   /**
-   * Get comments for an entry
-   */ async getComments(
+   * Get comments for an entry - now returns the nested comments from entry
+   */
+  async getComments(
     entryId: string,
     params?: { page?: number; page_size?: number }
   ): Promise<PaginatedResponse<Comment>> {
@@ -194,16 +352,18 @@ export class EntryService extends BaseApiService {
       `/api/entries/${entryId}/comments/${queryString}`
     );
   }
+
   /**
    * Create a comment on an entry
-   */ async createComment(
+   */
+  async createComment(
     entryId: string,
     data: CreateCommentData
   ): Promise<Comment> {
-    // Ensure content_type is set if not provided
+    // Prepare data for API - use contentType (camelCase) as per spec
     const commentData = {
-      ...data,
-      content_type: data.content_type || "text/plain",
+      content: data.content,
+      contentType: data.contentType || "text/plain",
     };
 
     return this.request<Comment>(`/api/entries/${entryId}/comments/`, {
@@ -220,11 +380,15 @@ export class EntryService extends BaseApiService {
     commentId: string,
     data: Partial<CreateCommentData>
   ): Promise<Comment> {
+    const commentData: any = {};
+    if (data.content !== undefined) commentData.content = data.content;
+    if (data.contentType !== undefined) commentData.contentType = data.contentType;
+
     return this.request<Comment>(
       `/api/entries/${entryId}/comments/${commentId}/`,
       {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: JSON.stringify(commentData),
       }
     );
   }
@@ -241,8 +405,7 @@ export class EntryService extends BaseApiService {
       ? commentId.split("/").filter(Boolean).pop()
       : commentId;
     await this.request(`/api/entries/${eId}/comments/${cId}/`, {
-      method: "PATCH",
-      body: JSON.stringify({ visibility: "deleted" }),
+      method: "DELETE",
     });
   }
 

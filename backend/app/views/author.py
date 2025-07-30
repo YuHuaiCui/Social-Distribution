@@ -397,14 +397,18 @@ class AuthorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get", "post"], url_path="entries")
     def entries(self, request, pk=None):
         """
-        GET = List entries visible to current user
-        POST = Create a new entry (must be owner)
+        GET [local, remote]: Get the recent entries from author AUTHOR_SERIAL (paginated)
+        POST [local]: Create a new entry but generate a new ID
 
-        For GET requests, applies visibility rules based on the relationship
-        between the requesting user and the author whose entries are being viewed.
+        Authentication requirements for GET:
+        - Not authenticated: only public entries
+        - Authenticated locally as author: all entries
+        - Authenticated locally as follower of author: public + unlisted entries
+        - Authenticated locally as friend of author: all entries
+        - Authenticated as remote node: Should not happen (remote nodes get entries via inbox push)
 
-        For POST requests, ensures only the author can create entries for themselves
-        to prevent spoofing.
+        Authentication requirements for POST:
+        - Authenticated locally as author
         """
         author = self.get_object()
 
@@ -445,29 +449,38 @@ class AuthorViewSet(viewsets.ModelViewSet):
             )
 
         if request.method == "POST":
-            # Ensure only the author can post their own entry
+            # Ensure only the author can post their own entry (must be authenticated locally as author)
             if not request.user.is_authenticated:
                 return Response(
-                    {"detail": "Not authorized to create entry for this author."},
-                    status=403,
+                    {"detail": "Authentication required to create entries."},
+                    status=status.HTTP_401_UNAUTHORIZED,
                 )
 
-            # Override author to ensure no spoofing
-            author = request.user
+            # Ensure the user is creating an entry for themselves (prevent spoofing)
+            if str(request.user.id) != str(author.id):
+                return Response(
+                    {"detail": "You can only create entries for yourself."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Use the authenticated user as the author
             data = request.data.copy()
-            data["author"] = str(author.id)
+            data["author"] = str(request.user.id)
 
             # Auto-set source/origin URLs if not provided
             data["source"] = data.get(
-                "source", f"{settings.SITE_URL}/api/authors/{author.id}/entries/"
+                "source", f"{settings.SITE_URL}/api/authors/{request.user.id}/entries/"
             )
             data["origin"] = data.get("origin", data["source"])
 
-            serializer = EntrySerializer(data=data)
+            serializer = EntrySerializer(data=data, context={"request": request})
             if serializer.is_valid():
-                entry = serializer.save(author=author)
-                return Response(EntrySerializer(entry).data, status=201)
-            return Response(serializer.errors, status=400)
+                entry = serializer.save(author=request.user)
+                return Response(
+                    EntrySerializer(entry, context={"request": request}).data,
+                    status=status.HTTP_201_CREATED,
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=["get", "patch"], url_path="me")
     def me(self, request):

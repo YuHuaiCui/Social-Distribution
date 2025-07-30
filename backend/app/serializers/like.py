@@ -3,6 +3,7 @@ from django.conf import settings
 from app.models import Like, Entry, Comment
 from app.serializers.author import AuthorSerializer
 
+
 class LikeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Like
@@ -13,7 +14,9 @@ class LikeSerializer(serializers.ModelSerializer):
         if not attrs.get("entry") and not attrs.get("comment"):
             raise serializers.ValidationError("A like must target an entry or comment.")
         if attrs.get("entry") and attrs.get("comment"):
-            raise serializers.ValidationError("A like can only target one: entry or comment.")
+            raise serializers.ValidationError(
+                "A like can only target one: entry or comment."
+            )
         return attrs
 
     def to_representation(self, instance):
@@ -29,31 +32,31 @@ class LikeSerializer(serializers.ModelSerializer):
         }
         """
         data = super().to_representation(instance)
-        
+
         # Determine the object URL
         object_url = None
         if instance.entry:
             object_url = instance.entry.url
         elif instance.comment:
             object_url = instance.comment.url
-        
+
         # CMPUT 404 compliant format with compatibility fields
         result = {
             # CMPUT 404 required fields
             "type": "like",
             "author": AuthorSerializer(instance.author, context=self.context).data,
-            "published": instance.created_at.isoformat() if instance.created_at else None,
+            "published": (
+                instance.created_at.isoformat() if instance.created_at else None
+            ),
             "id": instance.url,
             "object": object_url,
-            
             # Additional fields for frontend compatibility
             "url": instance.url,
             "entry": instance.entry.url if instance.entry else None,
             "comment": instance.comment.url if instance.comment else None,
             "created_at": data.get("created_at"),
+            # Also include author URL for backward compatibility
+            "author_url": instance.author.url,
         }
-        
-        # For backward compatibility, also include author as URL string
-        result["author"] = instance.author.url
-        
+
         return result

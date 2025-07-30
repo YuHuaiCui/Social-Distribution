@@ -3,22 +3,52 @@ from django.conf import settings
 from app.models.comment import Comment
 from app.serializers.author import AuthorSerializer  # adjust import if needed
 
+
 class CommentSerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)  # Nested author info
 
     class Meta:
         model = Comment
         fields = [
-            'id',
-            'url',
-            'author',
-            'entry',
-            'content',
-            'content_type',
-            'created_at',
-            'updated_at',
+            "id",
+            "url",
+            "author",
+            "entry",
+            "content",
+            "content_type",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ['id', 'url', 'author', 'entry', 'created_at', 'updated_at']
+        read_only_fields = ["id", "url", "author", "entry", "created_at", "updated_at"]
+
+    def _get_likes_data(self, instance):
+        """Get likes data for the comment with proper pagination"""
+        from app.models.like import Like
+        from app.serializers.like import LikeSerializer
+
+        # Get likes for this comment, ordered newest first
+        likes = Like.objects.filter(comment=instance).order_by("-created_at")
+        likes_count = likes.count()
+
+        # Get first page of likes (50 per page as specified)
+        likes_page = likes[:50]
+
+        # Include like details for comments
+        likes_src = LikeSerializer(likes_page, many=True, context=self.context).data
+
+        return {
+            "type": "likes",
+            "id": f"{instance.url}/likes",
+            "web": (
+                f"{settings.SITE_URL}/authors/{instance.entry.author.id}/entries/{instance.entry.id}"
+                if instance.entry
+                else None
+            ),
+            "page_number": 1,
+            "size": 50,
+            "count": likes_count,
+            "src": likes_src,
+        }
 
     def to_representation(self, instance):
         """
@@ -37,37 +67,29 @@ class CommentSerializer(serializers.ModelSerializer):
         }
         """
         data = super().to_representation(instance)
-        
-        # Get likes count for this comment
-        likes_count = instance.like_set.count() if hasattr(instance, 'like_set') else 0
-        
-        # CMPUT 404 compliant format with compatibility fields
+
+        # CMPUT 404 compliant format
         result = {
             # CMPUT 404 required fields
             "type": "comment",
             "author": AuthorSerializer(instance.author, context=self.context).data,
             "comment": instance.content,
             "contentType": instance.content_type,
-            "published": instance.created_at.isoformat() if instance.created_at else None,
+            "published": (
+                instance.created_at.isoformat() if instance.created_at else None
+            ),
             "id": instance.url,
             "entry": instance.entry.url if instance.entry else None,
-            "web": f"{settings.SITE_URL}/authors/{instance.entry.author.id}/entries/{instance.entry.id}" if instance.entry else None,
-            "likes": {
-                "type": "likes",
-                "id": f"{instance.url}/likes",
-                "web": f"{settings.SITE_URL}/authors/{instance.entry.author.id}/entries/{instance.entry.id}" if instance.entry else None,
-                "page_number": 1,
-                "size": 50,
-                "count": likes_count,
-                "src": []
-            },
-            
+            "web": (
+                f"{settings.SITE_URL}/authors/{instance.entry.author.id}/entries/{instance.entry.id}"
+                if instance.entry
+                else None
+            ),
+            "likes": self._get_likes_data(instance),
             # Additional fields for frontend compatibility
             "url": instance.url,
-            "content": instance.content,  # Snake case version
-            "content_type": instance.content_type,  # Snake case version
             "created_at": data.get("created_at"),
             "updated_at": data.get("updated_at"),
         }
-        
+
         return result

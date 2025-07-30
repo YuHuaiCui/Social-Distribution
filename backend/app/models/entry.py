@@ -63,21 +63,26 @@ class EntryManager(models.Manager):
             | Q(visibility=Entry.FRIENDS_ONLY)
             & Exists(friendship_exists)  # Friends-only posts from friends
         ).exclude(visibility=Entry.DELETED)
-        
+
         # Debug logging
         from .author import Author
+
         public_posts = queryset.filter(visibility=Entry.PUBLIC)
         remote_public_count = public_posts.filter(author__node__isnull=False).count()
         local_public_count = public_posts.filter(author__node__isnull=True).count()
-        
+
         if remote_public_count > 0 or local_public_count > 0:
-            print(f"DEBUG visible_to_author: Found {local_public_count} local PUBLIC posts and {remote_public_count} remote PUBLIC posts")
-            
+            print(
+                f"DEBUG visible_to_author: Found {local_public_count} local PUBLIC posts and {remote_public_count} remote PUBLIC posts"
+            )
+
             # Log sample remote posts
             remote_posts = public_posts.filter(author__node__isnull=False)[:2]
             for post in remote_posts:
-                print(f"DEBUG visible_to_author: Remote post - Title: {post.title}, Author: {post.author.username}, Node: {post.author.node.name if post.author.node else 'Unknown'}")
-        
+                print(
+                    f"DEBUG visible_to_author: Remote post - Title: {post.title}, Author: {post.author.username}, Node: {post.author.node.name if post.author.node else 'Unknown'}"
+                )
+
         return queryset
 
 
@@ -109,12 +114,18 @@ class Entry(models.Model):
     TEXT_MARKDOWN = "text/markdown"
     IMAGE_PNG = "image/png"
     IMAGE_JPEG = "image/jpeg"
+    IMAGE_PNG_BASE64 = "image/png;base64"
+    IMAGE_JPEG_BASE64 = "image/jpeg;base64"
+    APPLICATION_BASE64 = "application/base64"
 
     CONTENT_TYPE_CHOICES = [
         (TEXT_PLAIN, "Plain Text"),
         (TEXT_MARKDOWN, "Markdown"),
         (IMAGE_PNG, "PNG Image"),
         (IMAGE_JPEG, "JPEG Image"),
+        (IMAGE_PNG_BASE64, "PNG Image (Base64)"),
+        (IMAGE_JPEG_BASE64, "JPEG Image (Base64)"),
+        (APPLICATION_BASE64, "Base64 Data"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

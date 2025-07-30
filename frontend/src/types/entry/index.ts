@@ -3,27 +3,33 @@
  */
 
 import type { Author } from "../author";
-import type { ContentType, Visibility, TimestampedModel } from "../common";
+import type { ContentType, Visibility, TimestampedModel, PaginatedComments, PaginatedLikes } from "../common";
 
+// Updated Entry interface to match the new API specification
 export interface Entry extends TimestampedModel {
   type: "entry"; // Object type for federation
-  id: string; // Full URL as per spec
-  url: string;
-  web: string; // Frontend URL where entry can be viewed
-  author: Author | string; // Can be URL reference
   title: string;
+  id: string; // Full URL as ID per spec
+  web: string; // Frontend URL where entry can be viewed
   description: string; // Brief description for preview
+  contentType: ContentType; // Always use camelCase as per API spec
   content: string;
-  content_type: ContentType;
+  author: Author | string; // Can be URL reference
+  comments: PaginatedComments; // Nested comments with pagination
+  likes: PaginatedLikes; // Nested likes with pagination
+  published: string; // ISO 8601 timestamp
   visibility: Visibility;
+  
+  // Additional fields for frontend compatibility
+  url?: string; // For backwards compatibility
   source?: string;
   origin?: string;
-  published: string; // ISO 8601 timestamp
-  // Frontend computed fields
-  likes_count?: number;
-  comments_count?: number;
   categories?: string[];
   image?: string; // For backwards compatibility
+  
+  // Computed fields for easy access
+  likes_count?: number;
+  comments_count?: number;
   is_liked?: boolean;
   is_saved?: boolean;
 }
@@ -32,7 +38,7 @@ export interface CreateEntryData {
   title: string;
   description?: string; // Optional brief description
   content: string;
-  content_type: ContentType;
+  contentType?: ContentType; // Always use camelCase as per API spec
   visibility: Visibility;
   categories?: string[];
   image?: File;
@@ -51,20 +57,54 @@ export interface EntrySearchParams {
   page_size?: number;
 }
 
+// Updated Comment interface to match the new API specification
 export interface Comment extends TimestampedModel {
-  id: string;
-  url: string;
+  type: "comment";
+  id: string; // Full URL as ID per spec
   author: Author | string; // Can be URL reference
-  entry: Entry | string; // Can be URL reference
-  content: string;
-  content_type: "text/plain" | "text/markdown";
+  comment: string; // Content field renamed to comment per spec
+  contentType: string; // Always use camelCase as per API spec
+  published: string; // ISO 8601 timestamp
+  entry: string; // Entry URL
+  web: string; // Frontend URL
+  likes: PaginatedLikes; // Nested likes with pagination
+  
+  // Additional fields for frontend compatibility
+  url?: string;
+  content?: string; // For backwards compatibility (alias for comment)
   parent?: Comment | string; // Parent comment (for replies)
-  // Frontend computed fields
+  
+  // Computed fields
   likes_count?: number;
   is_liked?: boolean;
 }
 
 export interface CreateCommentData {
   content: string;
-  content_type?: "text/plain" | "text/markdown";
+  contentType?: "text/plain" | "text/markdown"; // Always use camelCase as per API spec
+}
+
+// Like interface for the nested likes data
+export interface Like {
+  type: "like";
+  id: string; // Full URL as ID per spec
+  author: Author | string;
+  published: string; // ISO 8601 timestamp
+  object: string; // URL of the liked object (entry or comment)
+  
+  // Additional fields for frontend compatibility
+  url?: string;
+  entry?: string;
+  comment?: string;
+  author_url?: string;
+  created_at?: string;
+}
+
+// Response format for paginated entries as per API spec
+export interface EntriesResponse {
+  type: "entries";
+  page_number: number;
+  size: number;
+  count: number;
+  src: Entry[];
 }

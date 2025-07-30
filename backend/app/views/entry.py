@@ -1268,10 +1268,11 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     def retrieve_by_fqid(self, request, entry_fqid=None):
         """
-        Retrieve an entry by its fully qualified ID (FQID).
+        GET [local]: Get the public entry whose URL is ENTRY_FQID
 
-        This is for CMPUT 404 compliance where entries can be referenced
-        by their full URL/FQID instead of just UUID.
+        Authentication requirements:
+        - friends-only entries: must be authenticated
+        - public/unlisted entries: no authentication required
         """
         if not entry_fqid:
             return Response(
@@ -1397,10 +1398,24 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     def retrieve_author_entry(self, request, author_id=None, entry_id=None):
         """
-        GET: Retrieve a specific entry by author and entry ID
+        GET [local, remote]: Get the public entry whose serial is ENTRY_SERIAL
+
+        Authentication requirements:
+        - friends-only entries: must be authenticated
+        - public/unlisted entries: no authentication required
         """
         try:
             entry = Entry.objects.get(id=entry_id, author__id=author_id)
+
+            # Apply authentication requirements based on visibility
+            if (
+                entry.visibility == Entry.FRIENDS_ONLY
+                and not request.user.is_authenticated
+            ):
+                return Response(
+                    {"detail": "Authentication required for friends-only entries."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
 
             # Check visibility permissions
             user_author = (
@@ -1427,12 +1442,21 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     def update_author_entry(self, request, author_id=None, entry_id=None):
         """
-        PUT: Update a specific entry by author and entry ID
+        PUT [local]: Update an entry
+
+        Authentication requirements:
+        - local entries: must be authenticated locally as the author
         """
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication required."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         try:
             entry = Entry.objects.get(id=entry_id, author__id=author_id)
 
-            # Check if user can edit this entry
+            # Check if user can edit this entry (must be the author for local entries)
             user_author = (
                 getattr(request.user, "author", None) or request.user
                 if request.user.is_authenticated
@@ -1440,7 +1464,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             )
             if user_author != entry.author and not request.user.is_staff:
                 return Response(
-                    {"detail": "You cannot edit this entry."},
+                    {"detail": "You must be the author to edit this entry."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -1460,12 +1484,21 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     def delete_author_entry(self, request, author_id=None, entry_id=None):
         """
-        DELETE: Delete a specific entry by author and entry ID
+        DELETE [local]: Remove a local entry
+
+        Authentication requirements:
+        - local entries: must be authenticated locally as the author
         """
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication required."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         try:
             entry = Entry.objects.get(id=entry_id, author__id=author_id)
 
-            # Check if user can delete this entry
+            # Check if user can delete this entry (must be the author for local entries)
             user_author = (
                 getattr(request.user, "author", None) or request.user
                 if request.user.is_authenticated
@@ -1473,7 +1506,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             )
             if user_author != entry.author and not request.user.is_staff:
                 return Response(
-                    {"detail": "You cannot delete this entry."},
+                    {"detail": "You must be the author to delete this entry."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 

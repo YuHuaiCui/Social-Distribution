@@ -20,7 +20,7 @@ import PrivacySelector from "./PrivacySelector";
 import { useDefaultVisibility, type Visibility } from "../utils/privacy";
 import { usePosts } from "./context/PostsContext";
 
-type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg";
+type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg" | "image/png;base64" | "image/jpeg;base64" | "application/base64";
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -58,7 +58,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     if (editingPost) {
       setTitle(editingPost.title || "");
       setContent(editingPost.content || "");
-      setContentType(editingPost.content_type || "text/markdown");
+      setContentType((editingPost.contentType || "text/markdown") as ContentType);
 
       const validVisibilities: Visibility[] = ["PUBLIC", "FRIENDS", "UNLISTED"];
       setVisibility(
@@ -122,10 +122,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     try {
       const entryData: CreateEntryData = {
         title,
+        description: editingPost?.description || "", // Include description for API spec
         content: contentType.startsWith("image/")
           ? content || "Image post" // Use caption for image posts
           : content,
-        content_type: contentType,
+        contentType: contentType, // Always use camelCase as per API spec
         visibility,
         categories,
         // Include image file for image posts
@@ -152,7 +153,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         setReplacingImage(false);
         setImages([]); // clear images
         setContent(updatedPost.content);
-        setContentType(updatedPost.content_type as ContentType);
+        setContentType((updatedPost.contentType || "text/markdown") as ContentType);
         setTitle(updatedPost.title);
         setCategories(updatedPost.categories || []);
         setVisibility(updatedPost.visibility as Visibility);
@@ -197,7 +198,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const contentTypeOptions = [
     { value: "text/markdown", label: "Markdown", icon: FileText },
     { value: "text/plain", label: "Plain Text", icon: FileText },
-    { value: "image/png", label: "Image", icon: ImageIcon },
+    { value: "image/png", label: "Image (Legacy)", icon: ImageIcon },
+    { value: "image/png;base64", label: "PNG Image", icon: ImageIcon },
+    { value: "image/jpeg;base64", label: "JPEG Image", icon: ImageIcon },
+    { value: "application/base64", label: "Base64 Data", icon: ImageIcon },
   ];
 
   return (

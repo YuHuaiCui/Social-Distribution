@@ -67,8 +67,12 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   const navigate = useNavigate();
   const [liked, setLiked] = useState(isLiked);
   const [saved, setSaved] = useState(isSaved);
-  const [likeCount, setLikeCount] = useState(post.likes_count || 0);
-  const [commentCount, setCommentCount] = useState(post.comments_count || 0);
+  const [likeCount, setLikeCount] = useState(
+    post.likes?.count || post.likes_count || 0
+  );
+  const [commentCount, setCommentCount] = useState(
+    post.comments?.count || post.comments_count || 0
+  );
   const [showActions, setShowActions] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -96,14 +100,14 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     // Initialize state from props and post data
     setLiked(isLiked || post.is_liked || false);
     setSaved(isSaved || post.is_saved || false);
-    setCommentCount(post.comments_count || 0);
+    setCommentCount(post.comments?.count || post.comments_count || 0);
 
     // Fetch like data if we have a valid post ID
     if (post.id) {
       debouncedFetchLikeData(post.id);
     } else {
       // Use fallback data if no valid ID
-      setLikeCount(post.likes_count || 0);
+      setLikeCount(post.likes?.count || post.likes_count || 0);
       setLiked(isLiked || post.is_liked || false);
     }
 
@@ -141,7 +145,9 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     };
   }, [
     post.id,
+    post.comments?.count,
     post.comments_count,
+    post.likes?.count,
     post.likes_count,
     post.is_liked,
     post.is_saved,
@@ -152,10 +158,16 @@ const PostCardComponent: React.FC<PostCardProps> = ({
 
   // Memoize author info extraction
   const author = useMemo(
-    () =>
-      typeof post.author === "string"
-        ? ({ display_name: "Unknown", id: "" } as Author)
-        : post.author,
+    () => {
+      if (typeof post.author === "string") {
+        return { display_name: "Unknown", id: "" } as Author;
+      }
+      // Ensure display_name exists and isn't empty
+      if (!post.author.display_name) {
+        return { ...post.author, display_name: "Unknown User" };
+      }
+      return post.author;
+    },
     [post.author]
   );
 
@@ -279,7 +291,45 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   }, [showActions]);
 
   const renderContent = () => {
-    if (post.content_type === "text/markdown") {
+    const contentType = post.contentType;
+    
+    // Handle base64 image content types
+    if (contentType?.includes('base64') || 
+        contentType === 'image/png;base64' || 
+        contentType === 'image/jpeg;base64' ||
+        contentType === 'application/base64') {
+      
+      // For base64 content, the content field contains the base64 data
+      let imageDataUrl = post.content;
+      
+      // If content doesn't start with data:, construct the data URL
+      if (!imageDataUrl.startsWith('data:')) {
+        const mimeType = contentType === 'image/png;base64' ? 'image/png' :
+                        contentType === 'image/jpeg;base64' ? 'image/jpeg' :
+                        'image/png'; // default fallback
+        imageDataUrl = `data:${mimeType};base64,${imageDataUrl}`;
+      }
+      
+      return (
+        <div className="mb-4 rounded-lg overflow-hidden">
+          <img
+            src={imageDataUrl}
+            alt={post.title || "Post image"}
+            className="w-full h-auto max-h-96 object-contain rounded-lg"
+            onError={(e) => {
+              console.error('Failed to load base64 image');
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          {/* Show description as caption if it exists */}
+          {post.description && (
+            <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (contentType === "text/markdown") {
       return (
         <div
           className="prose prose-sm max-w-none text-text-1"
@@ -340,7 +390,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           {/* Author info */}
           <div className="flex items-center mb-4">
             <Link
-              to={`/authors/${extractUUID(author.id)}`}
+              to={author.id ? `/authors/${extractUUID(author.id)}` : '#'}
               className="flex items-center"
             >
               <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
@@ -473,7 +523,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           </Link>
 
           {/* Title/Content separator for markdown posts */}
-          {post.content_type === "text/markdown" && (
+          {post.contentType === "text/markdown" && (
             <div className="flex items-center mb-4">
               <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
               <div className="mx-3 text-text-2">
@@ -486,15 +536,15 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           {/* Post content */}
           <div
             className={`mb-4 ${
-              post.content_type === "text/markdown" ? "prose-sm" : ""
+              post.contentType === "text/markdown" ? "prose-sm" : ""
             }`}
           >
             {renderContent()}
           </div>
 
-          {/* Post image if it's an image type */}
-          {(post.content_type === "image/png" ||
-            post.content_type === "image/jpeg") &&
+          {/* Post image if it's an image type (legacy format) */}
+          {(post.contentType === "image/png" ||
+            post.contentType === "image/jpeg") &&
             post.image && (
               <div className="mb-4 rounded-lg overflow-hidden">
                 <LoadingImage
