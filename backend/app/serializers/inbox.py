@@ -1,44 +1,21 @@
 from rest_framework import serializers
-from django.contrib.contenttypes.models import ContentType
-from app.models import Inbox, Entry, Follow, Like, Comment
-from app.serializers.entry import EntrySerializer
-from app.serializers.follow import FollowSerializer
-from app.serializers.like import LikeSerializer
-from app.serializers.comment import CommentSerializer
+from app.models import Inbox
 
 
 class InboxSerializer(serializers.ModelSerializer):
     """Serializer for inbox items."""
-    
-    content_object = serializers.SerializerMethodField()
     
     class Meta:
         model = Inbox
         fields = [
             'id',
             'activity_type', 
-            'content_object',
+            'object_data',
             'is_read',
             'delivered_at',
             'raw_data'
         ]
         read_only_fields = ['id', 'delivered_at']
-    
-    def get_content_object(self, obj):
-        """Return the serialized content object based on its type."""
-        if obj.content_object is None:
-            return None
-            
-        if isinstance(obj.content_object, Entry):
-            return EntrySerializer(obj.content_object).data
-        elif isinstance(obj.content_object, Follow):
-            return FollowSerializer(obj.content_object).data  
-        elif isinstance(obj.content_object, Like):
-            return LikeSerializer(obj.content_object).data
-        elif isinstance(obj.content_object, Comment):
-            return CommentSerializer(obj.content_object).data
-        
-        return None
 
 
 class ActivitySerializer(serializers.Serializer):

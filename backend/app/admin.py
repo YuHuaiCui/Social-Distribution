@@ -140,7 +140,7 @@ class InboxAdmin(admin.ModelAdmin):
     list_display = [
         "recipient",
         "activity_type",
-        "content_object_display",
+        "object_data_display",
         "is_read",
         "delivered_at",
     ]
@@ -149,10 +149,8 @@ class InboxAdmin(admin.ModelAdmin):
     ordering = ["-delivered_at"]
     readonly_fields = [
         "id",
-        "content_type",
-        "object_id",
-        "content_object",
         "delivered_at",
+        "object_data_display",
         "raw_data_display",
     ]
 
@@ -169,9 +167,9 @@ class InboxAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Content Object",
+            "Object Data",
             {
-                "fields": ("content_type", "object_id", "content_object"),
+                "fields": ("object_data_display",),
                 "classes": ("collapse",),
             },
         ),
@@ -186,23 +184,31 @@ class InboxAdmin(admin.ModelAdmin):
 
     actions = ["mark_as_read", "mark_as_unread", "delete_old_items"]
 
-    def content_object_display(self, obj):
-        """Display the linked content object in a readable format"""
-        if obj.content_object:
-            content_obj = obj.content_object
-            if hasattr(content_obj, "title"):  # Entry
-                return f"Entry: {content_obj.title}"
-            elif hasattr(content_obj, "follower") and hasattr(content_obj, "followed"):  # Follow
-                return f"Follow: {content_obj.follower} → {content_obj.followed}"
-            elif hasattr(content_obj, "author") and hasattr(content_obj, "entry"):  # Like
-                return f"Like: {content_obj.author} liked {content_obj.entry.title if content_obj.entry else 'comment'}"
-            elif hasattr(content_obj, "content"):  # Comment
-                return f"Comment: {content_obj.content[:50]}..."
+    def object_data_display(self, obj):
+        """Display the object data in a readable format"""
+        if obj.object_data:
+            data = obj.object_data
+            if obj.activity_type == "entry":
+                title = data.get("title", "Untitled")
+                author = data.get("author", {}).get("displayName", "Unknown")
+                return f"Entry: {title} by {author}"
+            elif obj.activity_type == "follow":
+                actor = data.get("actor", {}).get("displayName", "Unknown")
+                target = data.get("object", {}).get("displayName", "Unknown")
+                return f"Follow: {actor} → {target}"
+            elif obj.activity_type == "like":
+                author = data.get("author", {}).get("displayName", "Unknown")
+                target = data.get("object", "Unknown target")
+                return f"Like: {author} liked {target}"
+            elif obj.activity_type == "comment":
+                author = data.get("author", {}).get("displayName", "Unknown")
+                content = data.get("comment", "")[:50]
+                return f"Comment: {content}... by {author}"
             else:
-                return str(content_obj)
-        return "No content object"
+                return str(data)
+        return "No object data"
 
-    content_object_display.short_description = "Content"
+    object_data_display.short_description = "Object Data"
 
     def raw_data_display(self, obj):
         """Display raw JSON data in a formatted way"""

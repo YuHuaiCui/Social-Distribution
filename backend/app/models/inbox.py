@@ -1,6 +1,4 @@
 from django.db import models
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes.fields import GenericForeignKey
 import uuid
 
 from .author import Author
@@ -15,6 +13,8 @@ class Inbox(models.Model):
     - follows: Follow requests that need approval
     - likes: Notifications of likes on author's content
     - comments: Comments on author's entries
+    
+    Objects are stored directly in their JSON format instead of foreign key references.
     """
     
     # Activity types
@@ -46,18 +46,20 @@ class Inbox(models.Model):
         choices=ACTIVITY_TYPE_CHOICES
     )
     
-    # Generic foreign key to the actual object (Entry, Follow, Like, Comment)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.UUIDField()
-    content_object = GenericForeignKey('content_type', 'object_id')
+    # Store the object directly in JSON format instead of foreign key reference
+    object_data = models.JSONField(
+        help_text="The actual object (Entry, Follow, Like, Comment) in JSON format"
+    )
     
     # Metadata
     is_read = models.BooleanField(default=False)
     delivered_at = models.DateTimeField(auto_now_add=True)
     
-    # Store the raw JSON data for federation compliance
+    # Store the raw JSON data for federation compliance (keeping for backward compatibility)
     raw_data = models.JSONField(
-        help_text="Original JSON data received from remote node"
+        help_text="Original JSON data received from remote node",
+        null=True,
+        blank=True
     )
     
     class Meta:
@@ -66,10 +68,7 @@ class Inbox(models.Model):
             models.Index(fields=['recipient', 'activity_type']),
             models.Index(fields=['recipient', 'is_read']), 
             models.Index(fields=['delivered_at']),
-            models.Index(fields=['content_type', 'object_id']),
         ]
-        # Prevent duplicate entries for the same activity
-        unique_together = ['recipient', 'content_type', 'object_id']
     
     def __str__(self):
         return f"{self.activity_type} for {self.recipient.username} at {self.delivered_at}"

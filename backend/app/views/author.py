@@ -649,33 +649,35 @@ class AuthorViewSet(viewsets.ModelViewSet):
             activity_data = serializer.validated_data
             activity_type = activity_data.get('type', '')
             
-            # Process the activity based on its type
-            content_object = None
+            # Process the activity based on its type to get serialized object data
+            object_data = None
             
             if activity_type == 'entry':
-                content_object = self._process_entry_activity(activity_data, author)
+                object_data = self._process_entry_activity(activity_data, author)
             elif activity_type == 'follow':
-                content_object = self._process_follow_activity(activity_data, author)
+                object_data = self._process_follow_activity(activity_data, author)
             elif activity_type == 'like':
-                content_object = self._process_like_activity(activity_data, author)
+                object_data = self._process_like_activity(activity_data, author)
             elif activity_type == 'comment':
-                content_object = self._process_comment_activity(activity_data, author)
+                object_data = self._process_comment_activity(activity_data, author)
             
-            if content_object is None:
+            if object_data is None:
                 return Response(
                     {"error": f"Failed to process {activity_type} activity"}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Create inbox entry
-            content_type = ContentType.objects.get_for_model(content_object)
+            # Create inbox entry with object data stored directly
+            # Use a simple hash of object data to prevent duplicates
+            import hashlib
+            import json
+            data_hash = hashlib.md5(json.dumps(object_data, sort_keys=True).encode()).hexdigest()
             
             inbox_item, created = Inbox.objects.get_or_create(
                 recipient=author,
-                content_type=content_type,
-                object_id=content_object.id,
+                activity_type=activity_type,
+                object_data=object_data,
                 defaults={
-                    'activity_type': activity_type,
                     'raw_data': request.data
                 }
             )
@@ -695,7 +697,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
             )
 
     def _process_entry_activity(self, activity_data, recipient):
-        """Process an entry activity and create/update the entry per spec."""
+        """Process an entry activity and create/update the entry per spec, return serialized data."""
         try:
             # Get or create the entry author
             author_data = activity_data.get('author', {})
@@ -738,14 +740,16 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 }
             )
             
-            return entry
+            # Return serialized entry data instead of the model object
+            from app.serializers.entry import EntrySerializer
+            return EntrySerializer(entry).data
             
         except Exception as e:
             logger.error(f"Error processing entry activity: {str(e)}")
             return None
 
     def _process_follow_activity(self, activity_data, recipient):
-        """Process a follow activity and create the follow request per spec."""
+        """Process a follow activity and create the follow request per spec, return serialized data."""
         try:
             # Get follower information from actor
             actor_data = activity_data.get('actor', {})
@@ -786,14 +790,16 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 }
             )
             
-            return follow
+            # Return serialized follow data instead of the model object
+            from app.serializers.follow import FollowSerializer
+            return FollowSerializer(follow).data
             
         except Exception as e:
             logger.error(f"Error processing follow activity: {str(e)}")
             return None
 
     def _process_like_activity(self, activity_data, recipient):
-        """Process a like activity and create the like per spec."""
+        """Process a like activity and create the like per spec, return serialized data."""
         try:
             # Get liker information
             author_data = activity_data.get('author', {})
@@ -848,14 +854,16 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 }
             )
             
-            return like
+            # Return serialized like data instead of the model object
+            from app.serializers.like import LikeSerializer
+            return LikeSerializer(like).data
             
         except Exception as e:
             logger.error(f"Error processing like activity: {str(e)}")
             return None
 
     def _process_comment_activity(self, activity_data, recipient):
-        """Process a comment activity and create the comment per spec."""
+        """Process a comment activity and create the comment per spec, return serialized data."""
         try:
             # Get commenter information
             author_data = activity_data.get('author', {})
@@ -904,7 +912,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 }
             )
             
-            return comment
+            # Return serialized comment data instead of the model object
+            from app.serializers.comment import CommentSerializer
+            return CommentSerializer(comment).data
             
         except Exception as e:
             logger.error(f"Error processing comment activity: {str(e)}")
