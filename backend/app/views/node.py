@@ -150,10 +150,13 @@ class AddNodeView(APIView):
 
             # Fetch and store all authors from the remote node
             try:
+                print(f"Starting to fetch authors from new node: {host}")
                 self._fetch_and_store_remote_authors(node)
             except Exception as e:
                 # Log the error but don't fail the node creation
                 print(f"Warning: Failed to fetch authors from new node {host}: {str(e)}")
+                import traceback
+                traceback.print_exc()
 
             return Response(
                 {"message": "Node added successfully"}, status=status.HTTP_201_CREATED
@@ -182,21 +185,41 @@ class AddNodeView(APIView):
             
             while True:
                 # Fetch authors from remote node with pagination
+                url = f"{node.host.rstrip('/')}/api/authors/"
+                print(f"Fetching authors from URL: {url}, page: {page}")
+                
                 response = requests.get(
-                    f"{node.host.rstrip('/')}/api/authors/",
+                    url,
                     auth=HTTPBasicAuth(node.username, node.password),
                     params={"page": page, "size": 50},  # Fetch 50 at a time
                     timeout=10,
                 )
                 
+                print(f"Response status: {response.status_code}")
+                
                 if response.status_code != 200:
                     print(f"Failed to fetch authors from {node.host}: {response.status_code}")
+                    print(f"Response content: {response.text[:500]}")  # First 500 chars
                     break
                 
                 data = response.json()
-                authors = data.get("authors", [])
+                print(f"Response data keys: {data.keys()}")
+                
+                # Handle both formats: CMPUT 404 spec format and DRF pagination format
+                if "authors" in data:
+                    # CMPUT 404 spec format
+                    authors = data.get("authors", [])
+                elif "results" in data:
+                    # Django REST Framework pagination format
+                    authors = data.get("results", [])
+                else:
+                    print(f"Unexpected response format. Keys: {data.keys()}")
+                    authors = []
+                
+                print(f"Found {len(authors)} authors on page {page}")
                 
                 if not authors:
+                    print("No more authors to fetch")
                     break  # No more authors to fetch
                 
                 # Store each author locally
@@ -209,10 +232,14 @@ class AddNodeView(APIView):
                         continue
                 
                 # Check if there are more pages
-                if len(authors) < 50:
+                if "next" in data and data["next"]:
+                    # DRF pagination - use next URL if available
+                    page += 1
+                elif len(authors) < 50:
+                    # CMPUT 404 format - check by count
                     break  # Last page
-                
-                page += 1
+                else:
+                    page += 1
             
             print(f"Successfully stored {authors_stored} authors from {node.host}")
             
