@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.decorators import api_view, permission_classes
 from uuid import UUID
 from app.models.comment import Comment
 from app.models.entry import Entry
@@ -10,6 +11,51 @@ import requests
 from requests.auth import HTTPBasicAuth
 from app.models import Node
 from app.serializers.comment import CommentSerializer
+from django.conf import settings
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def received_comments(request):
+    """
+    Get comments received by the current user on their entries.
+    Returns a list of comments on entries authored by the current user.
+    """
+    user = request.user
+
+    # Get all comments on entries authored by the current user
+    comments = (
+        Comment.objects.filter(entry__author=user)
+        .exclude(author=user)  # Exclude comments by the user themselves
+        .select_related("author", "entry")
+        .order_by("-created_at")
+    )
+
+    # Create response data with entry information
+    comments_data = []
+    for comment in comments:
+        comments_data.append(
+            {
+                "id": comment.id,
+                "author": {
+                    "id": comment.author.id,
+                    "url": comment.author.url,
+                    "display_name": comment.author.displayName,
+                    "username": comment.author.username,
+                    "profile_image": comment.author.profileImage,
+                },
+                "entry": {
+                    "id": comment.entry.id,
+                    "title": comment.entry.title,
+                    "url": comment.entry.url,
+                },
+                "content": comment.content,
+                "created_at": comment.created_at,
+            }
+        )
+
+    return Response({"type": "comments", "comments": comments_data})
+
 
 def send_comment_to_remote_inbox(comment):
     """Send comment to remote inbox using centralized federation service."""
@@ -18,16 +64,19 @@ def send_comment_to_remote_inbox(comment):
 
     try:
         from app.utils.federation import FederationService
+
         success = FederationService.send_comment(comment)
-        
+
         if success:
-            print(f"[Federation] Comment sent successfully to {comment.entry.author.username}")
+            print(
+                f"[Federation] Comment sent successfully to {comment.entry.author.username}"
+            )
         else:
-            print(f"[Federation] Failed to send comment to {comment.entry.author.username}")
+            print(
+                f"[Federation] Failed to send comment to {comment.entry.author.username}"
+            )
     except Exception as e:
         print(f"[Federation] Error sending comment: {e}")
-
-
 
 
 class CommentListCreateView(generics.ListCreateAPIView):
@@ -35,58 +84,133 @@ class CommentListCreateView(generics.ListCreateAPIView):
     GET: List comments for an entry
     POST: Create a comment on an entry
     """
+
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def dispatch(self, request, *args, **kwargs):
         """Route requests based on available parameters - support both entry_id and entry_fqid."""
-        if 'entry_fqid' in kwargs:
+        if "entry_fqid" in kwargs:
             # Extract entry ID from FQID for FQID-based endpoints
-            entry_fqid = kwargs['entry_fqid']
+            entry_fqid = kwargs["entry_fqid"]
             try:
                 # Try to extract UUID from the FQID
-                if entry_fqid.startswith('http'):
+                if entry_fqid.startswith("http"):
                     # Full URL - extract last part
-                    entry_id = entry_fqid.split('/')[-1] if entry_fqid.split('/')[-1] else entry_fqid.split('/')[-2]
+                    entry_id = (
+                        entry_fqid.split("/")[-1]
+                        if entry_fqid.split("/")[-1]
+                        else entry_fqid.split("/")[-2]
+                    )
                 else:
                     # Assume it's already a UUID
                     entry_id = entry_fqid
-                
+
                 # Validate UUID format
                 UUID(entry_id)
-                kwargs['entry_id'] = entry_id
+                kwargs["entry_id"] = entry_id
                 # Remove the entry_fqid parameter since view methods expect entry_id
-                del kwargs['entry_fqid']
+                del kwargs["entry_fqid"]
             except (ValueError, IndexError):
                 return Response(
-                    {"detail": "Invalid entry FQID format"}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"detail": "Invalid entry FQID format"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-        
+
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         # Handle different URL patterns
         if "entry_id" in self.kwargs:
             entry_id = self.kwargs["entry_id"]
-            return Comment.objects.filter(entry__id=entry_id)
+            return Comment.objects.filter(entry__id=entry_id).order_by("-created_at")
         elif "author_id" in self.kwargs:
             # For /api/authors/{author_id}/commented/ endpoint
             author_id = self.kwargs["author_id"]
-            return Comment.objects.filter(author__id=author_id)
+            return Comment.objects.filter(author__id=author_id).order_by("-created_at")
         elif "author_fqid" in self.kwargs:
             # For /api/authors/{author_fqid}/commented/ endpoint
             from urllib.parse import unquote
             from app.models import Author
+
             author_fqid = unquote(self.kwargs["author_fqid"])
             try:
                 author = Author.objects.get(url=author_fqid)
-                return Comment.objects.filter(author=author)
+                return Comment.objects.filter(author=author).order_by("-created_at")
             except Author.DoesNotExist:
                 return Comment.objects.none()
         else:
             # Return all comments if no specific filter
-            return Comment.objects.all()
+            return Comment.objects.all().order_by("-created_at")
+
+    def list(self, request, *args, **kwargs):
+        """Override list to return comments in the correct format"""
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Apply visibility rules
+        if "entry_id" in self.kwargs:
+            entry_id = self.kwargs["entry_id"]
+            try:
+                entry = Entry.objects.get(id=entry_id)
+                # Check if user can see comments based on entry visibility
+                viewing_author = request.user if request.user.is_authenticated else None
+                if not self._should_include_comment_details(entry, viewing_author):
+                    # Return empty comments object if not visible
+                    return Response({
+                        "type": "comments",
+                        "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}/entries/{entry.id}",
+                        "id": f"{entry.url}/comments",
+                        "page_number": 1,
+                        "size": 5,
+                        "count": 0,
+                        "src": [],
+                    })
+            except Entry.DoesNotExist:
+                return Response(
+                    {"detail": "Entry not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        
+        # Serialize comments
+        serializer = self.get_serializer(queryset[:5], many=True)
+        
+        # Return in the correct format
+        return Response({
+            "type": "comments",
+            "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}/entries/{entry.id}" if 'entry' in locals() else None,
+            "id": f"{entry.url}/comments" if 'entry' in locals() else None,
+            "page_number": 1,
+            "size": 5,
+            "count": queryset.count(),
+            "src": serializer.data,
+        })
+
+    def _should_include_comment_details(self, instance, viewing_author):
+        """
+        Determine if comment details should be included based on visibility rules.
+        Comments details are included for:
+        - public entries
+        - unlisted entries
+        - friends-only entries when sending to a friend
+        """
+        if instance.visibility == Entry.PUBLIC:
+            return True
+        elif instance.visibility == Entry.UNLISTED:
+            return True
+        elif instance.visibility == Entry.FRIENDS_ONLY:
+            # Check if viewing_author is a friend of the entry author
+            if viewing_author and instance.author:
+                from app.models.friendship import Friendship
+
+                return (
+                    Friendship.objects.filter(
+                        author1=viewing_author, author2=instance.author
+                    ).exists()
+                    or Friendship.objects.filter(
+                        author1=instance.author, author2=viewing_author
+                    ).exists()
+                )
+        return False
 
     def perform_create(self, serializer):
         # Handle different URL patterns
@@ -97,28 +221,34 @@ class CommentListCreateView(generics.ListCreateAPIView):
             except Entry.DoesNotExist:
                 raise NotFound(f"Entry with ID {entry_id} not found")
         else:
-            
-            entry_url = serializer.validated_data.get('entry')
+            entry_url = serializer.validated_data.get("entry")
             if not entry_url:
                 raise ValidationError({"entry": "Entry field is required"})
             try:
                 entry = Entry.objects.get(url=entry_url)
             except Entry.DoesNotExist:
                 raise NotFound(f"Entry not found")
-            
+
         # Ensure required fields are present
-        if not serializer.validated_data.get('content'):
+        content = serializer.validated_data.get("content")
+        if not content:
             raise serializers.ValidationError({"content": "Content field is required"})
-              # Make sure content_type is valid
-        if serializer.validated_data.get('content_type') not in [Entry.TEXT_PLAIN, Entry.TEXT_MARKDOWN]:
-            serializer.validated_data['content_type'] = Entry.TEXT_PLAIN
-            
+        
+        # Make sure content_type is valid
+        content_type = serializer.validated_data.get("content_type")
+        if content_type not in [
+            Entry.TEXT_PLAIN,
+            Entry.TEXT_MARKDOWN,
+        ]:
+            serializer.validated_data["content_type"] = Entry.TEXT_PLAIN
+
         # Pass the author's URL (not the User object) since the FK uses to_field="url"
         # request.user IS the Author instance (Author extends AbstractUser)
         author_url = self.request.user.url
-        comment =serializer.save(author_id=author_url, entry_id=entry.url)
+        comment = serializer.save(author_id=author_url, entry_id=entry.url)
 
         send_comment_to_remote_inbox(comment)
+
 
 class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -126,27 +256,32 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
     PATCH: Update a comment
     DELETE: Delete a comment
     """
+
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    lookup_field = 'pk'
+    lookup_field = "pk"
 
     def get_object(self):
         """Override to handle different URL parameter names"""
         # Check for different possible parameter names
-        if 'pk' in self.kwargs:
-            comment_id = self.kwargs['pk']
-        elif 'comment_id' in self.kwargs:
-            comment_id = self.kwargs['comment_id']
-        elif 'comment_fqid' in self.kwargs:
+        if "pk" in self.kwargs:
+            comment_id = self.kwargs["pk"]
+        elif "comment_id" in self.kwargs:
+            comment_id = self.kwargs["comment_id"]
+        elif "comment_fqid" in self.kwargs:
             # For FQID-based lookups, extract the UUID
-            comment_fqid = self.kwargs['comment_fqid']
-            if comment_fqid.startswith('http'):
-                comment_id = comment_fqid.split('/')[-1] if comment_fqid.split('/')[-1] else comment_fqid.split('/')[-2]
+            comment_fqid = self.kwargs["comment_fqid"]
+            if comment_fqid.startswith("http"):
+                comment_id = (
+                    comment_fqid.split("/")[-1]
+                    if comment_fqid.split("/")[-1]
+                    else comment_fqid.split("/")[-2]
+                )
             else:
                 comment_id = comment_fqid
         else:
             raise NotFound("No comment identifier provided")
-        
+
         try:
             return Comment.objects.get(id=comment_id)
         except Comment.DoesNotExist:

@@ -141,12 +141,6 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
               >
                 Explore
               </Link>
-              <Link
-                to="/inbox"
-                className="text-text-2 hover:text-text-1 transition-colors font-medium"
-              >
-                Inbox
-              </Link>
             </nav>
           )}
 
@@ -203,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                           {notifications.map((notif) => {
                             const senderName =
                               typeof notif.sender === "object" && notif.sender
-                                ? notif.sender.display_name
+                                ? notif.sender.displayName || notif.sender.display_name
                                 : "Someone";
 
                             const timeAgo = formatTimeAgo(notif.created_at);
@@ -220,7 +214,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                     markAsRead([notif.id]);
                                   }
                                   if (notif.item_type === "follow") {
-                                    navigate("/inbox");
+                                    // Removed inbox navigation
                                   } else if (
                                     notif.item_type === "comment" ||
                                     notif.item_type === "like"
@@ -325,13 +319,6 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                               </motion.div>
                             );
                           })}
-                          <Link
-                            to="/inbox"
-                            className="block px-4 py-2 text-center text-sm text-[var(--primary-purple)] hover:bg-glass-low transition-colors"
-                            onClick={() => setShowNotifications(false)}
-                          >
-                            View all in inbox
-                          </Link>
                         </div>
                       ) : (
                         <div className="px-4 py-8 text-center text-text-2">
@@ -397,18 +384,16 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-glass-low transition-colors cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full overflow-hidden neumorphism-sm">
-                    {user.profile_image ? (
+                    {user.profileImage || user.profile_image ? (
                       <LoadingImage
-                        src={user.profile_image}
-                        alt={user.display_name || "Unknown"}
+                        src={user.profileImage || user.profile_image}
+                        alt={user.displayName || user.display_name || "Unknown"}
                         className="w-full h-full"
                         loaderSize={16}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white">
-                        {user.display_name
-                          ? user.display_name.charAt(0).toUpperCase()
-                          : "U"}
+                        {(user.displayName || user.display_name)?.charAt(0).toUpperCase() || "U"}
                       </div>
                     )}
                   </div>

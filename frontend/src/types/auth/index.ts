@@ -12,10 +12,10 @@ export interface LoginCredentials {
 
 export interface SignupData {
   username: string;
-  email: string;
+  email?: string;
   password: string;
   password_confirm: string;
-  display_name?: string;
+  displayName?: string;
   github_username?: string;
 }
 
@@ -48,7 +48,7 @@ export interface ChangePasswordData {
 
 export interface OAuth2Provider {
   name: string;
-  display_name: string;
+  displayName: string;
   icon?: string;
   auth_url: string;
 }

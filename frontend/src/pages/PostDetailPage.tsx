@@ -6,7 +6,6 @@ import {
   Heart,
   MessageCircle,
   Share2,
-  Bookmark,
   MoreVertical,
   Edit,
   Trash2,
@@ -19,12 +18,12 @@ import {
 import { useAuth } from "../components/context/AuthContext";
 import { useToast } from "../components/context/ToastContext";
 import { useCreatePost } from "../components/context/CreatePostContext";
-import { triggerNotificationUpdate } from "../components/context/NotificationContext";
 import type { Entry, Comment, Author } from "../types/models";
 import AnimatedButton from "../components/ui/AnimatedButton";
 import Card from "../components/ui/Card";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
+import LoadingImage from "../components/ui/LoadingImage";
 import { entryService } from "../services/entry";
 import { socialService } from "../services/social";
 import { renderMarkdown } from "../utils/markdown";
@@ -46,7 +45,6 @@ export const PostDetailPage: React.FC = () => {
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentContentType, setCommentContentType] = useState<
     "text/plain" | "text/markdown"
@@ -104,7 +102,7 @@ export const PostDetailPage: React.FC = () => {
         try {
           // Try fetching through author's endpoint which might have different permissions
           const response = await entryService.getEntriesByAuthor(user.id);
-          const authorPost = response.results.find(
+          const authorPost = response.src.find(
             (entry) => entry.id === validPostId
           );
 
@@ -162,14 +160,19 @@ export const PostDetailPage: React.FC = () => {
       const commentsWithLikes = await Promise.all(
         parentComments.map(async (comment) => {
           try {
-            const likeStatus = await socialService.getCommentLikeStatus(comment.id);
+            const likeStatus = await socialService.getCommentLikeStatus(
+              comment.id
+            );
             return {
               ...comment,
               likes_count: likeStatus.like_count,
               is_liked: likeStatus.liked_by_current_user,
             };
           } catch (error) {
-            console.error(`Error fetching like status for comment ${comment.id}:`, error);
+            console.error(
+              `Error fetching like status for comment ${comment.id}:`,
+              error
+            );
             return comment;
           }
         })
@@ -181,35 +184,19 @@ export const PostDetailPage: React.FC = () => {
       // Continue with other operations even if comments fail
     }
 
-    // Get like status using the API
+    // Get like status using the SocialService
     if (user?.id) {
       try {
-        const response = await fetch(`/api/entries/${validPostId}/likes/`);
-        if (response.ok) {
-          const likeData = await response.json();
-          setIsLiked(likeData.liked_by_current_user);
-        } else {
-          // If the API call fails, use the is_liked property from the post
-          setIsLiked(fetchedPost.is_liked || false);
-        }
+        const likeData = await socialService.getEntryLikes(validPostId);
+        // Check if current user liked this entry by looking through the likes
+        const liked_by_current_user = likeData.src.some(
+          (like) => like.author.id === user.id
+        );
+        setIsLiked(liked_by_current_user);
       } catch (error) {
         console.error("Error fetching like status:", error);
         // Fallback to post data
         setIsLiked(fetchedPost.is_liked || false);
-      }
-    }
-
-    // Get bookmarked/saved status
-    if (user?.id) {
-      try {
-        const savedPostsResponse = await socialService.getSavedPosts();
-        const isSaved = savedPostsResponse.results.some(
-          (savedPost) => savedPost.id === validPostId
-        );
-        setIsBookmarked(isSaved);
-      } catch (error) {
-        console.error("Error checking saved status:", error);
-        setIsBookmarked(false);
       }
     }
 
@@ -277,28 +264,6 @@ export const PostDetailPage: React.FC = () => {
       });
     }
   };
-  const handleBookmark = async () => {
-    if (!postId) return;
-
-    // Extract UUID from postId if it's a URL
-    const extractedId = extractUUID(postId);
-
-    const newBookmarkState = !isBookmarked;
-    setIsBookmarked(newBookmarkState);
-
-    try {
-      // Make the actual API call
-      if (newBookmarkState) {
-        await socialService.savePost(extractedId);
-      } else {
-        await socialService.unsavePost(extractedId);
-      }
-    } catch (err) {
-      console.error("Error updating bookmark status:", err);
-      // Revert on error
-      setIsBookmarked(!newBookmarkState);
-    }
-  };
 
   const handleShare = async () => {
     if (!post) return;
@@ -343,10 +308,10 @@ export const PostDetailPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Create the comment data with the correct type format
+      // Create the comment data with the correct API specification format
       const commentData = {
         content: commentText,
-        content_type: commentContentType,
+        contentType: commentContentType,
       };
 
       // If replying to another comment, add it as parent
@@ -399,8 +364,6 @@ export const PostDetailPage: React.FC = () => {
           })
         );
 
-        // Trigger notification update in case the post author receives a notification
-        triggerNotificationUpdate();
       }
     } catch (err) {
       console.error("Error submitting comment:", err);
@@ -526,7 +489,39 @@ export const PostDetailPage: React.FC = () => {
       );
     }
 
-    // For image posts, display the image and caption
+    // Handle base64 image content types
+    if (contentType?.includes('base64') || 
+        contentType === 'image/png;base64' || 
+        contentType === 'image/jpeg;base64' ||
+        contentType === 'application/base64') {
+      
+      // Use the new image API endpoint
+      const authorId = extractUUID(post?.author?.id || '');
+      const entryId = extractUUID(post?.id || postId || '');
+      const imageUrl = `/api/authors/${authorId}/entries/${entryId}/image`;
+      
+      return (
+        <div className="space-y-4">
+          <div className="rounded-lg overflow-hidden">
+            <LoadingImage
+              src={imageUrl}
+              alt={post?.title || "Post image"}
+              className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
+              fallback={
+                <div className="w-full h-64 bg-background-2 flex items-center justify-center text-text-2">
+                  <FileText size={64} />
+                </div>
+              }
+            />
+          </div>
+          {post?.description && (
+            <p className="text-text-1 text-center italic">{post.description}</p>
+          )}
+        </div>
+      );
+    }
+
+    // For regular image posts with image URL
     if (contentType === "image/png" || contentType === "image/jpeg") {
       return (
         <div className="space-y-4">
@@ -649,12 +644,12 @@ export const PostDetailPage: React.FC = () => {
               <Avatar
                 imgSrc={
                   isAuthorObject(post.author)
-                    ? post.author.profile_image
+                    ? post.author.profileImage || post.author.profile_image
                     : undefined
                 }
                 alt={
                   isAuthorObject(post.author)
-                    ? post.author.display_name
+                    ? post.author.displayName || post.author.display_name
                     : "Author"
                 }
                 size="lg"
@@ -663,7 +658,7 @@ export const PostDetailPage: React.FC = () => {
             <div className="flex-1">
               <h3 className="font-semibold text-text-1">
                 {isAuthorObject(post.author)
-                  ? post.author.display_name
+                  ? post.author.displayName || post.author.display_name
                   : "Unknown Author"}
               </h3>
               <div className="flex items-center space-x-3 text-sm text-text-2">
@@ -676,7 +671,7 @@ export const PostDetailPage: React.FC = () => {
                 <span>•</span>
                 <span className="flex items-center">
                   <Clock size={14} className="mr-1" />
-                  {formatDate(post.created_at)}
+                  {formatDate(post.published)}
                 </span>
               </div>
             </div>
@@ -708,7 +703,7 @@ export const PostDetailPage: React.FC = () => {
 
           {/* Content */}
           <div className="mb-8">
-            {renderContent(post.content, post.content_type)}
+                    {renderContent(post.content, post.contentType)}
           </div>
 
           {/* Actions */}
@@ -760,22 +755,6 @@ export const PostDetailPage: React.FC = () => {
                 <Share2 size={20} />
               </motion.button>
             </div>
-
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleBookmark}
-              className={`${
-                isBookmarked
-                  ? "text-[var(--primary-teal)]"
-                  : "text-text-2 hover:text-text-1"
-              } transition-colors`}
-            >
-              <Bookmark
-                size={20}
-                fill={isBookmarked ? "currentColor" : "none"}
-              />
-            </motion.button>
           </div>
         </Card>
 
@@ -810,8 +789,8 @@ export const PostDetailPage: React.FC = () => {
 
               <div className="flex space-x-3">
                 <Avatar
-                  imgSrc={user?.profile_image}
-                  alt={user?.display_name || "User"}
+                  imgSrc={user?.profileImage || user?.profile_image}
+                  alt={user?.displayName || user?.display_name || "User"}
                   size="md"
                 />
                 <div className="flex-1">
@@ -893,12 +872,14 @@ export const PostDetailPage: React.FC = () => {
                   <Avatar
                     imgSrc={
                       isAuthorObject(comment.author)
-                        ? comment.author.profile_image
+                        ? comment.author.profileImage ||
+                          comment.author.profile_image
                         : undefined
                     }
                     alt={
                       isAuthorObject(comment.author)
-                        ? comment.author.display_name
+                        ? comment.author.displayName ||
+                          comment.author.display_name
                         : "Author"
                     }
                     size="md"
@@ -909,11 +890,12 @@ export const PostDetailPage: React.FC = () => {
                         <div>
                           <span className="font-medium text-text-1">
                             {isAuthorObject(comment.author)
-                              ? comment.author.display_name
+                              ? comment.author.displayName ||
+                                comment.author.display_name
                               : "Unknown Author"}
                           </span>
                           <span className="text-sm text-text-2 ml-2">
-                            {formatTime(comment.created_at)}
+                            {formatTime(comment.published)}
                           </span>
                         </div>
                         <button
@@ -923,17 +905,17 @@ export const PostDetailPage: React.FC = () => {
                           Reply
                         </button>
                       </div>
-                      {comment.content_type === "text/markdown" ? (
+                      {comment.contentType === "text/markdown" ? (
                         <div
                           className="prose prose-sm max-w-none text-text-1"
                           dangerouslySetInnerHTML={{
-                            __html: renderMarkdown(comment.content),
+                            __html: renderMarkdown(comment.comment),
                           }}
                         />
                       ) : (
-                        <p className="text-text-1">{comment.content}</p>
+                        <p className="text-text-1">{comment.comment}</p>
                       )}
-                      
+
                       {/* Comment Actions */}
                       <div className="flex items-center space-x-4 mt-3">
                         <button
@@ -943,7 +925,9 @@ export const PostDetailPage: React.FC = () => {
                           {/* Gradient background on hover or when liked */}
                           <motion.div
                             className={`absolute inset-0 transition-opacity ${
-                              comment.is_liked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                              comment.is_liked
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
                             }`}
                             style={{
                               background:
@@ -952,7 +936,9 @@ export const PostDetailPage: React.FC = () => {
                           />
                           <motion.div
                             className={`relative z-10 flex items-center gap-1.5 ${
-                              comment.is_liked ? "text-white" : "text-text-2 group-hover:text-white"
+                              comment.is_liked
+                                ? "text-white"
+                                : "text-text-2 group-hover:text-white"
                             } transition-colors`}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.95 }}
@@ -970,7 +956,9 @@ export const PostDetailPage: React.FC = () => {
                               size={16}
                               fill={comment.is_liked ? "currentColor" : "none"}
                             />
-                            <span className="text-sm font-medium">{comment.likes_count || 0}</span>
+                            <span className="text-sm font-medium">
+                              {comment.likes_count || 0}
+                            </span>
                           </motion.div>
                         </button>
                       </div>
@@ -989,12 +977,14 @@ export const PostDetailPage: React.FC = () => {
                             <Avatar
                               imgSrc={
                                 isAuthorObject(reply.author)
-                                  ? reply.author.profile_image
+                                  ? reply.author.profileImage ||
+                                    reply.author.profile_image
                                   : undefined
                               }
                               alt={
                                 isAuthorObject(reply.author)
-                                  ? reply.author.display_name
+                                  ? reply.author.displayName ||
+                                    reply.author.display_name
                                   : "Author"
                               }
                               size="sm"
@@ -1003,23 +993,24 @@ export const PostDetailPage: React.FC = () => {
                               <div className="mb-1">
                                 <span className="font-medium text-sm text-text-1">
                                   {isAuthorObject(reply.author)
-                                    ? reply.author.display_name
+                                    ? reply.author.displayName ||
+                                      reply.author.display_name
                                     : "Unknown Author"}
                                 </span>
                                 <span className="text-xs text-text-2 ml-2">
-                                  {formatTime(reply.created_at)}
+                                  {formatTime(reply.published)}
                                 </span>
                               </div>
-                              {reply.content_type === "text/markdown" ? (
+                              {reply.contentType === "text/markdown" ? (
                                 <div
                                   className="prose prose-sm max-w-none text-text-1 text-sm"
                                   dangerouslySetInnerHTML={{
-                                    __html: renderMarkdown(reply.content),
+                                    __html: renderMarkdown(reply.comment),
                                   }}
                                 />
                               ) : (
                                 <p className="text-sm text-text-1">
-                                  {reply.content}
+                                  {reply.comment}
                                 </p>
                               )}
                             </div>

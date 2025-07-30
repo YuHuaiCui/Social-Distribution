@@ -3,15 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Settings,
   User,
-  Shield,
   Server,
   Palette,
   Save,
   Camera,
-  Mail,
   Lock,
   Globe,
-  Users,
   Eye,
   EyeOff,
   Check,
@@ -30,17 +27,9 @@ import Loader from "../components/ui/Loader";
 import Toggle from "../components/ui/Toggle";
 import type { Author } from "../types/models";
 import { api } from "../services/api";
-import { notifyPrivacySettingsChanged } from "../utils/privacy";
 
-type SettingsTab = "profile" | "account" | "privacy" | "node" | "appearance";
+type SettingsTab = "profile" | "account" | "node" | "appearance";
 
-interface PrivacySettings {
-  defaultVisibility: "public" | "friends" | "unlisted";
-  requireApprovalToFollow: boolean;
-  hideFollowerCount: boolean;
-  hideFollowingCount: boolean;
-  allowDirectMessages: boolean;
-}
 
 interface NodeSettings {
   nodeUrl: string;
@@ -67,10 +56,7 @@ export const SettingsPage: React.FC = () => {
   } | null>(null);
 
   // Profile settings
-  const [displayName, setDisplayName] = useState(user?.display_name || "");
-  const [bio, setBio] = useState(user?.bio || "");
-  const [location, setLocation] = useState(user?.location || "");
-  const [website, setWebsite] = useState(user?.website || "");
+  const [displayName, setDisplayName] = useState(user?.displayName || user?.display_name || "");
   const [githubUsername, setGithubUsername] = useState(user?.github_username || "");
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(
     null
@@ -83,20 +69,11 @@ export const SettingsPage: React.FC = () => {
   } | null>(null);
 
   // Account settings
-  const [email, setEmail] = useState(user?.email || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
 
-  // Privacy settings
-  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>({
-    defaultVisibility: "public",
-    requireApprovalToFollow: false,
-    hideFollowerCount: false,
-    hideFollowingCount: false,
-    allowDirectMessages: true,
-  });
 
   // Node settings
   const [nodeSettings, setNodeSettings] = useState<NodeSettings>({
@@ -123,23 +100,14 @@ export const SettingsPage: React.FC = () => {
   useEffect(() => {
     // Update form fields when user data changes
     if (user) {
-      setDisplayName(user.display_name || "");
-      setBio(user.bio || "");
-      setLocation(user.location || "");
-      setWebsite(user.website || "");
+      setDisplayName(user.displayName || user.display_name || "");
       setGithubUsername(user.github_username || "");
-      setEmail(user.email || "");
     }
   }, [user]);
 
   const loadSettings = async () => {
     setIsLoading(true);
     try {
-      // Load from localStorage for now
-      const savedPrivacy = localStorage.getItem("privacySettings");
-      if (savedPrivacy) {
-        setPrivacySettings(JSON.parse(savedPrivacy));
-      }
 
       const savedNode = localStorage.getItem("nodeSettings");
       if (savedNode) {
@@ -227,26 +195,17 @@ export const SettingsPage: React.FC = () => {
       if (profileImageFile) {
         updatedUser = await api.uploadProfileImage(profileImageFile);
         // Then update other profile fields if needed
-        if (displayName !== user?.display_name || 
-            bio !== user?.bio || 
-            location !== user?.location || 
-            website !== user?.website || 
+        if (displayName !== (user?.displayName || user?.display_name) || 
             githubUsername !== user?.github_username) {
           updatedUser = await api.updateCurrentAuthor({
-            display_name: displayName,
-            bio: bio,
-            location: location,
-            website: website,
+            displayName: displayName,
             github_username: githubUsername,
           });
         }
       } else {
         // Update other profile fields
         updatedUser = await api.updateCurrentAuthor({
-          display_name: displayName,
-          bio: bio,
-          location: location,
-          website: website,
+          displayName: displayName,
           github_username: githubUsername,
         });
       }
@@ -298,9 +257,6 @@ export const SettingsPage: React.FC = () => {
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
-      } else if (email !== user?.email) {
-        // Handle email change only
-        updatedUser = await api.updateCurrentAuthor({ email });
       } else {
         setSaveMessage({ type: "error", text: "No changes to save" });
         return;
@@ -323,26 +279,6 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSavePrivacy = async () => {
-    setIsSaving(true);
-    setSaveMessage(null);
-
-    try {
-      // Save to localStorage for now
-      localStorage.setItem("privacySettings", JSON.stringify(privacySettings));
-      // Notify components that privacy settings have changed
-      notifyPrivacySettingsChanged();
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setSaveMessage({ type: "success", text: "Privacy settings saved!" });
-    } catch (error) {
-      setSaveMessage({
-        type: "error",
-        text: "Failed to save privacy settings",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const handleSaveNode = async () => {
     setIsSaving(true);
@@ -399,7 +335,6 @@ export const SettingsPage: React.FC = () => {
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
     { id: "account", label: "Account", icon: Lock },
-    { id: "privacy", label: "Privacy", icon: Shield },
     { id: "node", label: "Node", icon: Server },
     { id: "appearance", label: "Appearance", icon: Palette },
   ];
@@ -529,7 +464,7 @@ export const SettingsPage: React.FC = () => {
                       className="relative"
                     >
                       <Avatar
-                        imgSrc={profileImagePreview || user?.profile_image}
+                        imgSrc={profileImagePreview || user?.profileImage || user?.profile_image}
                         alt={displayName}
                         size="xl"
                       />
@@ -554,26 +489,6 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Username (Read-only) */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-text-2 mb-2">
-                    Username
-                  </label>
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      value={user?.username || ""}
-                      disabled={true}
-                      className="pr-10"
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                      <Lock size={16} className="text-text-2" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-text-2 mt-1">
-                    Username cannot be changed
-                  </p>
-                </div>
 
                 {/* Display Name */}
                 <div className="mb-6">
@@ -588,48 +503,7 @@ export const SettingsPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Bio */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-text-2 mb-2">
-                    Bio
-                  </label>
-                  <textarea
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="Tell us about yourself..."
-                    className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 resize-none"
-                    rows={4}
-                  />
-                  <p className="text-xs text-text-2 mt-1">
-                    {bio.length}/500 characters
-                  </p>
-                </div>
 
-                {/* Location */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-text-2 mb-2">
-                    Location
-                  </label>
-                  <Input
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Your location"
-                  />
-                </div>
-
-                {/* Website */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-text-2 mb-2">
-                    Website
-                  </label>
-                  <Input
-                    type="url"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="Your website"
-                  />
-                </div>
 
                 {/* GitHub Username */}
                 <div className="mb-6">
@@ -695,19 +569,6 @@ export const SettingsPage: React.FC = () => {
                   Account Settings
                 </h2>
 
-                {/* Email */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-text-2 mb-2">
-                    Email Address
-                  </label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    icon={<Mail size={18} />}
-                  />
-                </div>
 
                 {/* Password Change */}
                 <div className="mb-6">
@@ -779,180 +640,6 @@ export const SettingsPage: React.FC = () => {
             </motion.div>
           )}
 
-          {/* Privacy Settings */}
-          {activeTab === "privacy" && (
-            <motion.div
-              key="privacy"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <Card
-                variant="main"
-                className="p-6 bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-xl"
-              >
-                <h2 className="text-xl font-semibold text-text-1 mb-6">
-                  Privacy Settings
-                </h2>
-
-                {/* Default Post Visibility */}
-                <div className="mb-8">
-                  <label className="block text-sm font-medium text-text-2 mb-3">
-                    Default Post Visibility
-                  </label>
-                  <div className="space-y-3">
-                    {[
-                      {
-                        value: "public",
-                        label: "Public",
-                        icon: Globe,
-                        desc: "Anyone can see your posts",
-                      },
-                      {
-                        value: "friends",
-                        label: "Friends Only",
-                        icon: Users,
-                        desc: "Only your friends can see",
-                      },
-                      {
-                        value: "unlisted",
-                        label: "Unlisted",
-                        icon: Eye,
-                        desc: "Visible to followers and friends",
-                      },
-                    ].map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <motion.label
-                          key={option.value}
-                          whileHover={{ x: 4 }}
-                          className={`flex items-center p-4 rounded-lg cursor-pointer transition-all border ${
-                            privacySettings.defaultVisibility === option.value
-                              ? "bg-gradient-to-r from-[var(--primary-purple)]/10 to-[var(--primary-violet)]/10 border-[var(--primary-violet)]"
-                              : "bg-[rgba(var(--glass-rgb),0.3)] border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)]"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="visibility"
-                              value={option.value}
-                              checked={
-                                privacySettings.defaultVisibility ===
-                                option.value
-                              }
-                              onChange={(e) =>
-                                setPrivacySettings({
-                                  ...privacySettings,
-                                  defaultVisibility: e.target.value as any,
-                                })
-                              }
-                              className="w-5 h-5 border-2 border-[var(--border-1)] text-[var(--primary-violet)] focus:ring-2 focus:ring-[var(--primary-violet)] focus:ring-offset-0"
-                            />
-                            <Icon size={20} className="text-text-1" />
-                          </div>
-                          <div className="flex-1 ml-3">
-                            <p className="font-medium text-text-1 mb-1">
-                              {option.label}
-                            </p>
-                            <p className="text-xs text-text-2">{option.desc}</p>
-                          </div>
-                          {privacySettings.defaultVisibility ===
-                            option.value && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="ml-auto"
-                            >
-                              <Check
-                                size={20}
-                                className="text-[var(--primary-violet)]"
-                              />
-                            </motion.div>
-                          )}
-                        </motion.label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Privacy Toggles */}
-                <div className="space-y-6 mb-8">
-                  {[
-                    {
-                      key: "requireApprovalToFollow",
-                      label: "Require approval for follow requests",
-                      desc: "All follow requests require approval (always enabled)",
-                      disabled: true,
-                    },
-                    {
-                      key: "hideFollowerCount",
-                      label: "Hide follower count",
-                      desc: "Others cannot see how many followers you have",
-                    },
-                    {
-                      key: "hideFollowingCount",
-                      label: "Hide following count",
-                      desc: "Others cannot see how many people you follow",
-                    },
-                    {
-                      key: "allowDirectMessages",
-                      label: "Allow direct messages",
-                      desc: "Other users can send you private messages",
-                    },
-                  ].map((setting) => (
-                    <motion.div
-                      key={setting.key}
-                      whileHover={setting.disabled ? {} : { x: 4 }}
-                      className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
-                        setting.disabled 
-                          ? "bg-[rgba(var(--glass-rgb),0.2)] border-[var(--border-1)]/50 opacity-60" 
-                          : "bg-[rgba(var(--glass-rgb),0.3)] border-[var(--border-1)] hover:bg-[rgba(var(--glass-rgb),0.4)]"
-                      }`}
-                    >
-                      <div className="flex-1 pr-4">
-                        <p className={`font-medium mb-1 ${
-                          setting.disabled ? "text-text-2" : "text-text-1"
-                        }`}>
-                          {setting.label}
-                        </p>
-                        <p className="text-xs text-text-2">{setting.desc}</p>
-                      </div>
-                      <div className="flex items-center">
-                        <Toggle
-                          checked={
-                            setting.disabled 
-                              ? true 
-                              : (privacySettings[
-                                  setting.key as keyof PrivacySettings
-                                ] as boolean)
-                          }
-                          onChange={setting.disabled ? () => {} : (checked) =>
-                            setPrivacySettings({
-                              ...privacySettings,
-                              [setting.key]: checked,
-                            })
-                          }
-                          disabled={setting.disabled}
-                          className="ml-4"
-                        />
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-
-                <AnimatedButton
-                  onClick={handleSavePrivacy}
-                  variant="primary"
-                  loading={isSaving}
-                  icon={<Save size={16} />}
-                  className="mt-6"
-                >
-                  Save Privacy Settings
-                </AnimatedButton>
-              </Card>
-            </motion.div>
-          )}
 
           {/* Node Settings */}
           {activeTab === "node" && (

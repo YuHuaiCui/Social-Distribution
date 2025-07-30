@@ -1,12 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useAuth } from './AuthContext';
-import { inboxService } from '../../services/inbox';
-import type { InboxItem, InboxStats } from '../../types';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 
 interface NotificationContextType {
   unreadCount: number;
   pendingFollows: number;
-  notifications: InboxItem[];
+  notifications: any[];
   isLoading: boolean;
   refreshNotifications: () => Promise<void>;
   markAsRead: (ids: string[]) => Promise<void>;
@@ -17,120 +14,47 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingFollows, setPendingFollows] = useState(0);
-  const [notifications, setNotifications] = useState<InboxItem[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch notifications and stats
+  // Stub implementation - inbox functionality removed
   const refreshNotifications = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    setIsLoading(true);
-    try {
-      // Fetch inbox stats
-      const stats = await inboxService.getInboxStats();
-      setUnreadCount(stats.unread_count);
-      setPendingFollows(stats.pending_follows);
-
-      // Fetch recent unread notifications
-      const response = await inboxService.getInbox({
-        read: false,
-        page_size: 10,
-      });
-      setNotifications(response.results);
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated]);
-
-  // Mark notifications as read
-  const markAsRead = useCallback(async (ids: string[]) => {
-    try {
-      await inboxService.markAsRead(ids);
-      
-      // Update local state
-      setNotifications(prev => 
-        prev.map(notif => 
-          ids.includes(notif.id) 
-            ? { ...notif, is_read: true, read: true } 
-            : notif
-        )
-      );
-      
-      // Update unread count
-      const readCount = ids.filter(id => 
-        notifications.find(n => n.id === id && !n.is_read)
-      ).length;
-      setUnreadCount(prev => Math.max(0, prev - readCount));
-    } catch (error) {
-      console.error('Failed to mark notifications as read:', error);
-    }
-  }, [notifications]);
-
-  // Mark all notifications as read
-  const markAllAsRead = useCallback(async () => {
-    const unreadIds = notifications
-      .filter(n => !n.is_read)
-      .map(n => n.id);
-    
-    if (unreadIds.length > 0) {
-      await markAsRead(unreadIds);
-    }
-  }, [notifications, markAsRead]);
-
-  // Clear a notification from the list
-  const clearNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    // No-op - inbox functionality removed
   }, []);
 
-  // Initial load and periodic refresh
-  useEffect(() => {
-    if (isAuthenticated) {
-      refreshNotifications();
-      
-      // Refresh every 10 seconds for more responsive notifications
-      const interval = setInterval(refreshNotifications, 10000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated, refreshNotifications]);
+  const markAsRead = useCallback(async (ids: string[]) => {
+    // No-op - inbox functionality removed
+  }, []);
 
-  // Listen for custom events that should trigger a refresh
-  useEffect(() => {
-    const handleNotificationEvent = () => {
-      refreshNotifications();
-    };
+  const markAllAsRead = useCallback(async () => {
+    // No-op - inbox functionality removed
+  }, []);
 
-    window.addEventListener('notification-update', handleNotificationEvent);
-    
-    return () => {
-      window.removeEventListener('notification-update', handleNotificationEvent);
-    };
-  }, [refreshNotifications]);
+  const clearNotification = useCallback((id: string) => {
+    // No-op - inbox functionality removed
+  }, []);
+
+  const value: NotificationContextType = {
+    unreadCount,
+    pendingFollows,
+    notifications,
+    isLoading,
+    refreshNotifications,
+    markAsRead,
+    markAllAsRead,
+    clearNotification,
+  };
 
   return (
-    <NotificationContext.Provider
-      value={{
-        unreadCount,
-        pendingFollows,
-        notifications,
-        isLoading,
-        refreshNotifications,
-        markAsRead,
-        markAllAsRead,
-        clearNotification,
-      }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );
 };
 
-export const useNotifications = () => {
+export const useNotifications = (): NotificationContextType => {
   const context = useContext(NotificationContext);
   if (context === undefined) {
     throw new Error('useNotifications must be used within a NotificationProvider');
@@ -138,7 +62,7 @@ export const useNotifications = () => {
   return context;
 };
 
-// Helper function to trigger notification refresh from anywhere
+// Export a no-op function for backward compatibility
 export const triggerNotificationUpdate = () => {
-  window.dispatchEvent(new Event('notification-update'));
+  // No-op - inbox functionality removed
 };

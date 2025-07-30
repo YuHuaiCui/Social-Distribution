@@ -1,8 +1,34 @@
 """
-URL parsing utilities for node-to-node communication.
+URL utilities for encoding, decoding, parsing, and validation.
 """
 
-from urllib.parse import urlparse, urljoin
+from urllib.parse import quote, unquote, urlparse, urljoin
+
+
+def percent_encode_url(url):
+    """
+    Percent encode a URL, encoding all special characters.
+    
+    Args:
+        url (str): URL to encode
+    
+    Returns:
+        str: Percent-encoded URL
+    """
+    return quote(url, safe='')
+
+
+def percent_decode_url(url):
+    """
+    Percent decode a URL.
+    
+    Args:
+        url (str): URL to decode
+    
+    Returns:
+        str: Percent-decoded URL
+    """
+    return unquote(url)
 
 
 def get_base_host(url):
@@ -85,4 +111,4 @@ def join_urls(base_url, path):
     Returns:
         str: The joined URL
     """
-    return urljoin(normalize_url(base_url), path.lstrip('/')) 
+    return urljoin(normalize_url(base_url), path.lstrip('/'))

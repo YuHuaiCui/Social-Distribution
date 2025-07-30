@@ -11,7 +11,6 @@ import {
   MessageCircle,
   Share2,
   MoreHorizontal,
-  Bookmark,
   Edit,
   Trash2,
   FileText,
@@ -46,29 +45,28 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
 interface PostCardProps {
   post: Entry;
   onLike?: (isLiked: boolean) => void;
-  onSave?: (isSaved: boolean) => void;
   onDelete?: (postId: string) => void;
   onUpdate?: (post: Entry) => void;
   isLiked?: boolean;
-  isSaved?: boolean;
 }
 
 const PostCardComponent: React.FC<PostCardProps> = ({
   post,
   onLike,
-  onSave,
   onDelete,
   isLiked = false,
-  isSaved = false,
 }) => {
   const { user } = useAuth();
   const { openCreatePost } = useCreatePost();
   const { showSuccess, showError, showInfo } = useToast();
   const navigate = useNavigate();
   const [liked, setLiked] = useState(isLiked);
-  const [saved, setSaved] = useState(isSaved);
-  const [likeCount, setLikeCount] = useState(post.likes_count || 0);
-  const [commentCount, setCommentCount] = useState(post.comments_count || 0);
+  const [likeCount, setLikeCount] = useState(
+    post.likes?.count || post.likes_count || 0
+  );
+  const [commentCount, setCommentCount] = useState(
+    post.comments?.count || post.comments_count || 0
+  );
   const [showActions, setShowActions] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -95,15 +93,14 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   useEffect(() => {
     // Initialize state from props and post data
     setLiked(isLiked || post.is_liked || false);
-    setSaved(isSaved || post.is_saved || false);
-    setCommentCount(post.comments_count || 0);
+    setCommentCount(post.comments?.count || post.comments_count || 0);
 
     // Fetch like data if we have a valid post ID
     if (post.id) {
       debouncedFetchLikeData(post.id);
     } else {
       // Use fallback data if no valid ID
-      setLikeCount(post.likes_count || 0);
+      setLikeCount(post.likes?.count || post.likes_count || 0);
       setLiked(isLiked || post.is_liked || false);
     }
 
@@ -141,25 +138,32 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     };
   }, [
     post.id,
+    post.comments?.count,
     post.comments_count,
+    post.likes?.count,
     post.likes_count,
     post.is_liked,
-    post.is_saved,
     isLiked,
-    isSaved,
     debouncedFetchLikeData,
   ]);
 
   // Memoize author info extraction
   const author = useMemo(
-    () =>
-      typeof post.author === "string"
-        ? ({ display_name: "Unknown", id: "" } as Author)
-        : post.author,
+    () => {
+      if (typeof post.author === "string") {
+        return { displayName: "Unknown", display_name: "Unknown", id: "" } as Author;
+      }
+      // Ensure displayName exists and isn't empty
+      const displayName = post.author.displayName || post.author.display_name;
+      if (!displayName) {
+        return { ...post.author, displayName: "Unknown User", display_name: "Unknown User" };
+      }
+      return post.author;
+    },
     [post.author]
   );
 
-  const date = new Date(post.created_at);
+  const date = new Date(post.published || post.created_at);
   const timeAgo = getTimeAgo(date);
 
   const handleLike = useCallback(async () => {
@@ -189,26 +193,6 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     }
   }, [liked, post.id, showSuccess, showInfo, showError, onLike]);
 
-  const handleSave = useCallback(async () => {
-    const extractedId = extractUUID(post.id);
-    const newSavedState = !saved;
-    setSaved(newSavedState);
-
-    try {
-      if (newSavedState) {
-        await socialService.savePost(extractedId);
-        showSuccess("Post saved to your collection");
-      } else {
-        await socialService.unsavePost(extractedId);
-        showInfo("Post removed from collection");
-      }
-      onSave?.(newSavedState);
-    } catch (error) {
-      // Revert on error
-      setSaved(!newSavedState);
-      showError("Failed to update saved status");
-    }
-  }, [saved, post.id, showSuccess, showInfo, showError, onSave]);
 
   const handleShare = useCallback(() => {
     // For public posts, show the share modal with social media options
@@ -279,7 +263,40 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   }, [showActions]);
 
   const renderContent = () => {
-    if (post.content_type === "text/markdown") {
+    const contentType = post.contentType;
+    
+    // Handle base64 image content types
+    if (contentType?.includes('base64') || 
+        contentType === 'image/png;base64' || 
+        contentType === 'image/jpeg;base64' ||
+        contentType === 'application/base64') {
+      
+      // Use the new image API endpoint
+      const authorId = extractUUID(post.author.id);
+      const entryId = extractUUID(post.id);
+      const imageUrl = `/api/authors/${authorId}/entries/${entryId}/image`;
+      
+      return (
+        <div className="mb-4 rounded-lg overflow-hidden">
+          <LoadingImage
+            src={imageUrl}
+            alt={post.title || "Post image"}
+            className="w-full h-auto max-h-96 object-contain rounded-lg"
+            fallback={
+              <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
+                <FileText size={48} />
+              </div>
+            }
+          />
+          {/* Show description as caption if it exists */}
+          {post.description && (
+            <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (contentType === "text/markdown") {
       return (
         <div
           className="prose prose-sm max-w-none text-text-1"
@@ -340,32 +357,32 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           {/* Author info */}
           <div className="flex items-center mb-4">
             <Link
-              to={`/authors/${extractUUID(author.id)}`}
+              to={author.id ? `/authors/${extractUUID(author.id)}` : '#'}
               className="flex items-center"
             >
               <div className="w-10 h-10 rounded-full overflow-hidden neumorphism-sm mr-3">
-                {author.profile_image ? (
+                {(author.profileImage || author.profile_image) ? (
                   <LoadingImage
-                    src={author.profile_image}
-                    alt={author.display_name}
+                    src={author.profileImage || author.profile_image}
+                    alt={author.displayName || author.display_name}
                     className="w-full h-full"
                     loaderSize={14}
                     aspectRatio="1/1"
                     fallback={
                       <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                        {author.display_name.charAt(0).toUpperCase()}
+                        {(author.displayName || author.display_name || "U").charAt(0).toUpperCase()}
                       </div>
                     }
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold">
-                    {author.display_name.charAt(0).toUpperCase()}
+                    {(author.displayName || author.display_name || "U").charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
               <div>
                 <h3 className="font-medium text-text-1">
-                  {author.display_name}
+                  {author.displayName || author.display_name}
                 </h3>
                 <div className="flex items-center text-xs text-text-2">
                   <span>{timeAgo}</span>
@@ -473,7 +490,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           </Link>
 
           {/* Title/Content separator for markdown posts */}
-          {post.content_type === "text/markdown" && (
+          {post.contentType === "text/markdown" && (
             <div className="flex items-center mb-4">
               <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border-1 to-transparent" />
               <div className="mx-3 text-text-2">
@@ -486,15 +503,15 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           {/* Post content */}
           <div
             className={`mb-4 ${
-              post.content_type === "text/markdown" ? "prose-sm" : ""
+              post.contentType === "text/markdown" ? "prose-sm" : ""
             }`}
           >
             {renderContent()}
           </div>
 
-          {/* Post image if it's an image type */}
-          {(post.content_type === "image/png" ||
-            post.content_type === "image/jpeg") &&
+          {/* Post image if it's an image type (legacy format) */}
+          {(post.contentType === "image/png" ||
+            post.contentType === "image/jpeg") &&
             post.image && (
               <div className="mb-4 rounded-lg overflow-hidden">
                 <LoadingImage
@@ -616,31 +633,6 @@ const PostCardComponent: React.FC<PostCardProps> = ({
               </div>
             </button>
 
-            {/* Save Button */}
-            <button
-              onClick={handleSave}
-              className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-              aria-label={saved ? "Unsave this post" : "Save this post"}
-            >
-              {/* Gradient background on hover or when saved */}
-              <div
-                className={`absolute inset-0 transition-opacity duration-300 ${
-                  saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                }`}
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--primary-violet) 0%, var(--primary-purple) 100%)",
-                }}
-              />
-              <div
-                className={`relative z-10 flex items-center gap-2 ${
-                  saved ? "text-white" : "text-text-2 group-hover:text-white"
-                } transition-colors save-button ${saved ? "saved" : ""}`}
-              >
-                <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
-                <span className="text-sm font-medium">Save</span>
-              </div>
-            </button>
           </div>
         </div>
       </Card>
@@ -688,7 +680,7 @@ export const PostCard = React.memo(
       prevProps.post.comments_count === nextProps.post.comments_count &&
       prevProps.post.visibility === nextProps.post.visibility &&
       prevProps.isLiked === nextProps.isLiked &&
-      prevProps.isSaved === nextProps.isSaved
+      true // removed saved functionality
     );
   }
 );

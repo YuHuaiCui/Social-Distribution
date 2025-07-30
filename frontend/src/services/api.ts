@@ -220,15 +220,15 @@ class ApiService {
   async updateCurrentAuthor(data: Partial<Author>): Promise<Author> {
     // Convert to snake_case for backend
     const backendData: any = {};
-    if (data.display_name !== undefined)
-      backendData.display_name = data.display_name;
+    if (data.displayName !== undefined)
+      backendData.displayName = data.displayName;
     if (data.github_username !== undefined)
       backendData.github_username = data.github_username;
     if (data.bio !== undefined) backendData.bio = data.bio;
     if (data.location !== undefined) backendData.location = data.location;
     if (data.website !== undefined) backendData.website = data.website;
-    if (data.profile_image !== undefined)
-      backendData.profile_image = data.profile_image;
+    if (data.profileImage !== undefined)
+      backendData.profileImage = data.profileImage;
     if (data.email !== undefined) backendData.email = data.email;
 
     return this.request<Author>("/api/authors/me/", {
@@ -249,7 +249,7 @@ class ApiService {
 
   async uploadProfileImage(file: File): Promise<Author> {
     const formData = new FormData();
-    formData.append("profile_image_file", file);
+    formData.append("profileImage", file);
 
     const csrfToken = document.cookie
       .split("; ")
@@ -385,12 +385,37 @@ class ApiService {
     const id = entryId.includes("/")
       ? entryId.split("/").filter(Boolean).pop()
       : entryId;
-    return this.request<{ like_count: number; liked_by_current_user: boolean }>(
-      `/api/entries/${id}/likes/`,
-      {
-        method: "GET",
-      }
-    );
+    const response = await this.request<{
+      type: "likes";
+      web: string;
+      id: string;
+      page_number: number;
+      size: number;
+      count: number;
+      src: Array<{
+        type: "like";
+        author: any;
+        published: string;
+        id: string;
+        object: string;
+      }>;
+    }>(`/api/entries/${id}/likes/`, {
+      method: "GET",
+    });
+
+    // Get current user info from context (if available) to check if user liked the entry
+    const currentUserResponse = await this.request<any>('/api/author/me/');
+    const currentUserId = currentUserResponse?.id;
+
+    // Check if current user has liked this entry
+    const liked_by_current_user = currentUserId 
+      ? response.src.some(like => like.author.id === currentUserId)
+      : false;
+
+    return {
+      like_count: response.count,
+      liked_by_current_user
+    };
   }
 
   // Follow endpoints - backend implemented
@@ -620,6 +645,13 @@ class ApiService {
   async deleteNode(host: string): Promise<any> {
     return this.request("/api/nodes/remove/", {
       method: "DELETE",
+      body: JSON.stringify({ host }),
+    });
+  }
+
+  async refreshNode(host: string): Promise<any> {
+    return this.request("/api/nodes/refresh/", {
+      method: "POST",
       body: JSON.stringify({ host }),
     });
   }

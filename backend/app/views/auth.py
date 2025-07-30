@@ -73,7 +73,7 @@ def signup(request):
     data = request.data
 
     # Validate required fields
-    required_fields = ["username", "email", "password", "display_name"]
+    required_fields = ["username", "password", "displayName"]
     for field in required_fields:
         if field not in data:
             return Response({"message": f"{field} is required"}, status=400)
@@ -82,9 +82,7 @@ def signup(request):
     if Author.objects.filter(username=data["username"]).exists():
         return Response({"message": "Username already exists"}, status=400)
 
-    # Check for duplicate email (case-insensitive)
-    if Author.objects.filter(email=data["email"]).exists():
-        return Response({"message": "Email already exists"}, status=400)
+    # Email field removed - no longer checking for duplicates
 
     # Validate password strength using Django's built-in validators
     try:
@@ -96,13 +94,9 @@ def signup(request):
         # Create the author/user with provided information
         author = Author.objects.create_user(
             username=data["username"],
-            email=data["email"],
             password=data["password"],
-            display_name=data.get("display_name", data["username"]),
+            displayName=data.get("displayName", data["username"]),
             github_username=data.get("github_username", ""),
-            bio=data.get("bio", ""),
-            location=data.get("location", ""),
-            website=data.get("website", ""),
             # Check if new users should be auto-approved
             is_approved=getattr(settings, "AUTO_APPROVE_NEW_USERS", False),
             is_active=True,

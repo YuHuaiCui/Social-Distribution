@@ -6,45 +6,63 @@ from app.serializers.author import AuthorSerializer
 
 
 class FollowSerializer(serializers.ModelSerializer):
-    follower = serializers.CharField(source="follower.url", read_only=True)
-    followed = serializers.CharField(source="followed.url", read_only=True)
+    type = serializers.CharField(default="follow", read_only=True)
+    summary = serializers.SerializerMethodField()
+    actor = serializers.SerializerMethodField()
+    object = serializers.SerializerMethodField()
+    status = serializers.CharField(read_only=True)
 
     class Meta:
         model = Follow
-        fields = ["id", "follower", "followed", "status", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        fields = ["id", "type", "summary", "actor", "object", "status", "created_at"]
 
-    def to_representation(self, instance):
-        """
-        Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
-        Returns follow objects in the required format:
-        {
-            "type": "follow",
-            "summary": "Greg wants to follow Lara",
-            "actor": { author object },
-            "object": { author object }
+    def get_summary(self, obj):
+        """Generate the summary text"""
+        return (
+            f"{obj.follower.displayName} wants to follow {obj.followed.displayName}"
+        )
+
+    def get_actor(self, obj):
+        """Get the actor (follower) in compliant format"""
+        follower = obj.follower
+        return {
+            "type": "author",
+            "id": follower.url,
+            "host": follower.host,
+            "displayName": follower.displayName,
+            "github": (
+                f"https://github.com/{follower.github_username}"
+                if follower.github_username
+                else ""
+            ),
+            "profileImage": follower.profileImage if follower.profileImage else "",
+            "web": (
+                follower.web
+                if follower.web
+                else f"{follower.host}authors/{follower.id}"
+            ),
         }
-        """
-        data = super().to_representation(instance)
-        
-        # CMPUT 404 compliant format with compatibility fields
-        result = {
-            # CMPUT 404 required fields
-            "type": "follow",
-            "summary": f"{instance.follower.display_name} wants to follow {instance.followed.display_name}",
-            "actor": AuthorSerializer(instance.follower, context=self.context).data,
-            "object": AuthorSerializer(instance.followed, context=self.context).data,
-            
-            # Additional fields for frontend compatibility
-            "id": data.get("id"),
-            "follower": instance.follower.url,
-            "followed": instance.followed.url,
-            "status": instance.status,
-            "created_at": data.get("created_at"),
-            "updated_at": data.get("updated_at"),
+
+    def get_object(self, obj):
+        """Get the object (followed author) in compliant format"""
+        followed = obj.followed
+        return {
+            "type": "author",
+            "id": followed.url,
+            "host": followed.host,
+            "displayName": followed.displayName,
+            "github": (
+                f"https://github.com/{followed.github_username}"
+                if followed.github_username
+                else ""
+            ),
+            "profileImage": followed.profileImage if followed.profileImage else "",
+            "web": (
+                followed.web
+                if followed.web
+                else f"{followed.host}authors/{followed.id}"
+            ),
         }
-        
-        return result
 
 
 class FollowCreateSerializer(serializers.ModelSerializer):
@@ -76,7 +94,7 @@ class FollowCreateSerializer(serializers.ModelSerializer):
 
         # Create the follow request
         follow = Follow.objects.create(
-            follower=follower, followed=followed_author, status=Follow.PENDING
+            follower=follower, followed=followed_author, status=Follow.REQUESTING
         )
 
         return follow

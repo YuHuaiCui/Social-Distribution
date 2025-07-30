@@ -16,14 +16,14 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
         
         # Always update these fields with the latest GitHub data
         if github_data.get('name'):
-            user.display_name = github_data.get('name')
+            user.displayName = github_data.get('name')
             # Also update first_name and last_name
             name_parts = github_data.get('name').split(' ', 1)
             user.first_name = name_parts[0]
             if len(name_parts) > 1:
                 user.last_name = name_parts[1]
-        elif github_data.get('login') and not user.display_name:
-            user.display_name = github_data.get('login')
+        elif github_data.get('login') and not user.displayName:
+            user.displayName = github_data.get('login')
             
         # Always update GitHub username
         if github_data.get('login'):
@@ -35,11 +35,8 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
             
         # Always update profile image
         if github_data.get('avatar_url'):
-            user.profile_image = github_data.get('avatar_url')
+            user.profileImage = github_data.get('avatar_url')
             
-        # Update bio if available
-        if github_data.get('bio'):
-            user.bio = github_data.get('bio')
             
         # Auto-approve GitHub users
         user.is_approved = True

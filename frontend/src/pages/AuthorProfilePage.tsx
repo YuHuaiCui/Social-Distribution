@@ -100,14 +100,14 @@ const AuthorProfilePage: React.FC = () => {
         isOpen: true,
         action,
         title: "Delete User",
-        message: `Are you sure you want to delete ${author.display_name}? This action cannot be undone.`,
+        message: `Are you sure you want to delete ${author.displayName || author.display_name}? This action cannot be undone.`,
       });
     } else if (action === "promote") {
       setConfirmDialog({
         isOpen: true,
         action,
         title: "Promote to Admin",
-        message: `Are you sure you want to promote ${author.display_name} to admin? This will give them full administrative privileges.`,
+        message: `Are you sure you want to promote ${author.displayName || author.display_name} to admin? This will give them full administrative privileges.`,
       });
     }
   };
@@ -119,11 +119,11 @@ const AuthorProfilePage: React.FC = () => {
     try {
       if (confirmDialog.action === "delete") {
         await api.deleteAuthor(author.id);
-        showSuccess(`${author.display_name} has been deleted`);
+        showSuccess(`${author.displayName || author.display_name} has been deleted`);
         navigate("/authors");
       } else if (confirmDialog.action === "promote") {
         await api.promoteToAdmin(author.id);
-        showSuccess(`${author.display_name} has been promoted to admin`);
+        showSuccess(`${author.displayName || author.display_name} has been promoted to admin`);
         setAuthor({
           ...author,
           is_staff: true,
@@ -156,17 +156,17 @@ const AuthorProfilePage: React.FC = () => {
       switch (action) {
         case "approve":
           await api.approveAuthor(author.id);
-          showSuccess(`${author.display_name} has been approved`);
+          showSuccess(`${author.displayName || author.display_name} has been approved`);
           setAuthor({ ...author, is_approved: true });
           break;
         case "deactivate":
           await api.deactivateAuthor(author.id);
-          showSuccess(`${author.display_name} has been deactivated`);
+          showSuccess(`${author.displayName || author.display_name} has been deactivated`);
           setAuthor({ ...author, is_active: false });
           break;
         case "activate":
           await api.activateAuthor(author.id);
-          showSuccess(`${author.display_name} has been activated`);
+          showSuccess(`${author.displayName || author.display_name} has been activated`);
           setAuthor({ ...author, is_active: true });
           break;
       }
@@ -297,7 +297,7 @@ const AuthorProfilePage: React.FC = () => {
       />
 
       {/* GitHub Activity Section - Only show if user has GitHub username */}
-      {author.github && (
+      {(author.github || author.github_username) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -306,7 +306,11 @@ const AuthorProfilePage: React.FC = () => {
           <h2 className="text-lg font-semibold text-text-1 mb-4">
             GitHub Activity
           </h2>
-          <GitHubActivity username={author.github.split("/").pop() || ""} />
+          <GitHubActivity username={
+            author.github 
+              ? author.github.split("/").pop() || ""
+              : author.github_username || ""
+          } />
         </motion.div>
       )}
 

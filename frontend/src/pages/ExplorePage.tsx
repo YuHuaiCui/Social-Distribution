@@ -31,7 +31,7 @@ interface TrendingAuthor extends Author {
   follower_count?: number;
   post_count?: number;
   is_following?: boolean;
-  follow_status?: "none" | "pending" | "accepted" | "rejected";
+  follow_status?: "none" | "requesting" | "accepted" | "rejected";
 }
 
 interface Category {
@@ -62,7 +62,7 @@ export const ExplorePage: React.FC = () => {
     switch (followStatus) {
       case "accepted":
         return { text: "Following", variant: "secondary" as const };
-      case "pending":
+      case "requesting":
         return { text: "Requested", variant: "secondary" as const };
       case "rejected":
       case "none":
@@ -145,11 +145,11 @@ export const ExplorePage: React.FC = () => {
                 return {
                   ...author,
                   is_following: status.is_following,
-                  follow_status: (status.follow_status || "none") as
-                    | "none"
-                    | "pending"
-                    | "accepted"
-                    | "rejected",
+                                  follow_status: (status.follow_status || "none") as
+                  | "none"
+                  | "requesting"
+                  | "accepted"
+                  | "rejected",
                 };
               } catch (error) {
                 console.error(
@@ -269,13 +269,13 @@ export const ExplorePage: React.FC = () => {
               ? {
                   ...author,
                   is_following: true, // Show as following for now
-                  follow_status: "pending", // Assume pending until confirmed
+                  follow_status: "requesting", // Assume requesting until confirmed
                   follower_count: (author.follower_count || 0) + 1,
                 }
               : author
           )
         );
-      } else if (followStatus === "pending") {
+              } else if (followStatus === "requesting") {
         // If already pending, don't do anything
         console.log("Follow request already pending");
         return;
@@ -620,18 +620,15 @@ export const ExplorePage: React.FC = () => {
                                 className="mb-4"
                               >
                                 <Avatar
-                                  imgSrc={author.profile_image}
-                                  alt={author.display_name}
+                                  imgSrc={author.profileImage || author.profile_image}
+                                  alt={author.displayName || author.display_name}
                                   size="xl"
                                 />
                               </motion.div>
 
                               <h3 className="font-semibold text-lg text-text-1 mb-1 hover:underline">
-                                {author.display_name}
+                                {author.displayName || author.display_name}
                               </h3>
-                              <p className="text-sm text-text-2 mb-3">
-                                @{author.username}
-                              </p>
 
                               {author.bio && (
                                 <p className="text-sm text-text-2 mb-4 line-clamp-2">

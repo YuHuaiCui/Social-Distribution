@@ -5,18 +5,35 @@
 import type { Author } from '../author';
 import type { TimestampedModel } from '../common';
 
-export interface Like extends TimestampedModel {
-  id: string;
-  author: Author | string; // Can be URL reference
-  target_type: 'entry' | 'comment';
-  target_id: string;
-}
+// Re-export Like from entry types for backward compatibility
+export type { Like } from '../entry';
 
 export interface Follow extends TimestampedModel {
   id: string;
-  follower: Author | string; // Can be URL reference
-  followed: Author | string; // Can be URL reference
-  status: 'pending' | 'accepted' | 'rejected';
+  type: string;
+  summary: string;
+  status: 'requesting' | 'accepted' | 'rejected';
+  actor: {
+    type: string;
+    id: string;
+    host: string;
+    displayName: string;
+    github?: string;
+    profileImage?: string;
+    web?: string;
+  };
+  object: {
+    type: string;
+    id: string;
+    host: string;
+    displayName: string;
+    github?: string;
+    profileImage?: string;
+    web?: string;
+  };
+  // Legacy fields for backward compatibility
+  follower?: Author | string; 
+  followed?: Author | string;
 }
 
 export interface Friendship extends TimestampedModel {
@@ -38,5 +55,5 @@ export interface FriendshipStats {
   followers_count: number;
   following_count: number;
   friends_count: number;
-  pending_requests_count: number;
+  requesting_requests_count: number;
 }

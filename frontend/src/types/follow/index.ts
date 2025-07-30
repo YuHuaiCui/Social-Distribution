@@ -2,7 +2,7 @@ export interface Follow {
     id: number;
     follower: string;  // URL of the follower
     followed: string;  // URL of the followed author
-    status: 'pending' | 'accepted' | 'rejected';
+    status: 'requesting' | 'accepted' | 'rejected';
     created_at: string;
     updated_at: string;
 }

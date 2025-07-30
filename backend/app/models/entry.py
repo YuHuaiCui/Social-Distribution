@@ -63,21 +63,26 @@ class EntryManager(models.Manager):
             | Q(visibility=Entry.FRIENDS_ONLY)
             & Exists(friendship_exists)  # Friends-only posts from friends
         ).exclude(visibility=Entry.DELETED)
-        
+
         # Debug logging
         from .author import Author
+
         public_posts = queryset.filter(visibility=Entry.PUBLIC)
         remote_public_count = public_posts.filter(author__node__isnull=False).count()
         local_public_count = public_posts.filter(author__node__isnull=True).count()
-        
+
         if remote_public_count > 0 or local_public_count > 0:
-            print(f"DEBUG visible_to_author: Found {local_public_count} local PUBLIC posts and {remote_public_count} remote PUBLIC posts")
-            
+            print(
+                f"DEBUG visible_to_author: Found {local_public_count} local PUBLIC posts and {remote_public_count} remote PUBLIC posts"
+            )
+
             # Log sample remote posts
             remote_posts = public_posts.filter(author__node__isnull=False)[:2]
             for post in remote_posts:
-                print(f"DEBUG visible_to_author: Remote post - Title: {post.title}, Author: {post.author.username}, Node: {post.author.node.name if post.author.node else 'Unknown'}")
-        
+                print(
+                    f"DEBUG visible_to_author: Remote post - Title: {post.title}, Author: {post.author.username}, Node: {post.author.node.name if post.author.node else 'Unknown'}"
+                )
+
         return queryset
 
 
@@ -109,12 +114,18 @@ class Entry(models.Model):
     TEXT_MARKDOWN = "text/markdown"
     IMAGE_PNG = "image/png"
     IMAGE_JPEG = "image/jpeg"
+    IMAGE_PNG_BASE64 = "image/png;base64"
+    IMAGE_JPEG_BASE64 = "image/jpeg;base64"
+    APPLICATION_BASE64 = "application/base64"
 
     CONTENT_TYPE_CHOICES = [
         (TEXT_PLAIN, "Plain Text"),
         (TEXT_MARKDOWN, "Markdown"),
         (IMAGE_PNG, "PNG Image"),
         (IMAGE_JPEG, "JPEG Image"),
+        (IMAGE_PNG_BASE64, "PNG Image (Base64)"),
+        (IMAGE_JPEG_BASE64, "JPEG Image (Base64)"),
+        (APPLICATION_BASE64, "Base64 Data"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -179,19 +190,22 @@ class Entry(models.Model):
     objects = EntryManager()
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-published", "-created_at"]  # Primary sort by published, fallback to created_at
         verbose_name_plural = "entries"
         indexes = [
             models.Index(fields=["author", "visibility"]),
-            models.Index(fields=["visibility", "created_at"]),
-            models.Index(fields=["author", "created_at"]),
+            models.Index(fields=["visibility", "published"]),
+            models.Index(fields=["author", "published"]),
             models.Index(fields=["content_type"]),
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["updated_at"]),
-            models.Index(fields=["-created_at"]),  # For default ordering
+            models.Index(fields=["published"]),
+            models.Index(fields=["-published"]),  # For default ordering
             models.Index(fields=["visibility"]),
+            # Keep created_at indexes for backward compatibility and fallback
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["-created_at"]),
             # Compound index for efficient filtered streams (author + visibility + time)
-            models.Index(fields=["author", "visibility", "created_at"]),
+            models.Index(fields=["author", "visibility", "published"]),
+            models.Index(fields=["author", "visibility", "created_at"]),  # Fallback
         ]
 
     def save(self, *args, **kwargs):
@@ -216,7 +230,8 @@ class Entry(models.Model):
 
         # Auto-generate web URL for local entries
         if not self.web and self.author.is_local:
-            self.web = f"{settings.SITE_URL}/authors/{self.author.id}/entries/{self.id}"
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            self.web = f"{frontend_url}/authors/{self.author.id}/entries/{self.id}"
 
         # Save the entry first to get created_at timestamp
         super().save(*args, **kwargs)

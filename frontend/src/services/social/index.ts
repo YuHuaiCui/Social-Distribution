@@ -67,12 +67,26 @@ export class SocialService extends BaseApiService {
    */
   async getEntryLikes(
     entryId: string,
-    params?: { page?: number; page_size?: number }
-  ): Promise<PaginatedResponse<Like>> {
+    params?: { page?: number; size?: number }
+  ): Promise<{
+    type: "likes";
+    web: string;
+    id: string;
+    page_number: number;
+    size: number;
+    count: number;
+    src: Like[];
+  }> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Like>>(
-      `/api/entries/${entryId}/likes/${queryString}`
-    );
+    return this.request<{
+      type: "likes";
+      web: string;
+      id: string;
+      page_number: number;
+      size: number;
+      count: number;
+      src: Like[];
+    }>(`/api/entries/${entryId}/likes/${queryString}`);
   }
 
   /**
@@ -148,14 +162,28 @@ export class SocialService extends BaseApiService {
   }
 
   /**
-   * Get pending follow requests for current user
+   * Get requesting follow requests for current user
    */
-  async getPendingFollowRequests(params?: {
+  async getRequestingFollowRequests(params?: {
     page?: number;
     page_size?: number;
   }): Promise<PaginatedResponse<Follow>> {
     const queryString = this.buildQueryString(params || {});
     return this.request<PaginatedResponse<Follow>>(
+      `/api/follows/requests/${queryString}`
+    );
+  }
+
+  /**
+   * Get all follow requests for current user (all statuses)
+   */
+  async getAllFollowRequests(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<Follow[]> {
+    const queryParams = { ...params, all_statuses: true };
+    const queryString = this.buildQueryString(queryParams);
+    return this.request<Follow[]>(
       `/api/follows/requests/${queryString}`
     );
   }
@@ -215,11 +243,27 @@ export class SocialService extends BaseApiService {
     is_following: boolean;
     is_followed_by: boolean;
     is_friends: boolean;
-    follow_status?: "pending" | "accepted" | "rejected";
+    follow_status?: "requesting" | "accepted" | "rejected" | "none";
   }> {
-    return this.request(
-      `/api/follows/status/?follower=${followerId}&followed=${followedId}`
+    const response = await this.request<{
+      follower: string;
+      followed: string;
+      status: string;
+      created_at?: string;
+    }>(
+      `/api/follows/status/?follower_url=${followerId}&followed_url=${followedId}`
     );
+
+    // Map backend response to frontend expected format
+    const isFollowing = response.status === "accepted";
+    const followStatus = response.status === "not_following" ? "none" : response.status;
+
+    return {
+      is_following: isFollowing,
+      is_followed_by: false, // This endpoint doesn't return this info
+      is_friends: false, // This endpoint doesn't return this info
+      follow_status: followStatus as "requesting" | "accepted" | "rejected" | "none",
+    };
   }
 
   /**
@@ -230,35 +274,40 @@ export class SocialService extends BaseApiService {
     return this.request<Author[]>(`/api/authors/suggestions/${queryString}`);
   }
 
-  // Saved posts methods
 
   /**
-   * Save a post
+   * Get likes received on current user's entries
    */
-  async savePost(entryId: string): Promise<void> {
-    await this.request(`/api/entries/${entryId}/save/`, {
-      method: "POST",
-    });
+  async getReceivedLikes(): Promise<{
+    type: string;
+    items: Like[];
+  }> {
+    return this.request('/api/likes/received/');
   }
 
   /**
-   * Unsave a post
+   * Get comments received on current user's entries
    */
-  async unsavePost(entryId: string): Promise<void> {
-    await this.request(`/api/entries/${entryId}/save/`, {
-      method: "DELETE",
-    });
-  }
-
-  /**
-   * Get saved posts
-   */
-  async getSavedPosts(params?: {
-    page?: number;
-    page_size?: number;
-  }): Promise<PaginatedResponse<Entry>> {
-    const queryString = this.buildQueryString(params || {});
-    return this.request(`/api/entries/saved/${queryString}`);
+  async getReceivedComments(): Promise<{
+    type: string;
+    comments: Array<{
+      id: string;
+      author: {
+        id: string;
+        displayName: string;
+        username: string;
+        profileImage?: string;
+      };
+      entry: {
+        id: string;
+        title: string;
+        url: string;
+      };
+      content: string;
+      created_at: string;
+    }>;
+  }> {
+    return this.request('/api/comments/received/');
   }
 }
 

@@ -5,12 +5,12 @@ from .author import Author
 class Follow(models.Model):
     """Represents follow relationships between authors"""
 
-    PENDING = "pending"
+    REQUESTING = "requesting"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
 
     STATUS_CHOICES = [
-        (PENDING, "Pending"),
+        (REQUESTING, "Requesting"),
         (ACCEPTED, "Accepted"),
         (REJECTED, "Rejected"),
     ]
@@ -22,7 +22,7 @@ class Follow(models.Model):
         Author, on_delete=models.CASCADE, related_name="followers_set", to_field="url"
     )
 
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=REQUESTING)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -41,7 +41,7 @@ class Follow(models.Model):
     def __str__(self):
         """
         String representation of the follow relationship.
-        
+
         Returns:
             str: A human-readable string showing follower -> followed (status)
         """

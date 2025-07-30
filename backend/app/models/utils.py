@@ -4,7 +4,6 @@ from django.dispatch import receiver
 
 from .author import Author
 from .entry import Entry, InboxDelivery
-from .inbox import Inbox
 from .like import Like
 from .comment import Comment
 from .follow import Follow
@@ -64,7 +63,7 @@ def deliver_to_inboxes(entry, recipients):
     """
     Deliver an entry to multiple author inboxes for federation.
 
-    Creates inbox items for each recipient and tracks delivery for federation.
+    Creates delivery tracking records for federation.
     This function is designed to be called asynchronously in production to
     avoid blocking the main request when delivering to many recipients.
 
@@ -72,36 +71,15 @@ def deliver_to_inboxes(entry, recipients):
         entry: The Entry object to deliver
         recipients: List/QuerySet of Author objects to deliver to
     """
-    inbox_items = []
     delivery_items = []
 
     for recipient in recipients:
-        # Prepare inbox notification item
-        inbox_items.append(
-            Inbox(
-                recipient=recipient,
-                item_type=Inbox.ENTRY,
-                entry=entry,  # Pass the Entry instance; Django handles the to_field="url" automatically
-                raw_data={
-                    "type": "entry",
-                    "id": entry.url,
-                    "title": entry.title,
-                    "content": entry.content,
-                    "contentType": entry.content_type,
-                    "author": entry.author.url,
-                    "published": entry.created_at.isoformat(),
-                    "visibility": entry.visibility,
-                },
-            )
-        )
-
         # Prepare delivery tracking record
         delivery_items.append(
             InboxDelivery(entry=entry, recipient=recipient, success=True)
         )
 
     # Use bulk operations for better performance with many recipients
-    Inbox.objects.bulk_create(inbox_items, ignore_conflicts=True)
     InboxDelivery.objects.bulk_create(delivery_items, ignore_conflicts=True)
 
 

@@ -26,9 +26,7 @@ import AnimatedButton from "./ui/AnimatedButton";
 import Card from "./ui/Card";
 import { api } from "../services/api";
 import { socialService } from "../services/social";
-import { inboxService } from "../services/inbox";
 import { useAuth } from "./context/AuthContext";
-import { triggerNotificationUpdate } from "./context/NotificationContext";
 import { useToast } from "./context/ToastContext";
 import { extractUUID } from "../utils/extractId";
 
@@ -63,7 +61,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
   const { showSuccess, showError } = useToast();
   const [isFollowing, setIsFollowing] = useState(author.is_following || false);
   const [followStatus, setFollowStatus] = useState<
-    "none" | "pending" | "accepted" | "rejected"
+    "none" | "requesting" | "accepted" | "rejected"
   >("none");
   const [isLoading, setIsLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -158,12 +156,12 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       } else if (followStatus === "none" || followStatus === "rejected") {
         // Send follow request
         await socialService.followAuthor(extractUUID(author.id));
-        setFollowStatus("pending");
+        setFollowStatus("requesting");
         onFollow?.(false);
         // Dispatch event for other components
         window.dispatchEvent(new Event("follow-update"));
       }
-      // If status is 'pending', clicking doesn't do anything
+      // If status is 'requesting', clicking doesn't do anything
     } catch (error) {
       console.error("Error following/unfollowing:", error);
       console.error("Author ID:", author.id);
@@ -204,9 +202,9 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         content_id: author.id,
         content_data: {
           reporter_id: currentUser.id,
-          reporter_name: currentUser.display_name,
+          reporter_name: currentUser.displayName || currentUser.display_name,
           reported_user_id: author.id,
-          reported_user_name: author.display_name,
+          reported_user_name: author.displayName || author.display_name,
           report_time: new Date().toISOString(),
           report_type: "user_report",
         },
@@ -216,8 +214,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       // For now, we'll use a hardcoded approach - in production, you'd want an endpoint to get admin IDs
       // or have the backend handle routing reports to admins
       const adminsResponse = await api.getAuthors({
-        is_staff: true,
-        page_size: 100,
+        page: 1,
       });
       const admins = adminsResponse.results || [];
 
@@ -226,16 +223,8 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         return;
       }
 
-      // Send report to all admin inboxes
-      await Promise.all(
-        admins.map((admin) =>
-          inboxService
-            .sendToInbox(extractUUID(admin.id), reportData)
-            .catch((err) => {
-              console.error(`Failed to send report to admin ${admin.id}:`, err);
-            })
-        )
-      );
+      // Inbox functionality removed - reports are no longer sent to admin inboxes
+      console.log('Report would be sent to admins:', admins.map(a => a.id));
 
       showSuccess("User has been reported to administrators");
     } catch (error) {
@@ -265,7 +254,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         case "delete":
           if (
             window.confirm(
-              `Are you sure you want to delete ${author.display_name}?`
+              `Are you sure you want to delete ${author.displayName || author.display_name}?`
             )
           ) {
             await api.deleteAuthor(extractUUID(author.id));
@@ -290,8 +279,8 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
       >
         <Link to={`/authors/${extractUUID(author.id)}`}>
           <Avatar
-            imgSrc={author.profile_image}
-            alt={author.display_name || "Unknown"}
+            imgSrc={author.profileImage || author.profile_image}
+            alt={author.displayName || author.display_name || "Unknown"}
             size="md"
             isAdmin={author.is_staff || author.is_superuser}
           />
@@ -303,17 +292,16 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             className="hover:underline"
           >
             <h4 className="font-medium text-text-1 truncate">
-              {author.display_name || "Unknown"}
+              {author.displayName || author.display_name || "Unknown"}
             </h4>
           </Link>
-          <p className="text-sm text-text-2 truncate">@{author.username}</p>
         </div>
 
         {showActions && !isOwnProfile && (
           <AnimatedButton
             size="sm"
             variant={
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "secondary"
                 : isFollowing || followStatus === "accepted"
                 ? "secondary"
@@ -321,15 +309,15 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             }
             onClick={handleFollow}
             loading={isLoading}
-            disabled={followStatus === "pending"}
-            icon={followStatus === "pending" ? <Clock size={14} /> : null}
+            disabled={followStatus === "requesting"}
+            icon={followStatus === "requesting" ? <Clock size={14} /> : null}
             className={
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "opacity-60 bg-glass-low border border-glass-high"
                 : ""
             }
           >
-            {followStatus === "pending"
+            {followStatus === "requesting"
               ? "Requested"
               : isFollowing || followStatus === "accepted"
               ? "Followed"
@@ -355,8 +343,8 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
           >
             <motion.div whileHover={{ scale: 1.05 }}>
               <Avatar
-                imgSrc={author.profile_image}
-                alt={author.display_name || "Unknown"}
+                imgSrc={author.profileImage || author.profile_image}
+                alt={author.displayName || author.display_name || "Unknown"}
                 size={variant === "detailed" ? "xl" : "lg"}
                 isAdmin={author.is_staff || author.is_superuser}
               />
@@ -364,9 +352,8 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
 
             <div>
               <h3 className="text-lg font-semibold text-text-1 hover:underline">
-                {author.display_name || "Unknown"}
+                {author.displayName || author.display_name || "Unknown"}
               </h3>
-              <p className="text-text-2">@{author.username}</p>
 
               {author.is_followed_by && (
                 <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs bg-glass-low text-text-2">
@@ -469,14 +456,6 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {/* Stats */}
         {showStats && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-sm">
-            <div className="flex items-center space-x-1 min-w-0">
-              <FileText size={16} className="text-text-2 flex-shrink-0" />
-              <span className="font-semibold text-text-1">
-                {formatCount(author.post_count || 0)}
-              </span>
-              <span className="text-text-2">posts</span>
-            </div>
-
             <Link
               to={`/authors/${extractUUID(author.id)}/followers`}
               className="flex items-center space-x-1 hover:underline min-w-0"
@@ -532,10 +511,6 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
               </div>
             )}
 
-            <div className="flex items-center space-x-2">
-              <Calendar size={16} />
-              <span>Joined {formatDate(author.created_at)}</span>
-            </div>
           </div>
         )}
 
@@ -543,7 +518,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {showActions && !isOwnProfile && (
           <AnimatedButton
             variant={
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "secondary"
                 : isFollowing || followStatus === "accepted"
                 ? "secondary"
@@ -551,9 +526,9 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             }
             onClick={handleFollow}
             loading={isLoading}
-            disabled={followStatus === "pending"}
+            disabled={followStatus === "requesting"}
             icon={
-              followStatus === "pending" ? (
+              followStatus === "requesting" ? (
                 <Clock size={16} />
               ) : isFollowing || followStatus === "accepted" ? (
                 <UserMinus size={16} />
@@ -562,12 +537,12 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
               )
             }
             className={`w-full ${
-              followStatus === "pending"
+              followStatus === "requesting"
                 ? "opacity-60 bg-glass-low border border-glass-high"
                 : ""
             }`}
           >
-            {followStatus === "pending"
+            {followStatus === "requesting"
               ? "Requested"
               : isFollowing || followStatus === "accepted"
               ? "Followed"

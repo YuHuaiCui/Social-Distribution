@@ -69,23 +69,20 @@ class Like(models.Model):
     def save(self, *args, **kwargs):
         """
         Save the like and auto-generate URL if not provided.
-        
+
         For likes by local authors, automatically generates the API URL.
-        The URL structure follows the pattern: /api/authors/{author_id}/liked/{like_id}
-        
-        Args:
-            *args: Variable length argument list
-            **kwargs: Arbitrary keyword arguments
+        Remote likes must already include a valid URL.
         """
-        # First save to get the ID
+        if not self.url:
+            if self.author.is_local:
+                # Temporarily assign a UUID if the object hasn't been saved yet
+                temp_id = self.id or uuid.uuid4()
+                self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{temp_id}"
+            else:
+                raise ValueError("Remote Like must have a URL.")
+
         super().save(*args, **kwargs)
-        
-        # Then update the URL if not provided
-        if not self.url and self.author.is_local:
-            # URL pattern for likes: /api/authors/{author_id}/liked/{like_id}
-            self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{self.id}"
-            # Save again to update the URL
-            super().save(update_fields=['url'])
+
 
     def __str__(self):
         """

@@ -4,7 +4,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const followService = {
     // Get all pending follow requests for the current user
-    getPendingFollowRequests: async (): Promise<Follow[]> => {
+    getRequestingFollowRequests: async (): Promise<Follow[]> => {
         const response = await fetch(`${API_URL}/api/follows/`, {
             credentials: 'include',
         });

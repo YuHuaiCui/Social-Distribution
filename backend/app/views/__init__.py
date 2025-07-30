@@ -10,7 +10,6 @@ from .base import *  # Import existing views
 # from .comment import CommentViewSet
 # from .like import LikeViewSet
 # from .follow import FollowViewSet
-# from .inbox import InboxViewSet
 
 # Add your views here as you create them
 __all__ = [
@@ -20,5 +19,4 @@ __all__ = [
     # 'CommentViewSet',
     # 'LikeViewSet',
     # 'FollowViewSet',
-    # 'InboxViewSet',
 ]

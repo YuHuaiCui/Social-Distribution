@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from app.models import Author, Node, Entry, Comment, Like, Follow, Friendship, Inbox
+from app.models import Author, Node, Entry, Comment, Like, Follow, Friendship
 
 
 @admin.register(Author)
@@ -11,7 +11,7 @@ class AuthorAdmin(UserAdmin):
     list_display = [
         "username",
         "email",
-        "display_name",
+        "displayName",
         "is_approved",
         "is_active",
         "is_staff",
@@ -26,14 +26,14 @@ class AuthorAdmin(UserAdmin):
         "node",
         "created_at",
     ]
-    search_fields = ["username", "email", "display_name", "github_username"]
+    search_fields = ["username", "email", "displayName", "github_username"]
     ordering = ["-created_at"]
 
     # Add custom fields to the fieldsets
     fieldsets = UserAdmin.fieldsets + (
         (
             "Profile Information",
-            {"fields": ("display_name", "github_username", "profile_image", "bio")},
+            {"fields": ("displayName", "github_username", "profileImage")},
         ),
         ("Federation", {"fields": ("url", "node", "is_approved")}),
         (
@@ -133,11 +133,3 @@ class FriendshipAdmin(admin.ModelAdmin):
     ordering = ["-created_at"]
 
 
-@admin.register(Inbox)
-class InboxAdmin(admin.ModelAdmin):
-    """Admin configuration for Inbox model"""
-
-    list_display = ["recipient", "item_type", "is_read", "created_at"]
-    list_filter = ["item_type", "is_read", "created_at"]
-    search_fields = ["recipient__username"]
-    ordering = ["-created_at"]

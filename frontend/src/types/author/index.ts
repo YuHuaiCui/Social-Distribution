@@ -4,28 +4,35 @@
 
 import type { Node, TimestampedModel } from '../common';
 
-export interface Author extends TimestampedModel {
+export interface Author {
   type: "author"; // Object type for federation
   id: string; // Full URL as per spec
-  url: string;
   host: string; // API host URL for this author's node
+  displayName: string; // How the user wants their name displayed
+  github: string; // Full GitHub URL or empty string
+  profileImage: string | null; // URL of profile image or null
   web: string; // Frontend URL where profile can be viewed
-  username: string;
-  email: string;
+  
+  // Backwards compatibility fields (may be removed in future)
+  url?: string;
+  username?: string;
+  email?: string;
   first_name?: string;
   last_name?: string;
-  display_name: string;
-  github?: string; // Full GitHub URL (not just username)
-  github_username?: string; // Kept for backwards compatibility
-  profile_image?: string;
+  display_name?: string; // snake_case version
+  github_username?: string;
+  profile_image?: string; // snake_case version
   bio?: string;
   location?: string;
   website?: string;
   node?: Node | null;
-  is_approved: boolean;
-  is_active: boolean;
+  is_approved?: boolean;
+  is_active?: boolean;
   is_staff?: boolean;
   is_superuser?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  
   // Frontend computed fields
   is_local?: boolean;
   is_remote?: boolean;
@@ -36,12 +43,11 @@ export interface Author extends TimestampedModel {
 }
 
 export interface AuthorUpdateData {
-  display_name?: string;
+  displayName?: string;
   github_username?: string;
   bio?: string;
   location?: string;
-  website?: string;
-  profile_image?: string;
+  profileImage?: string;
   email?: string;
 }
 

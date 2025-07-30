@@ -51,7 +51,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
           api.getFriends(authorId ?? currentUser.id),
           api.getFollowing(authorId ?? currentUser.id),
           api.getFollowers(authorId ?? currentUser.id),
-          socialService.getPendingFollowRequests({ page: 1, page_size: 1 }),
+          socialService.getRequestingFollowRequests({ page: 1, page_size: 1 }),
         ]);
 
       setFriendsCount(friends.length);
@@ -105,8 +105,8 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
 
   const filteredAuthors = (authors || []).filter(
     (author) =>
-      author.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (author.displayName || author.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (author.username || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (author.github_username &&
         author.github_username
           .toLowerCase()

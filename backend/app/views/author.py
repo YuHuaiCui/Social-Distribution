@@ -11,7 +11,6 @@ from app.models import Author, Entry, Follow
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
 from app.serializers.follow import FollowSerializer
-from app.serializers.collections import AuthorsSerializer, FollowersSerializer
 
 from django.http import HttpResponse
 import base64
@@ -94,14 +93,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         # If no type filter is specified, include both local and remote authors
         # Remote authors are already in the database from inbox processing
 
-        # Search by username, display name, github username, or email
+        # Search by username, display name, or github username
         search = self.request.query_params.get("search", None)
         if search:
             queryset = queryset.filter(
                 Q(username__icontains=search)
-                | Q(display_name__icontains=search)
+                | Q(displayName__icontains=search)
                 | Q(github_username__icontains=search)
-                | Q(email__icontains=search)
             )
 
         return queryset
@@ -342,10 +340,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         {"error": "Already following this user"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                # If pending, return error
-                elif existing_follow.status == Follow.PENDING:
+                # If requesting, return error
+                elif existing_follow.status == Follow.REQUESTING:
                     return Response(
-                        {"error": "Follow request already pending"},
+                        {"error": "Follow request already requesting"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 # If rejected, delete the old one and create a new one
@@ -354,7 +352,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
             # Create follow request
             follow = Follow.objects.create(
-                follower=current_user, followed=author_to_follow, status=Follow.PENDING
+                follower=current_user,
+                followed=author_to_follow,
+                status=Follow.REQUESTING,
             )
 
             # If following a remote author, send follow request using centralized service
@@ -368,34 +368,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     print(
                         f"Warning: Failed to send follow request to {author_to_follow.username}"
                     )
-                    # Still create the local follow record, but mark it as pending
-                    follow.status = Follow.PENDING
+                    # Still create the local follow record, but mark it as requesting
+                    follow.status = Follow.REQUESTING
                     follow.save()
-
-            # Create inbox item for the followed user (for local authors)
-            if author_to_follow.is_local:
-                from app.models.inbox import Inbox
-
-                Inbox.objects.create(
-                    recipient=follow.followed,
-                    item_type=Inbox.FOLLOW,
-                    follow=follow,
-                    raw_data={
-                        "type": "Follow",
-                        "actor": {
-                            "id": follow.follower.url,
-                            "display_name": follow.follower.display_name,
-                            "username": follow.follower.username,
-                            "profile_image": (
-                                follow.follower.profile_image
-                                if follow.follower.profile_image
-                                else None
-                            ),
-                        },
-                        "object": follow.followed.url,
-                        "status": follow.status,
-                    },
-                )
 
             serializer = FollowSerializer(follow)
             return Response(
@@ -421,14 +396,18 @@ class AuthorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get", "post"], url_path="entries")
     def entries(self, request, pk=None):
         """
-        GET = List entries visible to current user
-        POST = Create a new entry (must be owner)
+        GET [local, remote]: Get the recent entries from author AUTHOR_SERIAL (paginated)
+        POST [local]: Create a new entry but generate a new ID
 
-        For GET requests, applies visibility rules based on the relationship
-        between the requesting user and the author whose entries are being viewed.
+        Authentication requirements for GET:
+        - Not authenticated: only public entries
+        - Authenticated locally as author: all entries
+        - Authenticated locally as follower of author: public + unlisted entries
+        - Authenticated locally as friend of author: all entries
+        - Authenticated as remote node: Should not happen (remote nodes get entries via inbox push)
 
-        For POST requests, ensures only the author can create entries for themselves
-        to prevent spoofing.
+        Authentication requirements for POST:
+        - Authenticated locally as author
         """
         author = self.get_object()
 
@@ -469,29 +448,38 @@ class AuthorViewSet(viewsets.ModelViewSet):
             )
 
         if request.method == "POST":
-            # Ensure only the author can post their own entry
+            # Ensure only the author can post their own entry (must be authenticated locally as author)
             if not request.user.is_authenticated:
                 return Response(
-                    {"detail": "Not authorized to create entry for this author."},
-                    status=403,
+                    {"detail": "Authentication required to create entries."},
+                    status=status.HTTP_401_UNAUTHORIZED,
                 )
 
-            # Override author to ensure no spoofing
-            author = request.user
+            # Ensure the user is creating an entry for themselves (prevent spoofing)
+            if str(request.user.id) != str(author.id):
+                return Response(
+                    {"detail": "You can only create entries for yourself."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Use the authenticated user as the author
             data = request.data.copy()
-            data["author"] = str(author.id)
+            data["author"] = str(request.user.id)
 
             # Auto-set source/origin URLs if not provided
             data["source"] = data.get(
-                "source", f"{settings.SITE_URL}/api/authors/{author.id}/entries/"
+                "source", f"{settings.SITE_URL}/api/authors/{request.user.id}/entries/"
             )
             data["origin"] = data.get("origin", data["source"])
 
-            serializer = EntrySerializer(data=data)
+            serializer = EntrySerializer(data=data, context={"request": request})
             if serializer.is_valid():
-                entry = serializer.save(author=author)
-                return Response(EntrySerializer(entry).data, status=201)
-            return Response(serializer.errors, status=400)
+                entry = serializer.save(author=request.user)
+                return Response(
+                    EntrySerializer(entry, context={"request": request}).data,
+                    status=status.HTTP_201_CREATED,
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=["get", "patch"], url_path="me")
     def me(self, request):
@@ -514,12 +502,17 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
                 # Copy non-file fields from request data
                 for key, value in request.data.items():
-                    if key != "profile_image_file":
+                    if key not in ["profile_image_file", "profileImage"]:
                         update_data[key] = value
 
-                # Handle profile image upload if present
-                if "profile_image_file" in request.FILES:
+                # Handle profile image upload if present (support both camelCase and snake_case)
+                image_file = None
+                if "profileImage" in request.FILES:
+                    image_file = request.FILES["profileImage"]
+                elif "profile_image_file" in request.FILES:
                     image_file = request.FILES["profile_image_file"]
+                
+                if image_file:
 
                     # Convert uploaded image to base64 data URL (consistent with post images)
                     import base64
@@ -538,7 +531,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         f"data:{content_type};base64,{image_base64}"
                     )
 
-                    update_data["profile_image"] = profile_image_data_url
+                    update_data["profileImage"] = profile_image_data_url
 
                 # Update the author profile
                 serializer = AuthorSerializer(author, data=update_data, partial=True)
@@ -584,58 +577,14 @@ class AuthorViewSet(viewsets.ModelViewSet):
     def post_to_inbox(self, request, pk=None):
         """
         Post an item to an author's inbox for federation support.
-
-        This endpoint supports the ActivityPub-style inbox pattern where
-        remote instances can deliver activities (follows, likes, comments, etc.)
-        to local users.
-
-        Expected data format:
-        {
-            "content_type": "entry" | "comment" | "like" | "follow" | "report",
-            "content_id": "id of the content",
-            "content_data": { ... additional data ... }
-        }
+        
+        Note: Inbox functionality has been removed from the system.
+        This endpoint now returns a 410 Gone status.
         """
-        from app.models import Inbox
-        from app.serializers.inbox import InboxItemSerializer
-
-        try:
-            # Get the recipient author
-            recipient = self.get_object()
-
-            # Extract content information from request
-            content_type = request.data.get("content_type")
-            content_id = request.data.get("content_id")
-            content_data = request.data.get("content_data", {})
-
-            # Validate content type
-            valid_types = ["entry", "comment", "like", "follow", "report"]
-            if content_type not in valid_types:
-                return Response(
-                    {
-                        "error": f"Invalid content_type. Must be one of: {', '.join(valid_types)}"
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Create inbox item with the provided data
-            inbox_item = Inbox.objects.create(
-                recipient=recipient,
-                item_type=content_type,
-                raw_data={
-                    "content_type": content_type,
-                    "content_id": content_id,
-                    **content_data,
-                },
-            )
-
-            serializer = InboxItemSerializer(inbox_item)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        return Response(
+            {"error": "Inbox functionality has been removed"},
+            status=status.HTTP_410_GONE
+        )
 
     # CMPUT 404 Compliant API Endpoints
 
@@ -787,12 +736,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     id=author_id,
                     url=author_url,
                     username=author_data.get("username", ""),
-                    display_name=author_data.get("displayName", ""),
+                    displayName=author_data.get("displayName", ""),
                     github_username=author_data.get("github", ""),
-                    profile_image=author_data.get("profileImage", ""),
-                    bio=author_data.get("bio", ""),
-                    location=author_data.get("location", ""),
-                    website=author_data.get("website", ""),
+                    profileImage=author_data.get("profileImage", ""),
                     host=author_data.get("host", node.host),
                     web=author_data.get("page", ""),
                     node=node,
@@ -832,9 +778,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     {"error": "Already following this user"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            elif existing_follow.status == Follow.PENDING:
+            elif existing_follow.status == Follow.REQUESTING:
                 return Response(
-                    {"error": "Follow request already pending"},
+                    {"error": "Follow request already requesting"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             elif existing_follow.status == Follow.REJECTED:
@@ -842,36 +788,11 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
         # Create follow request
         follow = Follow.objects.create(
-            follower=current_user, followed=remote_author, status=Follow.PENDING
+            follower=current_user, followed=remote_author, status=Follow.REQUESTING
         )
 
-        # Create inbox item for the followed user
-        from app.models.inbox import Inbox
-
-        Inbox.objects.create(
-            recipient=follow.followed,
-            item_type=Inbox.FOLLOW,
-            follow=follow,
-            raw_data={
-                "type": "Follow",
-                "actor": {
-                    "id": follow.follower.url,
-                    "display_name": follow.follower.display_name,
-                    "username": follow.follower.username,
-                    "profile_image": (
-                        follow.follower.profile_image
-                        if follow.follower.profile_image
-                        else None
-                    ),
-                },
-                "object": follow.followed.url,
-                "status": follow.status,
-            },
-        )
-
-        # Send follow request to remote node
-        if remote_author.node:
-            self._send_follow_to_remote(follow, remote_author, node)
+        # Send follow request to remote node (don't create local inbox item for remote author)
+        self._send_follow_to_remote(follow, remote_author, node)
 
         serializer = FollowSerializer(follow)
         return Response(
@@ -880,24 +801,15 @@ class AuthorViewSet(viewsets.ModelViewSet):
         )
 
     def _send_follow_to_remote(self, follow, remote_author, node):
-        """Send follow request to remote node"""
+        """Send follow request to remote node using compliant format"""
         import requests
         from requests.auth import HTTPBasicAuth
 
         try:
-            # Prepare follow request data
-            follow_data = {
-                "type": "Follow",
-                "actor": {
-                    "id": follow.follower.url,
-                    "url": follow.follower.url,
-                    "host": follow.follower.host,
-                    "displayName": follow.follower.display_name,
-                    "username": follow.follower.username,
-                    "profileImage": follow.follower.profile_image,
-                },
-                "object": remote_author.url,
-            }
+            # Use the follow serializer to get the proper format
+            from app.serializers.follow import FollowSerializer
+
+            follow_data = FollowSerializer(follow).data
 
             # Send to remote author's inbox
             inbox_url = f"{node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"

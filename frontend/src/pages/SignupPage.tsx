@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Github } from 'lucide-react';
+import { Lock, User, Github } from 'lucide-react';
 import { api } from '../services/api';
 import { useToast } from '../components/context/ToastContext';
 import BackgroundEffects from '../components/ui/BackgroundEffects';
@@ -18,39 +18,30 @@ export const SignupPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
     password_confirm: '',
-    display_name: '',
+    displayName: '',
     github_username: '',
   });
   const [errors, setErrors] = useState({
     username: '',
-    email: '',
     password: '',
     password_confirm: '',
-    display_name: '',
+    displayName: '',
   });
 
   const validateForm = () => {
     const newErrors = {
       username: '',
-      email: '',
       password: '',
       password_confirm: '',
-      display_name: '',
+      displayName: '',
     };
 
     if (!formData.username.trim()) {
       newErrors.username = 'Username is required';
     } else if (formData.username.length < 3) {
       newErrors.username = 'Username must be at least 3 characters';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
     }
 
     if (!formData.password) {
@@ -65,8 +56,8 @@ export const SignupPage: React.FC = () => {
       newErrors.password_confirm = 'Passwords do not match';
     }
 
-    if (!formData.display_name.trim()) {
-      newErrors.display_name = 'Display name is required';
+    if (!formData.displayName.trim()) {
+      newErrors.displayName = 'Display name is required';
     }
 
     setErrors(newErrors);
@@ -98,9 +89,6 @@ export const SignupPage: React.FC = () => {
     }
   };
 
-  const handleGithubLogin = () => {
-    window.location.href = `${import.meta.env.VITE_API_URL}/accounts/github/login/`;
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center relative py-12">
@@ -165,39 +153,18 @@ export const SignupPage: React.FC = () => {
                     <Input
                       type="text"
                       placeholder="Your display name"
-                      value={formData.display_name}
+                      value={formData.displayName}
                       onChange={(e) => {
-                        setFormData({ ...formData, display_name: e.target.value });
-                        if (errors.display_name) setErrors({ ...errors, display_name: '' });
+                        setFormData({ ...formData, displayName: e.target.value });
+                        if (errors.displayName) setErrors({ ...errors, displayName: '' });
                       }}
-                      className={errors.display_name ? 'field-error' : ''}
+                      className={errors.displayName ? 'field-error' : ''}
                       required
                     />
-                    {errors.display_name && (
-                      <p className="mt-1 text-xs text-primary-pink">{errors.display_name}</p>
+                    {errors.displayName && (
+                      <p className="mt-1 text-xs text-primary-pink">{errors.displayName}</p>
                     )}
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-text-1 mb-1.5">
-                    Email <span className="field-required"></span>
-                  </label>
-                  <Input
-                    type="email"
-                    icon={<Mail size={18} />}
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={(e) => {
-                      setFormData({ ...formData, email: e.target.value });
-                      if (errors.email) setErrors({ ...errors, email: '' });
-                    }}
-                    className={errors.email ? 'field-error' : ''}
-                    required
-                  />
-                  {errors.email && (
-                    <p className="mt-1 text-xs text-primary-pink">{errors.email}</p>
-                  )}
                 </div>
 
                 <div>
@@ -278,26 +245,6 @@ export const SignupPage: React.FC = () => {
                 </AnimatedButton>
               </form>
 
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border-1"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 py-1 bg-[rgba(var(--glass-rgb),0.8)] backdrop-blur-sm text-text-2 rounded-full border border-border-1">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                variant="secondary"
-                size="lg"
-                icon={<Github size={20} />}
-                onClick={handleGithubLogin}
-                className="w-full btn-github"
-              >
-                Sign up with GitHub
-              </Button>
 
               <p className="text-center mt-6 text-text-2 text-sm">
                 By signing up, you agree to our{' '}

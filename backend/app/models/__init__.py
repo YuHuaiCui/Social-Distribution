@@ -5,14 +5,11 @@ from .follow import Follow
 from .entry import Entry, EntryManager, InboxDelivery
 from .comment import Comment
 from .like import Like
-from .inbox import Inbox
 from .friendship import Friendship
-from .saved_entry import SavedEntry
 
 # Import utility functions
 from .utils import (
     get_author_stream,
-    deliver_to_inboxes,
     get_mutual_friends,
     has_liked_entry,
     has_liked_comment,
@@ -30,10 +27,8 @@ __all__ = [
     "InboxDelivery",
     "Comment",
     "Like",
-    "Inbox",
     "Friendship",
     "get_author_stream",
-    "deliver_to_inboxes",
     "get_mutual_friends",
     "has_liked_entry",
     "has_liked_comment",

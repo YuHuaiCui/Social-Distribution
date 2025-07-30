@@ -161,9 +161,8 @@ class AuthorAPITest(BaseAPITestCase):
             "email": "new@example.com",
             "password": "newpass123",
             "password_confirm": "newpass123",
-            "display_name": "New Author",
+            "displayName": "New Author",
             "github_username": "newauthor",
-            "bio": "Test bio",
             "location": "Test location",
             "website": "https://test.com",
             "is_active": True,
@@ -186,9 +185,8 @@ class AuthorAPITest(BaseAPITestCase):
         author = Author.objects.get(username="newauthor")
         self.assertEqual(author.email, "new@example.com")
         self.assertTrue(author.check_password("newpass123"))
-        self.assertEqual(author.display_name, "New Author")
+        self.assertEqual(author.displayName, "New Author")
         self.assertEqual(author.github_username, "newauthor")
-        self.assertEqual(author.bio, "Test bio")
         # self.assertEqual(author.location, 'Test location') in the model but not in serializer
         # self.assertEqual(author.website, 'https://test.com') in the model but not in serializer
         self.assertFalse(author.is_approved)  # Should be unapproved by default
@@ -197,7 +195,7 @@ class AuthorAPITest(BaseAPITestCase):
     def test_author_update(self):
         """Test updating author details"""
         url = reverse("social-distribution:authors-detail", args=[self.regular_user.id])
-        data = {"display_name": "Updated Name"}
+        data = {"displayName": "Updated Name"}
 
         # Test unauthorized update
         response = self.another_user_client.patch(url, data)
@@ -206,7 +204,7 @@ class AuthorAPITest(BaseAPITestCase):
         # Test self update
         response = self.user_client.patch(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["display_name"], "Updated Name")
+        self.assertEqual(response.data["displayName"], "Updated Name")
 
         # Test admin update
         response = self.admin_client.patch(url, {"is_approved": True})
@@ -288,20 +286,20 @@ class AuthorAPITest(BaseAPITestCase):
         self.assertEqual(response.data["username"], "testuser")
 
         # Test update profile
-        data = {"display_name": "Updated Me"}
+        data = {"displayName": "Updated Me"}
         response = self.user_client.patch(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["display_name"], "Updated Me")
+        self.assertEqual(response.data["displayName"], "Updated Me")
 
         # Test profile image upload
         image_content = b"fake-image-content"
         image_file = SimpleUploadedFile(
             "test_image.jpg", image_content, content_type="image/jpeg"
         )
-        data = {"profile_image_file": image_file}
+        data = {"profileImage": image_file}
         response = self.user_client.patch(url, data, format="multipart")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("profile_image", response.data)
+        self.assertIn("profileImage", response.data)
 
     def test_public_author_profile_pages(self):
         """Test add public author profile pages"""
@@ -312,19 +310,17 @@ class AuthorAPITest(BaseAPITestCase):
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["username"], "anotheruser")
-        self.assertEqual(response.data["display_name"], "Another User")
+        self.assertEqual(response.data["displayName"], "Another User")
         self.assertIn("created_at", response.data)
-        self.assertIn("bio", response.data)
 
         # Profile should include all necessary public information
         expected_fields = [
             "id",
             "url",
             "username",
-            "display_name",
+            "displayName",
             "github",
-            "profile_image",
-            "bio",
+            "profileImage",
             "is_approved",
             "is_active",
             "created_at",
@@ -369,7 +365,6 @@ class AuthorAPITest(BaseAPITestCase):
             "id": "https://remote.example.com/api/authors/123/",
             "username": "remoteuser",
             "displayName": "Updated Remote User",  # Different from local cache
-            "bio": "Fresh bio from remote",
             "github": "https://github.com/remoteuser",
             "profileImage": "https://remote.example.com/images/profile.jpg",
             "host": "https://remote.example.com/api/",
@@ -428,7 +423,7 @@ class AuthorAPITest(BaseAPITestCase):
 
         # Verify that the response contains local cached data
         self.assertEqual(response.data["username"], "remoteuser2")
-        self.assertEqual(response.data["display_name"], "Remote User 2")
+        self.assertEqual(response.data["displayName"], "Remote User 2")
 
     def test_local_author_no_federation(self):
         """Test that local authors don't trigger federation calls"""
@@ -464,7 +459,7 @@ class AuthorModelTest(TestCase):
 
         self.assertEqual(author.username, "testuser")
         self.assertEqual(author.email, "test@example.com")
-        self.assertEqual(author.display_name, "Test User")
+        self.assertEqual(author.displayName, "Test User")
         self.assertTrue(author.check_password("testpassword"))
         self.assertTrue(author.is_active)
         self.assertFalse(author.is_staff)

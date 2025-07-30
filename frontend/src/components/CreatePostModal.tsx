@@ -20,7 +20,7 @@ import PrivacySelector from "./PrivacySelector";
 import { useDefaultVisibility, type Visibility } from "../utils/privacy";
 import { usePosts } from "./context/PostsContext";
 
-type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg";
+type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg" | "image/png;base64" | "image/jpeg;base64" | "application/base64";
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -43,6 +43,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
   // Form state
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState<ContentType>("text/markdown");
   const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
@@ -57,8 +58,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   React.useEffect(() => {
     if (editingPost) {
       setTitle(editingPost.title || "");
+      setDescription(editingPost.description || "");
       setContent(editingPost.content || "");
-      setContentType(editingPost.content_type || "text/markdown");
+      setContentType((editingPost.contentType || "text/markdown") as ContentType);
 
       const validVisibilities: Visibility[] = ["PUBLIC", "FRIENDS", "UNLISTED"];
       setVisibility(
@@ -73,6 +75,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setImages([]);
     } else {
       setTitle("");
+      setDescription("");
       setContent("");
       setContentType("text/markdown");
       setVisibility(defaultVisibility);
@@ -122,10 +125,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     try {
       const entryData: CreateEntryData = {
         title,
+        description, // Use the form description field
         content: contentType.startsWith("image/")
           ? content || "Image post" // Use caption for image posts
           : content,
-        content_type: contentType,
+        contentType: contentType, // Always use camelCase as per API spec
         visibility,
         categories,
         // Include image file for image posts
@@ -152,8 +156,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         setReplacingImage(false);
         setImages([]); // clear images
         setContent(updatedPost.content);
-        setContentType(updatedPost.content_type as ContentType);
+        setContentType((updatedPost.contentType || "text/markdown") as ContentType);
         setTitle(updatedPost.title);
+        setDescription(updatedPost.description || "");
         setCategories(updatedPost.categories || []);
         setVisibility(updatedPost.visibility as Visibility);
       } else {
@@ -181,6 +186,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     if (!isLoading) {
       // Reset form
       setTitle("");
+      setDescription("");
       setContent("");
       setContentType("text/markdown");
       setVisibility(defaultVisibility);
@@ -197,7 +203,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const contentTypeOptions = [
     { value: "text/markdown", label: "Markdown", icon: FileText },
     { value: "text/plain", label: "Plain Text", icon: FileText },
-    { value: "image/png", label: "Image", icon: ImageIcon },
+    { value: "image/png", label: "Image (Legacy)", icon: ImageIcon },
+    { value: "image/png;base64", label: "PNG Image", icon: ImageIcon },
+    { value: "image/jpeg;base64", label: "JPEG Image", icon: ImageIcon },
+    { value: "application/base64", label: "Base64 Data", icon: ImageIcon },
   ];
 
   return (
@@ -285,6 +294,17 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                     placeholder="Give your post a title..."
                     className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-lg font-medium text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200"
                     autoFocus
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Brief description for preview (optional)..."
+                    className="w-full px-4 py-2 bg-input-bg border border-border-1 rounded-lg text-sm text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200"
                   />
                 </div>
 

@@ -48,15 +48,9 @@ class FollowTest(TestCase):
 
         # Verify in database
         follow = Follow.objects.get(follower=self.author_a, followed=self.author_b)
-        self.assertEqual(follow.status, Follow.PENDING)
+        self.assertEqual(follow.status, Follow.REQUESTING)
 
-        # Verify inbox notification was created
-        from app.models.inbox import Inbox
-
-        inbox_item = Inbox.objects.get(
-            recipient=self.author_b, item_type=Inbox.FOLLOW, follow=follow
-        )
-        self.assertEqual(inbox_item.recipient, self.author_b)
+        # Note: Inbox functionality has been removed from the system
         self.assertEqual(inbox_item.follow, follow)
         self.assertFalse(inbox_item.is_read)
 
@@ -91,7 +85,7 @@ class FollowTest(TestCase):
         """Test accepting a follow request"""
         # Create a follow request
         follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # Accept the request
@@ -125,7 +119,7 @@ class FollowTest(TestCase):
         """Test rejecting a follow request"""
         # Create a follow request
         follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # Reject the request
@@ -159,10 +153,10 @@ class FollowTest(TestCase):
         """Test viewing incoming follow requests (default GET)"""
         # Create follow requests
         Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
         Follow.objects.create(
-            follower=self.author_c, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_c, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # View incoming requests
@@ -175,10 +169,10 @@ class FollowTest(TestCase):
         """Test viewing incoming follow requests via /requests/ endpoint"""
         # Create some follow requests
         Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
         Follow.objects.create(
-            follower=self.author_c, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_c, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # View incoming requests
@@ -201,7 +195,7 @@ class FollowTest(TestCase):
                 is_approved=True,
             )
             Follow.objects.create(
-                follower=follower, followed=self.author_b, status=Follow.PENDING
+                follower=follower, followed=self.author_b, status=Follow.REQUESTING
             )
 
         # Test request - API returns simple list, not paginated
@@ -228,7 +222,7 @@ class FollowTest(TestCase):
         """Test that only the followed author can accept/reject requests"""
         # Create a follow request
         follow = Follow.objects.create(
-            follower=self.author_a, followed=self.author_b, status=Follow.PENDING
+            follower=self.author_a, followed=self.author_b, status=Follow.REQUESTING
         )
 
         # Try to accept as wrong user
@@ -315,7 +309,7 @@ class FollowTest(TestCase):
             follower=self.author_a, followed=self.author_b, status=Follow.ACCEPTED
         )
         Follow.objects.create(
-            follower=self.author_b, followed=self.author_c, status=Follow.PENDING
+            follower=self.author_b, followed=self.author_c, status=Follow.REQUESTING
         )
 
         self.client.force_authenticate(user=self.author_a)
@@ -331,14 +325,14 @@ class FollowTest(TestCase):
         self.assertEqual(response.data["status"], Follow.ACCEPTED)
         self.assertIn("created_at", response.data)
 
-        # Test pending relationship
+        # Test requesting relationship
         response = self.client.get(
             f"/api/follows/status/?follower_url={self.author_b.url}&followed_url={self.author_c.url}"
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["follower"], self.author_b.url)
         self.assertEqual(response.data["followed"], self.author_c.url)
-        self.assertEqual(response.data["status"], Follow.PENDING)
+        self.assertEqual(response.data["status"], Follow.REQUESTING)
 
         # Test no relationship
         response = self.client.get(
@@ -394,7 +388,7 @@ class FollowTest(TestCase):
         Follow.objects.create(
             follower=self.author_a,
             followed=self.author_c,
-            status=Follow.PENDING,  # This should not appear
+            status=Follow.REQUESTING,  # This should not appear
         )
 
         self.client.force_authenticate(user=self.author_a)
@@ -438,15 +432,9 @@ class FollowTest(TestCase):
 
         # Verify follow was created
         follow = Follow.objects.get(follower=self.author_a, followed=self.author_b)
-        self.assertEqual(follow.status, Follow.PENDING)
+        self.assertEqual(follow.status, Follow.REQUESTING)
 
-        # Verify inbox notification was created
-        from app.models.inbox import Inbox
-
-        inbox_item = Inbox.objects.get(
-            recipient=self.author_b, item_type=Inbox.FOLLOW, follow=follow
-        )
-        self.assertEqual(inbox_item.recipient, self.author_b)
+        # Note: Inbox functionality has been removed from the system
         self.assertEqual(inbox_item.follow, follow)
         self.assertFalse(inbox_item.is_read)
 

@@ -8,14 +8,14 @@ export { authService } from './auth';
 export { authorService } from './author';
 export { entryService } from './entry';
 export { socialService } from './social';
-export { inboxService } from './inbox';
+export { nodeService } from './node';
 
 // Export service classes for custom instances
 export { default as AuthService } from './auth';
 export { default as AuthorService } from './author';
 export { default as EntryService } from './entry';
 export { default as SocialService } from './social';
-export { default as InboxService } from './inbox';
+export { default as NodeService } from './node';
 export { default as BaseApiService } from './base';
 
 // Legacy api export for backwards compatibility
@@ -23,7 +23,7 @@ import { authService } from './auth';
 import { authorService } from './author';
 import { entryService } from './entry';
 import { socialService } from './social';
-import { inboxService } from './inbox';
+import { nodeService } from './node';
 
 /**
  * Legacy API object for backwards compatibility
@@ -42,6 +42,15 @@ export const api = {
   getCurrentAuthor: authorService.getCurrentAuthor.bind(authorService),
   updateCurrentAuthor: authorService.updateCurrentAuthor.bind(authorService),
   uploadProfileImage: authorService.uploadProfileImage.bind(authorService),
+  changePassword: authorService.changePassword.bind(authorService),
+  getAuthorEntries: authorService.getAuthorEntries.bind(authorService),
+  
+  // Admin methods
+  approveAuthor: authorService.approveAuthor.bind(authorService),
+  deactivateAuthor: authorService.deactivateAuthor.bind(authorService),
+  activateAuthor: authorService.activateAuthor.bind(authorService),
+  deleteAuthor: authorService.deleteAuthor.bind(authorService),
+  promoteToAdmin: authorService.promoteToAdmin.bind(authorService),
 
   // Entry methods
   getEntries: entryService.getEntries.bind(entryService),
@@ -64,8 +73,10 @@ export const api = {
   getFollowers: socialService.getFollowers.bind(socialService),
   getFollowing: socialService.getFollowing.bind(socialService),
 
-  // Inbox methods
-  getInbox: inboxService.getInbox.bind(inboxService),
-  markInboxItemRead: inboxService.markItemAsRead.bind(inboxService),
-  clearInbox: inboxService.clearInbox.bind(inboxService),
+  // Node management methods (admin only)
+  getNodes: nodeService.getNodes.bind(nodeService),
+  addNode: nodeService.addNode.bind(nodeService),
+  updateNode: nodeService.updateNode.bind(nodeService),
+  deleteNode: nodeService.deleteNode.bind(nodeService),
+
 };

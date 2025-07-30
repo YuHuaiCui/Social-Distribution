@@ -32,15 +32,11 @@ class AuthorSerializer(serializers.ModelSerializer):
             "host",
             "web",
             "username",
-            "email",
             "first_name",
             "last_name",
-            "display_name",
+            "displayName",
             "github_username",
-            "profile_image",
-            "bio",
-            "location",
-            "website",
+            "profileImage",
             "node",
             "node_id",
             "is_remote",
@@ -64,7 +60,6 @@ class AuthorSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         extra_kwargs = {
-            "email": {"required": True},
             "username": {"required": True},
         }
 
@@ -141,7 +136,7 @@ class AuthorSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """
-        Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
+        Customize the representation to match CMPUT 404 spec format.
         Returns author objects in the required format:
         {
             "type": "author",
@@ -153,8 +148,6 @@ class AuthorSerializer(serializers.ModelSerializer):
             "web": "http://nodeaaaa/authors/greg"
         }
         """
-        data = super().to_representation(instance)
-
         # For remote authors, use their original host and web URLs
         # For local authors, use the local site URL
         if instance.node is not None:  # Remote author
@@ -167,44 +160,22 @@ class AuthorSerializer(serializers.ModelSerializer):
             )
         else:  # Local author
             host_url = f"{settings.SITE_URL}/api/"
-            web_url = f"{settings.SITE_URL}/authors/{instance.id}"
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            web_url = f"{frontend_url}/authors/{instance.id}"
 
-        # CMPUT 404 compliant format with compatibility fields
+        # CMPUT 404 compliant format - only required fields
         result = {
-            # CMPUT 404 required fields
             "type": "author",
             "id": instance.url,  # Full URL as ID per spec
             "host": host_url,
-            "displayName": instance.display_name,
+            "displayName": instance.displayName,
             "github": (
                 f"https://github.com/{instance.github_username}"
                 if instance.github_username
                 else ""
             ),
-            "profileImage": instance.profile_image or None,
+            "profileImage": instance.profileImage or None,
             "web": web_url,
-            # Additional fields for frontend compatibility
-            "url": instance.url,
-            "username": instance.username,
-            "email": instance.email,
-            "first_name": instance.first_name,
-            "last_name": instance.last_name,
-            "display_name": instance.display_name,  # Snake case version
-            "github_username": instance.github_username,
-            "profile_image": instance.profile_image,
-            "bio": instance.bio,
-            "location": instance.location,
-            "website": instance.website,
-            "node": data.get("node"),
-            "node_id": data.get("node_id"),
-            "is_remote": data.get("is_remote"),
-            "is_approved": instance.is_approved,
-            "is_active": instance.is_active,
-            "is_staff": instance.is_staff,
-            "is_superuser": instance.is_superuser,
-            "created_at": data.get("created_at"),
-            "updated_at": data.get("updated_at"),
-            "is_following": data.get("is_following"),
         }
 
         return result
@@ -228,12 +199,9 @@ class AuthorListSerializer(serializers.ModelSerializer):
             "host",
             "web",
             "username",
-            "email",
-            "display_name",
+            "displayName",
             "github_username",
-            "profile_image",
-            "location",
-            "website",
+            "profileImage",
             "is_approved",
             "is_active",
             "created_at",
@@ -279,41 +247,36 @@ class AuthorListSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """
-        Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
+        Customize the representation to match CMPUT 404 spec format.
         """
-        data = super().to_representation(instance)
+        # For remote authors, use their original host and web URLs
+        # For local authors, use the local site URL
+        if instance.node is not None:  # Remote author
+            # Use the stored host and web URLs from the remote node
+            host_url = instance.host if instance.host else f"{instance.node.host}/api/"
+            web_url = (
+                instance.web
+                if instance.web
+                else f"{instance.node.host.rstrip('/')}/authors/{instance.id}"
+            )
+        else:  # Local author
+            host_url = f"{settings.SITE_URL}/api/"
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            web_url = f"{frontend_url}/authors/{instance.id}"
 
-        # CMPUT 404 compliant format with compatibility fields
+        # CMPUT 404 compliant format - only required fields
         result = {
-            # CMPUT 404 required fields
             "type": "author",
             "id": instance.url,  # Full URL as ID per spec
-            "host": f"{settings.SITE_URL}/api/",
-            "displayName": instance.display_name,
+            "host": host_url,
+            "displayName": instance.displayName,
             "github": (
                 f"https://github.com/{instance.github_username}"
                 if instance.github_username
                 else ""
             ),
-            "profileImage": instance.profile_image or None,
-            "web": f"{settings.SITE_URL}/authors/{instance.id}",
-            # Additional fields for frontend compatibility
-            "url": instance.url,
-            "username": instance.username,
-            "email": instance.email,
-            "display_name": instance.display_name,  # Snake case version
-            "github_username": instance.github_username,
-            "profile_image": instance.profile_image,
-            "location": instance.location,
-            "website": instance.website,
-            "is_approved": instance.is_approved,
-            "is_active": instance.is_active,
-            "created_at": data.get("created_at"),
-            "followers_count": data.get("followers_count"),
-            "following_count": data.get("following_count"),
-            "is_following": data.get("is_following"),
-            "node_id": data.get("node_id"),
-            "is_remote": data.get("is_remote"),
+            "profileImage": instance.profileImage or None,
+            "web": web_url,
         }
 
         return result
