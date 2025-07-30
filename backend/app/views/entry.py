@@ -358,11 +358,32 @@ class EntryViewSet(viewsets.ModelViewSet):
     
     def _serialize_entry_for_inbox(self, entry):
         """Serialize entry in the format expected by remote inboxes."""
+        # Generate the entry ID (required field for ActivitySerializer)
+        entry_id = entry.url
+        if not entry_id:
+            # Fallback: generate the URL if not set
+            entry_id = f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}/"
+        
+        # Generate the web URL
+        web_url = entry.web
+        if not web_url:
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            web_url = f"{frontend_url}/authors/{entry.author.id}/entries/{entry.id}"
+        
+        # Generate author ID
+        author_id = entry.author.url
+        if not author_id:
+            author_id = f"{settings.SITE_URL}/api/authors/{entry.author.id}/"
+        
+        # Log what we're working with
+        logger.debug(f"Entry serialization - entry.url: '{entry.url}', entry.id: '{entry.id}', generated entry_id: '{entry_id}'")
+        logger.debug(f"Author serialization - author.url: '{entry.author.url}', author.id: '{entry.author.id}', generated author_id: '{author_id}'")
+        
         # Ensure all required fields for ActivitySerializer validation are present
         entry_data = {
             "type": "entry",
-            "id": entry.url or f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}/",
-            "web": entry.web or f"{settings.FRONTEND_URL or settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+            "id": entry_id,
+            "web": web_url,
             "title": entry.title or "",
             "description": entry.description or "",
             "content": entry.content or "",
@@ -373,13 +394,32 @@ class EntryViewSet(viewsets.ModelViewSet):
             "published": entry.published.isoformat() if entry.published else timezone.now().isoformat(),
             "author": {
                 "type": "author",
-                "id": entry.author.url or f"{settings.SITE_URL}/api/authors/{entry.author.id}/",
-                "web": entry.author.web or f"{settings.FRONTEND_URL or settings.SITE_URL}/authors/{entry.author.id}",
+                "id": author_id,
+                "web": entry.author.web or f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}",
                 "host": entry.author.host or f"{settings.SITE_URL}/api/",
                 "displayName": entry.author.displayName or entry.author.username,
                 "profileImage": entry.author.profileImage or "",
             }
         }
+        
+        # Validate that required fields are present before sending
+        required_fields = ['type', 'id', 'title', 'content', 'contentType']
+        missing_fields = [field for field in required_fields if not entry_data.get(field)]
+        if missing_fields:
+            logger.error(f"Missing required fields in entry data: {missing_fields}")
+            logger.error(f"Entry data: {json.dumps(entry_data, indent=2)}")
+            raise ValueError(f"Cannot send entry with missing required fields: {missing_fields}")
+        
+        # Validate author has required fields
+        if not entry_data['author'].get('id'):
+            logger.error(f"Missing author id in entry data")
+            logger.error(f"Author data: {json.dumps(entry_data['author'], indent=2)}")
+            raise ValueError("Cannot send entry with missing author id")
+        
+        # Final safety check - ensure ID is not None/empty string
+        if not entry_data['id'] or entry_data['id'] == 'None':
+            logger.error(f"Invalid entry ID: '{entry_data['id']}'")
+            raise ValueError(f"Entry ID is invalid: '{entry_data['id']}'")
         
         # Log the serialized data for debugging
         logger.debug(f"Serialized entry for inbox: {json.dumps(entry_data, indent=2)}")
