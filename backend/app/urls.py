@@ -281,4 +281,10 @@ urlpatterns = [
     # Inbox notification endpoints
     path("api/likes/received/", received_likes, name="received-likes"),
     path("api/comments/received/", received_comments, name="received-comments"),
+    # Author by FQID: /api/authors/{AUTHOR_FQID}/ (most general, should be last)
+    path(
+        "authors/<path:author_fqid>/",
+        AuthorViewSet.as_view({"get": "retrieve_by_fqid"}),
+        name="author-by-fqid",
+    ),
 ]

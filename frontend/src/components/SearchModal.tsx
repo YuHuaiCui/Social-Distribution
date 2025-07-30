@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, FileText, Hash, ArrowRight } from "lucide-react";
+import { Search, FileText, Hash, ArrowRight, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "../services/api";
@@ -302,8 +302,11 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                                       .toUpperCase() || "U"}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors">
+                                    <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors flex items-center gap-1">
                                       {author.displayName || author.display_name || "Unknown Author"}
+                                      {(author.node || author.is_remote) && (
+                                        <Globe size={12} className="text-blue-400 shrink-0" title="Remote Author" />
+                                      )}
                                     </h4>
                                   </div>
                                   <ArrowRight

@@ -19,6 +19,7 @@ import {
   UserX,
   CheckCircle,
   XCircle,
+  Globe,
 } from "lucide-react";
 import type { Author } from "../types/models";
 import Avatar from "./Avatar/Avatar";
@@ -291,8 +292,11 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             to={`/authors/${extractUUID(author.id)}`}
             className="hover:underline"
           >
-            <h4 className="font-medium text-text-1 truncate">
+            <h4 className="font-medium text-text-1 truncate flex items-center gap-1">
               {author.displayName || author.display_name || "Unknown"}
+              {(author.node || author.is_remote) && (
+                <Globe size={10} className="text-blue-500 shrink-0" title="Remote Author" />
+              )}
             </h4>
           </Link>
         </div>
@@ -351,8 +355,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             </motion.div>
 
             <div>
-              <h3 className="text-lg font-semibold text-text-1 hover:underline">
+              <h3 className="text-lg font-semibold text-text-1 hover:underline flex items-center gap-2">
                 {author.displayName || author.display_name || "Unknown"}
+                {(author.node || author.is_remote) && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" title="Remote Author">
+                    <Globe size={12} className="mr-1" />
+                    Remote
+                  </span>
+                )}
               </h3>
 
               {author.is_followed_by && (

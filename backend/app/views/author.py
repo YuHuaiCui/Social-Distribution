@@ -974,3 +974,90 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 {"error": "Could not retrieve author"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def retrieve_by_fqid(self, request, author_fqid=None):
+        """
+        GET [remote]: retrieve AUTHOR_FQID's profile
+        
+        This endpoint retrieves an author by their FQID (Fully Qualified ID),
+        which is their complete URL. It supports fetching both local and remote authors.
+        
+        For remote authors, it attempts to fetch fresh data from the remote node
+        and falls back to local cached data if the remote fetch fails.
+        """
+        if not author_fqid:
+            return Response(
+                {"error": "Author FQID is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Decode the URL-encoded FQID
+            decoded_fqid = unquote(author_fqid)
+
+            # Try to find the author by URL first (handles both local and remote)
+            try:
+                author = Author.objects.get(url=decoded_fqid)
+                
+                # If this is a remote author, try to fetch fresh data from the remote node
+                if author.node is not None:
+                    from app.utils.remote import RemoteObjectFetcher
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.info(
+                        f"Fetching fresh remote author data for {author.username} from {author.node.host}"
+                    )
+
+                    # Try to fetch fresh data from the remote node
+                    remote_data = RemoteObjectFetcher.fetch_author_by_url(author.url)
+
+                    if remote_data:
+                        logger.info(
+                            f"Successfully fetched fresh remote author data for {author.username}"
+                        )
+                        return Response(remote_data)
+                    else:
+                        logger.warning(
+                            f"Failed to fetch fresh remote author data for {author.username}, falling back to local cache"
+                        )
+                        # Fall through to return local cached data
+
+                # Return local data (either for local authors or as fallback for remote authors)
+                serializer = AuthorSerializer(author, context={"request": request})
+                return Response(serializer.data)
+
+            except Author.DoesNotExist:
+                # Author not found locally, try to fetch from remote node
+                from app.utils.remote import RemoteObjectFetcher
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    f"Author not found locally, attempting to fetch from remote: {decoded_fqid}"
+                )
+
+                # Try to fetch fresh data from the remote node
+                remote_data = RemoteObjectFetcher.fetch_author_by_url(decoded_fqid)
+
+                if remote_data:
+                    logger.info(
+                        f"Successfully fetched remote author data from URL: {decoded_fqid}"
+                    )
+                    return Response(remote_data)
+                else:
+                    logger.warning(
+                        f"Failed to fetch remote author data for URL: {decoded_fqid}"
+                    )
+                    return Response(
+                        {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                    )
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error retrieving author by FQID {author_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve author"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
