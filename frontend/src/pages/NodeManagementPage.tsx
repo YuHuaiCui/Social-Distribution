@@ -60,14 +60,14 @@ export const NodeManagementPage: React.FC = () => {
     is_active: true,
   });
 
-  // Check if user is admin
-  const isAdmin = user?.is_staff || user?.is_superuser;
+  // Check if user is admin - default to false if fields are not available
+  const isAdmin = user?.is_staff || user?.is_superuser || false;
 
   useEffect(() => {
-    if (isAdmin && user) {
+    if (user) {
       fetchNodes();
     }
-  }, [isAdmin, user]);
+  }, [user]);
 
   const fetchNodes = async () => {
     try {
@@ -91,9 +91,11 @@ export const NodeManagementPage: React.FC = () => {
       }
 
       setNodes(nodesData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching nodes:", error);
-      if (error instanceof Error) {
+      if (error?.message?.includes("403") || error?.message?.toLowerCase().includes("forbidden") || error?.message?.toLowerCase().includes("permission")) {
+        showError("You don't have permission to view nodes. Admin access required.");
+      } else if (error instanceof Error) {
         showError(`Failed to fetch nodes: ${error.message}`);
       } else {
         showError("Failed to fetch nodes");
@@ -127,9 +129,13 @@ export const NodeManagementPage: React.FC = () => {
         is_active: true,
       });
       fetchNodes();
-    } catch (error) {
-      showError("Failed to add node");
+    } catch (error: any) {
       console.error("Error adding node:", error);
+      if (error?.message?.includes("403") || error?.message?.toLowerCase().includes("forbidden") || error?.message?.toLowerCase().includes("permission")) {
+        showError("You don't have permission to add nodes. Admin access required.");
+      } else {
+        showError("Failed to add node");
+      }
     }
   };
 
@@ -154,9 +160,13 @@ export const NodeManagementPage: React.FC = () => {
         is_active: true,
       });
       fetchNodes();
-    } catch (error) {
-      showError("Failed to update node");
+    } catch (error: any) {
       console.error("Error updating node:", error);
+      if (error?.message?.includes("403") || error?.message?.toLowerCase().includes("forbidden") || error?.message?.toLowerCase().includes("permission")) {
+        showError("You don't have permission to update nodes. Admin access required.");
+      } else {
+        showError("Failed to update node");
+      }
     }
   };
 
@@ -173,9 +183,13 @@ export const NodeManagementPage: React.FC = () => {
       await api.deleteNode(node.host);
       showSuccess("Node deleted successfully");
       fetchNodes();
-    } catch (error) {
-      showError("Failed to delete node");
+    } catch (error: any) {
       console.error("Error deleting node:", error);
+      if (error?.message?.includes("403") || error?.message?.toLowerCase().includes("forbidden") || error?.message?.toLowerCase().includes("permission")) {
+        showError("You don't have permission to delete nodes. Admin access required.");
+      } else {
+        showError("Failed to delete node");
+      }
     }
   };
 
@@ -208,19 +222,6 @@ export const NodeManagementPage: React.FC = () => {
     }));
   };
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background-1 to-background-2 flex items-center justify-center">
-        <Card variant="main" className="p-8 text-center">
-          <Shield size={48} className="mx-auto mb-4 text-red-500" />
-          <h1 className="text-2xl font-bold text-text-1 mb-2">Access Denied</h1>
-          <p className="text-text-2">
-            You need administrator privileges to access node management.
-          </p>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background-1 to-background-2 p-4">
