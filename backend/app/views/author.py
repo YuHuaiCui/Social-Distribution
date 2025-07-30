@@ -578,12 +578,16 @@ class AuthorViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
-    @action(detail=True, methods=["post"], url_path="inbox")
+    @action(detail=True, methods=["get", "post"], url_path="inbox")
     def post_to_inbox(self, request, pk=None):
         """
+        GET [local]: retrieve the author's inbox contents
         POST [remote]: send an activity to the author's inbox
         
-        The inbox receives activities from remote nodes:
+        GET: Returns all activities (entries, follows, likes, comments) in the author's inbox.
+             Only the author themselves can access their own inbox.
+        
+        POST: The inbox receives activities from remote nodes:
         - if the type is "entry" then add that entry to AUTHOR_SERIAL's inbox
         - if the type is "follow" then add that follow to AUTHOR_SERIAL's inbox to approve later
         - if the type is "Like" then add that like to AUTHOR_SERIAL's inbox  
@@ -591,6 +595,45 @@ class AuthorViewSet(viewsets.ModelViewSet):
         
         URL: /api/authors/{AUTHOR_SERIAL}/inbox
         """
+        if request.method == "GET":
+            return self._get_inbox(request, pk)
+        elif request.method == "POST":
+            return self._post_to_inbox(request, pk)
+
+    def _get_inbox(self, request, pk=None):
+        """Handle GET requests to retrieve inbox contents."""
+        try:
+            author = self.get_object()
+            
+            # Only allow authors to access their own inbox
+            if request.user != author:
+                return Response(
+                    {"error": "You can only access your own inbox"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get all inbox items for this author
+            from app.serializers.inbox import InboxSerializer
+            inbox_items = Inbox.objects.filter(recipient=author).order_by('-delivered_at')
+            
+            # Apply pagination
+            page = self.paginate_queryset(inbox_items)
+            if page is not None:
+                serializer = InboxSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            serializer = InboxSerializer(inbox_items, many=True)
+            return Response({"type": "inbox", "items": serializer.data})
+            
+        except Exception as e:
+            logger.error(f"Error retrieving inbox for author {pk}: {str(e)}")
+            return Response(
+                {"error": "Failed to retrieve inbox"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _post_to_inbox(self, request, pk=None):
+        """Handle POST requests to add activities to inbox."""
         try:
             # Get the recipient author
             author = self.get_object()

@@ -6,7 +6,8 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import models
 from django.db.models import Q
-from app.models import Entry, Author, Node, Follow, Friendship
+from django.contrib.contenttypes.models import ContentType
+from app.models import Entry, Author, Node, Follow, Friendship, Inbox
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
 import uuid
@@ -597,19 +598,31 @@ class EntryViewSet(viewsets.ModelViewSet):
             friends_ids = following_ids & followers_ids
 
             # Get all entries from friends, excluding deleted entries
-            entries = (
+            friend_entries = (
                 Entry.objects.filter(author__id__in=friends_ids)
                 .exclude(visibility=Entry.DELETED)
-                .order_by("-created_at")
             )
 
+            # Get entries from inbox (federated entries from remote nodes)
+            entry_content_type = ContentType.objects.get_for_model(Entry)
+            inbox_entry_ids = Inbox.objects.filter(
+                recipient=current_author,
+                activity_type='entry',
+                content_type=entry_content_type
+            ).values_list('object_id', flat=True)
+            
+            inbox_entries = Entry.objects.filter(id__in=inbox_entry_ids)
+
+            # Combine friend entries and inbox entries, remove duplicates
+            combined_entries = friend_entries.union(inbox_entries).order_by("-created_at")
+
             # Apply pagination
-            page = self.paginate_queryset(entries)
+            page = self.paginate_queryset(combined_entries)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = self.get_serializer(entries, many=True)
+            serializer = self.get_serializer(combined_entries, many=True)
             return Response(serializer.data)
 
         except Exception as e:
