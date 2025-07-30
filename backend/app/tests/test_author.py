@@ -296,7 +296,7 @@ class AuthorAPITest(BaseAPITestCase):
         image_file = SimpleUploadedFile(
             "test_image.jpg", image_content, content_type="image/jpeg"
         )
-        data = {"profile_image_file": image_file}
+        data = {"profileImage": image_file}
         response = self.user_client.patch(url, data, format="multipart")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("profileImage", response.data)

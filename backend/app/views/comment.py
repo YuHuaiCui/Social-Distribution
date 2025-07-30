@@ -42,7 +42,7 @@ def received_comments(request):
                     "url": comment.author.url,
                     "display_name": comment.author.displayName,
                     "username": comment.author.username,
-                    "profile_image": comment.author.profile_image,
+                    "profile_image": comment.author.profileImage,
                 },
                 "entry": {
                     "id": comment.entry.id,

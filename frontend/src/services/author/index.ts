@@ -122,7 +122,7 @@ export class AuthorService extends BaseApiService {
    */
   async uploadProfileImage(file: File): Promise<Author> {
     const formData = new FormData();
-    formData.append("profile_image_file", file);
+    formData.append("profileImage", file);
 
     return this.requestFormData<Author>("/api/authors/me/", formData, {
       method: "PATCH",

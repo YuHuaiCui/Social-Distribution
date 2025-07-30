@@ -249,7 +249,7 @@ class ApiService {
 
   async uploadProfileImage(file: File): Promise<Author> {
     const formData = new FormData();
-    formData.append("profile_image_file", file);
+    formData.append("profileImage", file);
 
     const csrfToken = document.cookie
       .split("; ")

@@ -502,12 +502,17 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
                 # Copy non-file fields from request data
                 for key, value in request.data.items():
-                    if key != "profile_image_file":
+                    if key not in ["profile_image_file", "profileImage"]:
                         update_data[key] = value
 
-                # Handle profile image upload if present
-                if "profile_image_file" in request.FILES:
+                # Handle profile image upload if present (support both camelCase and snake_case)
+                image_file = None
+                if "profileImage" in request.FILES:
+                    image_file = request.FILES["profileImage"]
+                elif "profile_image_file" in request.FILES:
                     image_file = request.FILES["profile_image_file"]
+                
+                if image_file:
 
                     # Convert uploaded image to base64 data URL (consistent with post images)
                     import base64
@@ -526,7 +531,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         f"data:{content_type};base64,{image_base64}"
                     )
 
-                    update_data["profile_image"] = profile_image_data_url
+                    update_data["profileImage"] = profile_image_data_url
 
                 # Update the author profile
                 serializer = AuthorSerializer(author, data=update_data, partial=True)
@@ -733,7 +738,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     username=author_data.get("username", ""),
                     displayName=author_data.get("displayName", ""),
                     github_username=author_data.get("github", ""),
-                    profile_image=author_data.get("profileImage", ""),
+                    profileImage=author_data.get("profileImage", ""),
                     host=author_data.get("host", node.host),
                     web=author_data.get("page", ""),
                     node=node,
