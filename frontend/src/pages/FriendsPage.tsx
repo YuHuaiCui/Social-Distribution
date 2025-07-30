@@ -140,7 +140,6 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-text-1 mb-2">Connections</h1>
-        <p className="text-text-2">Manage your social network</p>
       </div>
 
       {/* Filter Tabs */}
