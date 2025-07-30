@@ -118,7 +118,7 @@ class EntrySerializer(serializers.ModelSerializer):
             "type": "comments",
             # this may or may not be the same as page for the entry,
             # depending if there's a separate URL to just see the comments
-            "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+            "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{instance.author.id}/entries/{instance.id}",
             "id": f"{instance.url}/comments",
             # comments.page, comments.size, comments.count,
             # comments.src are only sent if:
@@ -157,7 +157,7 @@ class EntrySerializer(serializers.ModelSerializer):
 
         return {
             "type": "likes",
-            "web": f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+            "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{instance.author.id}/entries/{instance.id}",
             "id": f"{instance.url}/likes",
             "page_number": 1,
             "size": 50,
@@ -300,7 +300,7 @@ class EntrySerializer(serializers.ModelSerializer):
                     "id": getattr(instance.author, "url", ""),
                     "displayName": getattr(instance.author, "display_name", "Unknown"),
                     "host": f"{settings.SITE_URL}/api/",
-                    "web": f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}",
+                    "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{getattr(instance.author, 'id', 'unknown')}",
                 }
 
             # Return a more complete minimal representation
@@ -308,7 +308,7 @@ class EntrySerializer(serializers.ModelSerializer):
                 "type": "entry",
                 "title": getattr(instance, "title", ""),
                 "id": getattr(instance, "url", ""),
-                "web": getattr(instance, "web", "") or f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}",
+                "web": getattr(instance, "web", "") or f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}",
                 "description": getattr(instance, "description", ""),
                 "contentType": getattr(instance, "content_type", "text/plain"),
                 "content": getattr(instance, "content", ""),
@@ -316,7 +316,7 @@ class EntrySerializer(serializers.ModelSerializer):
                 "comments": {
                     "type": "comments",
                     "id": f"{getattr(instance, 'url', '')}/comments",
-                    "web": f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}/comments",
+                    "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}/comments",
                     "page_number": 1,
                     "size": 5,
                     "count": 0,
@@ -325,7 +325,7 @@ class EntrySerializer(serializers.ModelSerializer):
                 "likes": {
                     "type": "likes", 
                     "id": f"{getattr(instance, 'url', '')}/likes",
-                    "web": f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}/likes",
+                    "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}/likes",
                     "page_number": 1,
                     "size": 50,
                     "count": 0,

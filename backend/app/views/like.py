@@ -326,7 +326,7 @@ class EntryLikeView(APIView):
             # Build response according to spec
             response_data = {
                 "type": "likes",
-                "web": entry.url.replace('/api/', '/') if entry.url else f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+                "web": entry.url.replace('/api/', '/') if entry.url else f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}/entries/{entry.id}",
                 "id": f"{entry.url}/likes" if entry.url else f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}/likes",
                 "page_number": page_number,
                 "size": page_size,

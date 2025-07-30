@@ -224,7 +224,8 @@ class Author(AbstractUser):
 
             # Generate frontend profile URL if not set
             if not self.web:
-                self.web = f"{settings.SITE_URL}/authors/{self.id}"
+                frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+                self.web = f"{frontend_url}/authors/{self.id}"
                 update_fields.append("web")
 
             # Only save again if we actually updated fields to avoid infinite recursion

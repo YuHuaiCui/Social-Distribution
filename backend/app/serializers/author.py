@@ -160,7 +160,8 @@ class AuthorSerializer(serializers.ModelSerializer):
             )
         else:  # Local author
             host_url = f"{settings.SITE_URL}/api/"
-            web_url = f"{settings.SITE_URL}/authors/{instance.id}"
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            web_url = f"{frontend_url}/authors/{instance.id}"
 
         # CMPUT 404 compliant format - only required fields
         result = {
@@ -260,7 +261,8 @@ class AuthorListSerializer(serializers.ModelSerializer):
             )
         else:  # Local author
             host_url = f"{settings.SITE_URL}/api/"
-            web_url = f"{settings.SITE_URL}/authors/{instance.id}"
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            web_url = f"{frontend_url}/authors/{instance.id}"
 
         # CMPUT 404 compliant format - only required fields
         result = {

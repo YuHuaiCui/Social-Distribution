@@ -230,7 +230,8 @@ class Entry(models.Model):
 
         # Auto-generate web URL for local entries
         if not self.web and self.author.is_local:
-            self.web = f"{settings.SITE_URL}/authors/{self.author.id}/entries/{self.id}"
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            self.web = f"{frontend_url}/authors/{self.author.id}/entries/{self.id}"
 
         # Save the entry first to get created_at timestamp
         super().save(*args, **kwargs)

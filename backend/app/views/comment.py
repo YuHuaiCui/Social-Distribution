@@ -158,7 +158,7 @@ class CommentListCreateView(generics.ListCreateAPIView):
                     # Return empty comments object if not visible
                     return Response({
                         "type": "comments",
-                        "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+                        "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}/entries/{entry.id}",
                         "id": f"{entry.url}/comments",
                         "page_number": 1,
                         "size": 5,
@@ -177,7 +177,7 @@ class CommentListCreateView(generics.ListCreateAPIView):
         # Return in the correct format
         return Response({
             "type": "comments",
-            "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}" if 'entry' in locals() else None,
+            "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}/entries/{entry.id}" if 'entry' in locals() else None,
             "id": f"{entry.url}/comments" if 'entry' in locals() else None,
             "page_number": 1,
             "size": 5,

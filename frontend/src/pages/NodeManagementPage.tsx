@@ -119,7 +119,7 @@ export const NodeManagementPage: React.FC = () => {
       }
 
       await api.addNode(formData);
-      showSuccess("Node added successfully");
+      showSuccess("Node added successfully. Remote authors are being synced in the background.");
       setIsAddingNode(false);
       setFormData({
         name: "",
@@ -635,7 +635,7 @@ export const NodeManagementPage: React.FC = () => {
                 <div>
                   <span className="text-text-2">URL:</span>
                   <p className="text-text-1 font-mono">
-                    {window.location.origin}
+                    {import.meta.env.VITE_API_URL || "http://localhost:8000"}
                   </p>
                 </div>
                 <div>
