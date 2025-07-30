@@ -48,7 +48,8 @@ class Inbox(models.Model):
     
     # Store the object directly in JSON format instead of foreign key reference
     object_data = models.JSONField(
-        help_text="The actual object (Entry, Follow, Like, Comment) in JSON format"
+        help_text="The actual object (Entry, Follow, Like, Comment) in JSON format",
+        default=dict
     )
     
     # Metadata

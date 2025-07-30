@@ -89,7 +89,6 @@ class EntrySerializer(serializers.ModelSerializer):
 
         return Like.objects.filter(author=request.user, entry=obj).exists()
 
-
     def _get_comments_data(self, instance, viewing_author):
         """Get comments data for the entry with proper visibility and pagination"""
         from app.models.comment import Comment
@@ -292,7 +291,9 @@ class EntrySerializer(serializers.ModelSerializer):
 
             # Try to get basic fields that should always work
             try:
-                author_data = AuthorSerializer(instance.author, context=self.context).data
+                author_data = AuthorSerializer(
+                    instance.author, context=self.context
+                ).data
             except Exception as author_error:
                 logger.error(f"Author serialization failed: {author_error}")
                 author_data = {
@@ -308,7 +309,8 @@ class EntrySerializer(serializers.ModelSerializer):
                 "type": "entry",
                 "title": getattr(instance, "title", ""),
                 "id": getattr(instance, "url", ""),
-                "web": getattr(instance, "web", "") or f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}",
+                "web": getattr(instance, "web", "")
+                or f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}",
                 "description": getattr(instance, "description", ""),
                 "contentType": getattr(instance, "content_type", "text/plain"),
                 "content": getattr(instance, "content", ""),
@@ -320,20 +322,25 @@ class EntrySerializer(serializers.ModelSerializer):
                     "page_number": 1,
                     "size": 5,
                     "count": 0,
-                    "src": []
+                    "src": [],
                 },
                 "likes": {
-                    "type": "likes", 
+                    "type": "likes",
                     "id": f"{getattr(instance, 'url', '')}/likes",
                     "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}/likes",
                     "page_number": 1,
                     "size": 50,
                     "count": 0,
-                    "src": []
+                    "src": [],
                 },
                 "published": (
-                    instance.published.isoformat() if getattr(instance, "published", None)
-                    else (instance.created_at.isoformat() if getattr(instance, "created_at", None) else None)
+                    instance.published.isoformat()
+                    if getattr(instance, "published", None)
+                    else (
+                        instance.created_at.isoformat()
+                        if getattr(instance, "created_at", None)
+                        else None
+                    )
                 ),
                 "visibility": getattr(instance, "visibility", "PUBLIC"),
                 "comments_count": 0,
@@ -452,5 +459,5 @@ class EntrySerializer(serializers.ModelSerializer):
             except (ValueError, TypeError):
                 # If parsing fails, remove the field to let model handle it
                 data.pop("published", None)
-        
+
         return super().to_internal_value(data)
