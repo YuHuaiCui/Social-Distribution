@@ -35,18 +35,18 @@ export function isValidUUID(str: string): boolean {
 }
 
 /**
- * Check if an author is remote by examining their ID
- * Remote authors have full URLs as IDs, local authors have UUIDs
+ * Check if an author is remote by examining backend flags
+ * Remote authors have a node property (not null), local authors have node = null
  */
 export function isRemoteAuthor(author: { id: string; node?: any; is_remote?: boolean }): boolean {
-  // First check explicit flags if available
-  if (author.node || author.is_remote) {
+  // Check explicit remote flag first
+  if (author.is_remote === true) {
     return true;
   }
   
-  // Check if ID looks like a full URL (CMPUT 404 spec for remote authors)
-  const authorId = author.id;
-  return authorId && (authorId.includes('http') || (authorId.includes('/') && authorId.split('/').length > 2));
+  // Check if author has a node property - this is the authoritative backend field
+  // Local authors have node = null, remote authors have node = <node_object>
+  return author.node != null;
 }
 
 /**
