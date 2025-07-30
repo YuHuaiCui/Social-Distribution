@@ -292,7 +292,7 @@ class AddNodeView(APIView):
                 existing_author.url = author_url
                 existing_author.displayName = author_data.get("displayName", "")
                 existing_author.github_username = self._extract_github_username(author_data.get("github", ""))
-                existing_author.profileImage = author_data.get("profileImage", "")
+                existing_author.profileImage = author_data.get("profileImage") or ""  # Ensure empty string instead of None
                 existing_author.host = author_data.get("host", node.host)
                 existing_author.web = author_data.get("web", "")
                 existing_author.node = node
@@ -307,7 +307,7 @@ class AddNodeView(APIView):
                     username=author_data.get("displayName", f"remote_user_{author_id_str[:8]}"),
                     displayName=author_data.get("displayName", ""),
                     github_username=self._extract_github_username(author_data.get("github", "")),
-                    profileImage=author_data.get("profileImage", ""),
+                    profileImage=author_data.get("profileImage") or "",  # Ensure empty string instead of None
                     host=author_data.get("host", node.host),
                     web=author_data.get("web", ""),
                     node=node,
@@ -451,6 +451,13 @@ class UpdateNodeView(APIView):
             node_obj.is_active = is_auth
             node_obj.save()
 
+            # Refetch authors from the updated node
+            try:
+                print(f"Refetching authors from updated node: {host}")
+                AddNodeView()._fetch_and_store_remote_authors(node_obj)
+            except Exception as e:
+                print(f"Warning: Failed to refetch authors from updated node {host}: {str(e)}")
+
             return Response(
                 {"message": "Node updated successfully!"}, status=status.HTTP_200_OK
             )
@@ -458,6 +465,82 @@ class UpdateNodeView(APIView):
             print(f"Unable to edit node: {str(e)}")
             return Response(
                 {"error": "Failed to update node. Please try again later."}, status=500
+            )
+
+
+class RefreshNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    @extend_schema(
+        summary="Refresh authors from a Node.",
+        description="Refetch and update all authors from an existing Node.",
+        request={
+            "type": "object",
+            "properties": {
+                "host": {"type": "string", "example": "http://192.168.1.72:8000"}
+            },
+            "required": ["host"]
+        },
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Authors refreshed successfully.",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "example": "Authors refreshed successfully! Stored 5 authors.",
+                        }
+                    },
+                },
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                description="Node not found.",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "Node not found."}
+                    },
+                },
+            ),
+        },
+        tags=["Node API"],
+    )
+    def post(self, request):
+        """
+        Refresh authors from an existing node.
+        """
+        try:
+            host = request.data.get("host")
+            
+            if not host:
+                return Response(
+                    {"error": "Host is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            node_obj = get_object_or_404(Node, host=host)
+            
+            # Fetch and store authors from the node
+            try:
+                print(f"Refreshing authors from node: {host}")
+                AddNodeView()._fetch_and_store_remote_authors(node_obj)
+                return Response(
+                    {"message": "Authors refreshed successfully!"}, 
+                    status=status.HTTP_200_OK
+                )
+            except Exception as e:
+                print(f"Failed to refresh authors from node {host}: {str(e)}")
+                return Response(
+                    {"error": "Failed to refresh authors from node."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            print(f"Unable to refresh node: {str(e)}")
+            return Response(
+                {"error": "Failed to refresh node. Please try again later."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 

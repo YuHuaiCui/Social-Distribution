@@ -16,6 +16,7 @@ from app.views.node import (
     GetNodesView,
     UpdateNodeView,
     AddNodeView,
+    RefreshNodeView,
     DeleteNodeView,
     RemoteFolloweeView,
     RemoteAuthorsView,
@@ -255,6 +256,7 @@ urlpatterns = [
     path("nodes/", GetNodesView.as_view(), name="get-nodes"),
     path("nodes/add/", AddNodeView.as_view(), name="add-node"),
     path("nodes/update/", UpdateNodeView.as_view(), name="update-node"),
+    path("nodes/refresh/", RefreshNodeView.as_view(), name="refresh-node"),
     path("nodes/remove/", DeleteNodeView.as_view(), name="delete-node"),
     # Remote API endpoints
     path(
