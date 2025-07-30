@@ -36,9 +36,14 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
   const { theme, toggleTheme } = useTheme();
   const { notifications, unreadCount, markAsRead, refreshNotifications } =
     useNotifications();
-  
+
   // Debug: log notifications
-  console.log('Header notifications:', notifications, 'unreadCount:', unreadCount);
+  console.log(
+    "Header notifications:",
+    notifications,
+    "unreadCount:",
+    unreadCount
+  );
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -86,23 +91,29 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
     setShowNotifications(false);
   };
 
-  const handleAcceptFollowRequest = async (followId: string, event: React.MouseEvent) => {
+  const handleAcceptFollowRequest = async (
+    followId: string,
+    event: React.MouseEvent
+  ) => {
     event.stopPropagation();
     try {
-      await socialService.acceptFollowRequest(followId.replace('follow-', ''));
+      await socialService.acceptFollowRequest(followId.replace("follow-", ""));
       refreshNotifications();
     } catch (error) {
-      console.error('Failed to accept follow request:', error);
+      console.error("Failed to accept follow request:", error);
     }
   };
 
-  const handleRejectFollowRequest = async (followId: string, event: React.MouseEvent) => {
+  const handleRejectFollowRequest = async (
+    followId: string,
+    event: React.MouseEvent
+  ) => {
     event.stopPropagation();
     try {
-      await socialService.rejectFollowRequest(followId.replace('follow-', ''));
+      await socialService.rejectFollowRequest(followId.replace("follow-", ""));
       refreshNotifications();
     } catch (error) {
-      console.error('Failed to reject follow request:', error);
+      console.error("Failed to reject follow request:", error);
     }
   };
 
@@ -221,7 +232,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                       {notifications.length > 0 ? (
                         <div>
                           {notifications.map((notif) => {
-                            console.log('Rendering notification:', notif);
+                            console.log("Rendering notification:", notif);
                             const timeAgo = formatTimeAgo(notif.created_at);
 
                             return (
@@ -235,17 +246,23 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                   if (!notif.is_read) {
                                     markAsRead([notif.id]);
                                   }
-                                  
+
                                   if (notif.item_type === "like") {
                                     // Navigate to the liked entry
-                                    const entryId = notif.content_data?.data?.entry_id;
+                                    const entryId =
+                                      notif.content_data?.data?.entry_id;
                                     if (entryId) {
                                       navigate(`/posts/${entryId}`);
                                     }
                                   } else if (notif.item_type === "follow") {
                                     // Always navigate to the follower's profile page
-                                    const authorId = notif.sender.id.includes("/")
-                                      ? notif.sender.id.split("/").filter(Boolean).pop()
+                                    const authorId = notif.sender.id.includes(
+                                      "/"
+                                    )
+                                      ? notif.sender.id
+                                          .split("/")
+                                          .filter(Boolean)
+                                          .pop()
                                       : notif.sender.id;
                                     if (authorId) {
                                       navigate(`/authors/${authorId}`);
@@ -277,48 +294,82 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                   <div className="flex-1">
                                     <p className="text-sm text-text-1">
                                       <span className="font-medium">
-                                        {notif.item_type === "like" 
-                                          ? notif.sender.displayName || notif.sender.username
-                                          : notif.sender.displayName || notif.sender.username || "Someone"
-                                        }
+                                        {notif.item_type === "like"
+                                          ? notif.sender?.displayName ||
+                                            notif.sender?.display_name ||
+                                            notif.sender?.username ||
+                                            "Unknown User"
+                                          : notif.sender?.displayName ||
+                                            notif.sender?.display_name ||
+                                            notif.sender?.username ||
+                                            "Someone"}
                                       </span>
                                       {notif.item_type === "follow" && (
                                         <>
-                                          {notif.content_data?.data?.status === "requesting" && " wants to follow you"}
-                                          {notif.content_data?.data?.status === "accepted" && " is now following you"}
-                                          {notif.content_data?.data?.status === "rejected" && "'s follow request was rejected"}
+                                          {notif.content_data?.data?.status ===
+                                            "requesting" &&
+                                            " wants to follow you"}
+                                          {notif.content_data?.data?.status ===
+                                            "accepted" &&
+                                            " is now following you"}
+                                          {notif.content_data?.data?.status ===
+                                            "rejected" &&
+                                            "'s follow request was rejected"}
                                         </>
                                       )}
-                                      {notif.item_type === "like" && " liked your post"}
-                                      {notif.item_type === "like" && notif.content_data?.data?.entry_title && (
-                                        <span className="text-text-2"> "{notif.content_data.data.entry_title}"</span>
-                                      )}
+                                      {notif.item_type === "like" &&
+                                        " liked your post"}
+                                      {notif.item_type === "like" &&
+                                        notif.content_data?.data
+                                          ?.entry_title && (
+                                          <span className="text-text-2">
+                                            {" "}
+                                            "
+                                            {
+                                              notif.content_data.data
+                                                .entry_title
+                                            }
+                                            "
+                                          </span>
+                                        )}
                                     </p>
                                     <p className="text-xs text-text-2 mt-1">
                                       {timeAgo}
                                     </p>
-                                    {notif.item_type === "follow" && notif.content_data?.data?.status === "requesting" && (
-                                      <div className="flex space-x-2 mt-2">
-                                        <Button
-                                          size="sm"
-                                          variant="primary"
-                                          onClick={(e) => handleAcceptFollowRequest(notif.id, e)}
-                                          className="flex items-center space-x-1 text-xs px-2 py-1"
-                                        >
-                                          <Check size={12} />
-                                          <span>Accept</span>
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          onClick={(e) => handleRejectFollowRequest(notif.id, e)}
-                                          className="flex items-center space-x-1 text-xs px-2 py-1"
-                                        >
-                                          <X size={12} />
-                                          <span>Reject</span>
-                                        </Button>
-                                      </div>
-                                    )}
+                                    {notif.item_type === "follow" &&
+                                      notif.content_data?.data?.status ===
+                                        "requesting" && (
+                                        <div className="flex space-x-2 mt-2">
+                                          <Button
+                                            size="sm"
+                                            variant="primary"
+                                            onClick={(e) =>
+                                              handleAcceptFollowRequest(
+                                                notif.id,
+                                                e
+                                              )
+                                            }
+                                            className="flex items-center space-x-1 text-xs px-2 py-1"
+                                          >
+                                            <Check size={12} />
+                                            <span>Accept</span>
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={(e) =>
+                                              handleRejectFollowRequest(
+                                                notif.id,
+                                                e
+                                              )
+                                            }
+                                            className="flex items-center space-x-1 text-xs px-2 py-1"
+                                          >
+                                            <X size={12} />
+                                            <span>Reject</span>
+                                          </Button>
+                                        </div>
+                                      )}
                                   </div>
                                 </div>
                               </motion.div>
@@ -398,7 +449,9 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white">
-                        {(user.displayName || user.display_name)?.charAt(0).toUpperCase() || "U"}
+                        {(user.displayName || user.display_name)
+                          ?.charAt(0)
+                          .toUpperCase() || "U"}
                       </div>
                     )}
                   </div>
