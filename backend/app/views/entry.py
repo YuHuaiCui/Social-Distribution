@@ -34,7 +34,6 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     Special endpoints:
     - GET /api/entries/liked/ - Get entries liked by current user
-    - GET /api/entries/saved/ - Get entries saved by current user
     - GET /api/entries/feed/ - Get entries from friends
     """
 
@@ -734,52 +733,6 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=False, methods=["get"], url_path="saved")
-    def saved_entries(self, request):
-        """
-        Get the current user's saved entries.
-
-        Returns a paginated list of entries that the authenticated user
-        has saved/bookmarked, ordered by most recent save first.
-        """
-        from app.models import SavedEntry
-
-        user = request.user
-
-        if not user.is_authenticated:
-            return Response(
-                {"error": "Authentication required"},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        try:
-            # The user is already an Author instance since Author extends AbstractUser
-            user_author = user
-
-            # Get entries that this user has saved
-            saved_entry_ids = SavedEntry.objects.filter(
-                author=user_author,
-            ).values_list("entry__id", flat=True)
-
-            entries = Entry.objects.filter(id__in=saved_entry_ids).order_by(
-                "-created_at"
-            )
-
-            # Apply pagination
-            page = self.paginate_queryset(entries)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
-
-            serializer = self.get_serializer(entries, many=True)
-            return Response(serializer.data)
-
-        except Exception as e:
-            logger.error(f"Error retrieving saved entries for user {user}: {str(e)}")
-            return Response(
-                {"error": f"Could not retrieve saved entries: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
     @action(detail=False, methods=["get"], url_path="feed")
     def feed_entries(self, request):
@@ -958,105 +911,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=True, methods=["post", "delete"], url_path="save")
-    def save_entry(self, request, id=None):
-        """
-        Save or unsave a post.
 
-        Uses the SavedEntry model to track which entries users have saved.
-        """
-        from app.models import SavedEntry
-
-        entry = self.get_object()
-        user = request.user
-
-        try:
-            # The user is already an Author instance since Author extends AbstractUser
-            user_author = user
-
-            # Check if entry is already saved
-            existing_save = SavedEntry.objects.filter(
-                author=user_author,
-                entry=entry,
-            ).first()
-
-            if request.method == "POST":
-                # Save the entry
-                if existing_save:
-                    return Response(
-                        {"detail": "Entry already saved"}, status=status.HTTP_200_OK
-                    )
-
-                # Create a new saved entry record
-                SavedEntry.objects.create(
-                    author=user_author,
-                    entry=entry,
-                )
-                return Response(
-                    {"detail": "Entry saved successfully"},
-                    status=status.HTTP_201_CREATED,
-                )
-
-            elif request.method == "DELETE":
-                # Unsave the entry
-                if not existing_save:
-                    return Response(
-                        {"detail": "Entry was not saved"},
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-
-                existing_save.delete()
-                return Response(
-                    {"detail": "Entry unsaved successfully"},
-                    status=status.HTTP_204_NO_CONTENT,
-                )
-
-        except Exception as e:
-            logger.error(
-                f"Error saving/unsaving entry {entry.id} for user {user}: {str(e)}"
-            )
-            return Response(
-                {"error": f"Could not save/unsave entry: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    def save_entry_by_fqid(self, request, entry_fqid=None):
-        """
-        Save or unsave a post by FQID.
-
-        Uses the SavedEntry model to track which entries users have saved.
-        """
-        if not entry_fqid:
-            return Response(
-                {"error": "Entry FQID is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            # Extract UUID from FQID
-            if "/" in entry_fqid:
-                entry_id = entry_fqid.rstrip("/").split("/")[-1]
-            else:
-                entry_id = entry_fqid
-
-            # Validate UUID
-            import uuid
-
-            uuid.UUID(entry_id)
-
-            # Use existing save logic
-            self.kwargs["id"] = entry_id
-            return self.save_entry(request, id=entry_id)
-
-        except ValueError:
-            return Response(
-                {"error": "Invalid entry ID format"}, status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            logger.error(f"Error saving entry by FQID {entry_fqid}: {str(e)}")
-            return Response(
-                {"error": "Could not save/unsave entry"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
     def _send_update_to_remote_nodes(self, entry):
         """

@@ -5,7 +5,6 @@ import {
   Home,
   Users,
   Star,
-  Bookmark,
   Hash,
   Settings,
   Server,
@@ -37,7 +36,6 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
     { path: "/home", icon: Home, label: "Home Feed" },
     { path: "/friends", icon: Users, label: "Friends" },
     { path: "/liked", icon: Star, label: "Liked" },
-    { path: "/saved", icon: Bookmark, label: "Saved" },
     { path: "/node-management", icon: Server, label: "Node Management" },
   ];
 

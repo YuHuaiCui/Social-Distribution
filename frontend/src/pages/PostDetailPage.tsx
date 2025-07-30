@@ -6,7 +6,6 @@ import {
   Heart,
   MessageCircle,
   Share2,
-  Bookmark,
   MoreVertical,
   Edit,
   Trash2,
@@ -46,7 +45,6 @@ export const PostDetailPage: React.FC = () => {
   const [comments, setComments] = useState<CommentWithReplies[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [commentContentType, setCommentContentType] = useState<
     "text/plain" | "text/markdown"
@@ -199,19 +197,6 @@ export const PostDetailPage: React.FC = () => {
       }
     }
 
-    // Get bookmarked/saved status
-    if (user?.id) {
-      try {
-        const savedPostsResponse = await socialService.getSavedPosts();
-        const isSaved = savedPostsResponse.results.some(
-          (savedPost) => savedPost.id === validPostId
-        );
-        setIsBookmarked(isSaved);
-      } catch (error) {
-        console.error("Error checking saved status:", error);
-        setIsBookmarked(false);
-      }
-    }
 
     // Always set loading to false at the end
     setIsLoading(false);
@@ -275,28 +260,6 @@ export const PostDetailPage: React.FC = () => {
           ? (post.likes_count || 0) + 1
           : Math.max((post.likes_count || 0) - 1, 0),
       });
-    }
-  };
-  const handleBookmark = async () => {
-    if (!postId) return;
-
-    // Extract UUID from postId if it's a URL
-    const extractedId = extractUUID(postId);
-
-    const newBookmarkState = !isBookmarked;
-    setIsBookmarked(newBookmarkState);
-
-    try {
-      // Make the actual API call
-      if (newBookmarkState) {
-        await socialService.savePost(extractedId);
-      } else {
-        await socialService.unsavePost(extractedId);
-      }
-    } catch (err) {
-      console.error("Error updating bookmark status:", err);
-      // Revert on error
-      setIsBookmarked(!newBookmarkState);
     }
   };
 
@@ -676,7 +639,7 @@ export const PostDetailPage: React.FC = () => {
                 <span>•</span>
                 <span className="flex items-center">
                   <Clock size={14} className="mr-1" />
-                  {formatDate(post.created_at)}
+                  {formatDate(post.published || post.created_at)}
                 </span>
               </div>
             </div>
@@ -761,21 +724,6 @@ export const PostDetailPage: React.FC = () => {
               </motion.button>
             </div>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleBookmark}
-              className={`${
-                isBookmarked
-                  ? "text-[var(--primary-teal)]"
-                  : "text-text-2 hover:text-text-1"
-              } transition-colors`}
-            >
-              <Bookmark
-                size={20}
-                fill={isBookmarked ? "currentColor" : "none"}
-              />
-            </motion.button>
           </div>
         </Card>
 

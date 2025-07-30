@@ -16,7 +16,6 @@ import SearchResultsPage from "./pages/SearchResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import FriendsPage from "./pages/FriendsPage";
 import AuthorProfilePage from "./pages/AuthorProfilePage";
-import SavedPostsPage from "./pages/SavedPostsPage";
 import LikedPostsPage from "./pages/LikedPostsPage";
 import FollowRequestsPage from "./pages/FollowRequestsPage";
 import DocsPage from "./pages/DocsPage";
@@ -139,14 +138,6 @@ export const routes: RouteObject[] = [
         ),
       },
 
-      {
-        path: "/saved",
-        element: (
-          <Protected>
-            <SavedPostsPage />
-          </Protected>
-        ),
-      },
       {
         path: "/liked",
         element: (

@@ -260,36 +260,6 @@ export class SocialService extends BaseApiService {
     return this.request<Author[]>(`/api/authors/suggestions/${queryString}`);
   }
 
-  // Saved posts methods
-
-  /**
-   * Save a post
-   */
-  async savePost(entryId: string): Promise<void> {
-    await this.request(`/api/entries/${entryId}/save/`, {
-      method: "POST",
-    });
-  }
-
-  /**
-   * Unsave a post
-   */
-  async unsavePost(entryId: string): Promise<void> {
-    await this.request(`/api/entries/${entryId}/save/`, {
-      method: "DELETE",
-    });
-  }
-
-  /**
-   * Get saved posts
-   */
-  async getSavedPosts(params?: {
-    page?: number;
-    page_size?: number;
-  }): Promise<PaginatedResponse<Entry>> {
-    const queryString = this.buildQueryString(params || {});
-    return this.request(`/api/entries/saved/${queryString}`);
-  }
 
   /**
    * Get likes received on current user's entries

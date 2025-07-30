@@ -5,6 +5,7 @@ import type { CreateEntryData } from "../types";
 
 const CreateEntryForm = () => {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [visibility, setVisibility] = useState("public");
   const [contentType, setContentType] = useState("text/plain");
@@ -19,9 +20,10 @@ const CreateEntryForm = () => {
     e.preventDefault();
     const entryData: CreateEntryData = {
       title,
+      description,
       content,
       visibility: visibility as CreateEntryData["visibility"],
-      content_type: contentType as CreateEntryData["content_type"],
+      contentType: contentType as CreateEntryData["contentType"],
     };
 
     try {
@@ -29,6 +31,7 @@ const CreateEntryForm = () => {
 
       setMessage("Entry created successfully!");
       setTitle("");
+      setDescription("");
       setContent("");
     } catch (err: unknown) {
       const errorMessage =
@@ -48,6 +51,13 @@ const CreateEntryForm = () => {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
+        />
+        <input
+          className="w-full border px-3 py-2 rounded"
+          type="text"
+          placeholder="Description (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         />
         <textarea
           className="w-full border px-3 py-2 rounded"

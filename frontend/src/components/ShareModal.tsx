@@ -113,11 +113,36 @@ const ShareModalComponent: React.FC<ShareModalProps> = ({
   }, []);
 
   const handleCopyLink = useCallback(() => {
-    navigator.clipboard.writeText(postUrl).then(() => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(postUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => {
+        fallbackCopyTextToClipboard(postUrl);
+      });
+    } else {
+      fallbackCopyTextToClipboard(postUrl);
+    }
+  }, [postUrl]);
+
+  const fallbackCopyTextToClipboard = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
-  }, [postUrl]);
+    } catch (err) {
+      console.error('Fallback: Oops, unable to copy', err);
+    }
+    document.body.removeChild(textArea);
+  };
 
   const handleShare = useCallback((platform: string) => {
     const encodedUrl = encodeURIComponent(postUrl);

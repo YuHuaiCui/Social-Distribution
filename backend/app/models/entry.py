@@ -190,19 +190,22 @@ class Entry(models.Model):
     objects = EntryManager()
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-published", "-created_at"]  # Primary sort by published, fallback to created_at
         verbose_name_plural = "entries"
         indexes = [
             models.Index(fields=["author", "visibility"]),
-            models.Index(fields=["visibility", "created_at"]),
-            models.Index(fields=["author", "created_at"]),
+            models.Index(fields=["visibility", "published"]),
+            models.Index(fields=["author", "published"]),
             models.Index(fields=["content_type"]),
-            models.Index(fields=["created_at"]),
-            models.Index(fields=["updated_at"]),
-            models.Index(fields=["-created_at"]),  # For default ordering
+            models.Index(fields=["published"]),
+            models.Index(fields=["-published"]),  # For default ordering
             models.Index(fields=["visibility"]),
+            # Keep created_at indexes for backward compatibility and fallback
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["-created_at"]),
             # Compound index for efficient filtered streams (author + visibility + time)
-            models.Index(fields=["author", "visibility", "created_at"]),
+            models.Index(fields=["author", "visibility", "published"]),
+            models.Index(fields=["author", "visibility", "created_at"]),  # Fallback
         ]
 
     def save(self, *args, **kwargs):

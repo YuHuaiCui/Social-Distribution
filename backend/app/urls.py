@@ -59,17 +59,6 @@ entry_feed = EntryViewSet.as_view(
         "get": "feed_entries",
     }
 )
-entry_saved = EntryViewSet.as_view(
-    {
-        "get": "saved_entries",
-    }
-)
-entry_save_action = EntryViewSet.as_view(
-    {
-        "post": "save_entry",
-        "delete": "save_entry",
-    }
-)
 
 urlpatterns = [
     # Core router endpoints - CMPUT 404 Compliant
@@ -120,11 +109,6 @@ urlpatterns = [
         name="entry-feed",
     ),
     path(
-        "entries/saved/",
-        EntryViewSet.as_view({"get": "saved_entries"}),
-        name="entry-saved",
-    ),
-    path(
         "entries/by-url/",
         EntryViewSet.as_view({"get": "get_entry_by_url"}),
         name="entry-by-url",
@@ -140,11 +124,6 @@ urlpatterns = [
             }
         ),
         name="entry-detail",
-    ),
-    path(
-        "entries/<uuid:id>/save/",
-        EntryViewSet.as_view({"post": "save_entry", "delete": "save_entry"}),
-        name="entry-save",
     ),
     path("entries/<uuid:entry_id>/likes/", EntryLikeView.as_view(), name="entry-likes"),
     path(
@@ -174,14 +153,6 @@ urlpatterns = [
         "entries/<path:entry_fqid>/image/",
         ImageUploadView.as_view(),
         name="entry-image-by-fqid",
-    ),
-    # Entry Save by FQID: /api/entries/{ENTRY_FQID}/save/ (specific patterns first)
-    path(
-        "entries/<path:entry_fqid>/save/",
-        EntryViewSet.as_view(
-            {"post": "save_entry_by_fqid", "delete": "save_entry_by_fqid"}
-        ),
-        name="entry-save-by-fqid",
     ),
     # Entry by FQID: /api/entries/{ENTRY_FQID}/ (most general, should be last)
     path(

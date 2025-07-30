@@ -16,7 +16,7 @@ export const HomePage: React.FC = () => {
   const { user } = useAuth();
   const { openCreatePost } = useCreatePost();
   const { refreshTrigger } = usePosts();
-  const [feed, setFeed] = useState<"all" | "friends" | "liked" | "saved">(
+  const [feed, setFeed] = useState<"all" | "friends" | "liked">(
     "all"
   );
   const [posts, setPosts] = useState<Entry[]>([]);
@@ -107,8 +107,6 @@ export const HomePage: React.FC = () => {
               ? "Follow more people to see their posts here"
               : feed === "liked"
               ? "Posts you like will appear here"
-              : feed === "saved"
-              ? "Saved posts will appear here"
               : "Be the first to create a post!"}
           </p>
           {feed === "all" && (
@@ -139,7 +137,6 @@ export const HomePage: React.FC = () => {
               <PostCard
                 post={post}
                 isLiked={post.is_liked}
-                isSaved={post.is_saved}
                 onDelete={(deletedId) => {
                   setPosts((prev) => prev.filter((p) => p.id !== deletedId));
                 }}
@@ -165,8 +162,6 @@ export const HomePage: React.FC = () => {
             ? "Friends Feed"
             : feed === "liked"
             ? "Liked Posts"
-            : feed === "saved"
-            ? "Saved Posts"
             : "Social Stream"}
         </h1>
 

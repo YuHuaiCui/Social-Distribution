@@ -5,8 +5,7 @@
 import type { Author } from "../author";
 import type { ContentType, Visibility, TimestampedModel, PaginatedComments, PaginatedLikes } from "../common";
 
-// Updated Entry interface to match the new API specification
-export interface Entry extends TimestampedModel {
+export interface Entry {
   type: "entry"; // Object type for federation
   title: string;
   id: string; // Full URL as ID per spec
@@ -31,7 +30,6 @@ export interface Entry extends TimestampedModel {
   likes_count?: number;
   comments_count?: number;
   is_liked?: boolean;
-  is_saved?: boolean;
 }
 
 export interface CreateEntryData {

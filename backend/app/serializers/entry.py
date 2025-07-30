@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.conf import settings
 from django.utils import timezone
 import binascii
+from dateutil import parser as date_parser
 from app.models import Entry
 from app.models import Author
 from app.serializers.author import AuthorSerializer
@@ -14,7 +15,6 @@ class EntrySerializer(serializers.ModelSerializer):
     likes_count = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
-    is_saved = serializers.SerializerMethodField()
 
     class Meta:
         model = Entry
@@ -32,13 +32,10 @@ class EntrySerializer(serializers.ModelSerializer):
             "source",
             "origin",
             "published",
-            "created_at",
-            "updated_at",
             "comments_count",
             "likes_count",
             "image",
             "is_liked",
-            "is_saved",
         ]
         read_only_fields = [
             "type",
@@ -48,9 +45,6 @@ class EntrySerializer(serializers.ModelSerializer):
             "author",
             "source",
             "origin",
-            "published",
-            "created_at",
-            "updated_at",
             "comments_count",
             "likes_count",
         ]
@@ -73,7 +67,7 @@ class EntrySerializer(serializers.ModelSerializer):
         """Get the number of likes for this entry"""
         from app.models import Like
 
-        return Like.objects.filter(entry=obj.url).count()
+        return Like.objects.filter(entry=obj).count()
 
     def get_image(self, obj):
         """Get the image data as base64 for image posts"""
@@ -95,18 +89,6 @@ class EntrySerializer(serializers.ModelSerializer):
 
         return Like.objects.filter(author=request.user, entry=obj).exists()
 
-    def get_is_saved(self, obj):
-        """Check if the current user has saved this entry"""
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            return False
-
-        from app.models import SavedEntry
-
-        # The user is already an Author instance since Author extends AbstractUser
-        user_author = request.user
-
-        return SavedEntry.objects.filter(author=user_author, entry=obj).exists()
 
     def _get_comments_data(self, instance, viewing_author):
         """Get comments data for the entry with proper visibility and pagination"""
@@ -223,6 +205,7 @@ class EntrySerializer(serializers.ModelSerializer):
         }
         """
         try:
+            # Get the base representation first
             data = super().to_representation(instance)
 
             # Get the viewing author from the request context
@@ -273,41 +256,75 @@ class EntrySerializer(serializers.ModelSerializer):
                     )
                 ),
                 "visibility": instance.visibility,
-                # Additional fields for frontend compatibility
+                # Additional fields for frontend compatibility (internal use only)
                 "url": instance.url,
                 "source": instance.source,
                 "origin": instance.origin,
-                "created_at": data.get("created_at"),
-                "updated_at": data.get("updated_at"),
                 "comments_count": self.get_comments_count(instance),
                 "likes_count": self.get_likes_count(instance),
-                "image": data.get("image"),
-                "is_liked": data.get("is_liked"),
-                "is_saved": data.get("is_saved"),
+                "image": self.get_image(instance),
+                "is_liked": self.get_is_liked(instance),
             }
 
             return result
         except Exception as e:
-            # Log the error and return a minimal representation to prevent 503 errors
+            # Log the error with more details
             import logging
+            import traceback
 
             logger = logging.getLogger(__name__)
             logger.error(f"Error serializing entry {instance.id}: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
 
-            # Return a minimal representation that won't cause errors
+            # Try to get basic fields that should always work
+            try:
+                author_data = AuthorSerializer(instance.author, context=self.context).data
+            except Exception as author_error:
+                logger.error(f"Author serialization failed: {author_error}")
+                author_data = {
+                    "type": "author",
+                    "id": getattr(instance.author, "url", ""),
+                    "displayName": getattr(instance.author, "display_name", "Unknown"),
+                    "host": f"{settings.SITE_URL}/api/",
+                    "web": f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}",
+                }
+
+            # Return a more complete minimal representation
             return {
                 "type": "entry",
-                "id": getattr(instance, "url", ""),
                 "title": getattr(instance, "title", ""),
-                "content": getattr(instance, "content", ""),
+                "id": getattr(instance, "url", ""),
+                "web": getattr(instance, "web", "") or f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}",
+                "description": getattr(instance, "description", ""),
                 "contentType": getattr(instance, "content_type", "text/plain"),
+                "content": getattr(instance, "content", ""),
+                "author": author_data,
+                "comments": {
+                    "type": "comments",
+                    "id": f"{getattr(instance, 'url', '')}/comments",
+                    "web": f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}/comments",
+                    "page_number": 1,
+                    "size": 5,
+                    "count": 0,
+                    "src": []
+                },
+                "likes": {
+                    "type": "likes", 
+                    "id": f"{getattr(instance, 'url', '')}/likes",
+                    "web": f"{settings.SITE_URL}/authors/{getattr(instance.author, 'id', 'unknown')}/entries/{getattr(instance, 'id', 'unknown')}/likes",
+                    "page_number": 1,
+                    "size": 50,
+                    "count": 0,
+                    "src": []
+                },
+                "published": (
+                    instance.published.isoformat() if getattr(instance, "published", None)
+                    else (instance.created_at.isoformat() if getattr(instance, "created_at", None) else None)
+                ),
                 "visibility": getattr(instance, "visibility", "PUBLIC"),
-                "author": {"id": "", "displayName": "Unknown"},
-                "comments": {"type": "comments", "count": 0, "src": []},
-                "likes": {"type": "likes", "count": 0, "src": []},
                 "comments_count": 0,
                 "likes_count": 0,
-                "error": "Serialization error occurred",
+                "error": f"Serialization error: {str(e)}",
             }
 
     def update(self, instance, validated_data):
@@ -383,18 +400,43 @@ class EntrySerializer(serializers.ModelSerializer):
         """
         Handle conversion of API data to model data.
         - Convert contentType (camelCase) to content_type (snake_case) for model
-        - Convert author URL to UUID if it's included
+        - Handle author object or URL reference
+        - Handle published field
         """
         # Handle contentType field from API spec - convert to snake_case for model
         if "contentType" in data:
             data["content_type"] = data.pop("contentType")
 
-        if (
-            "author" in data
-            and isinstance(data["author"], str)
-            and data["author"].startswith("http")
-        ):
-            parsed = urlparse(data["author"])
-            author_id = parsed.path.rstrip("/").split("/")[-1]
-            data["author"] = author_id
+        # Handle author field - can be a string URL or nested author object
+        if "author" in data:
+            author_data = data["author"]
+            if isinstance(author_data, str) and author_data.startswith("http"):
+                # Extract author ID from URL
+                parsed = urlparse(author_data)
+                author_id = parsed.path.rstrip("/").split("/")[-1]
+                data["author"] = author_id
+            elif isinstance(author_data, dict):
+                # Handle nested author object
+                if "id" in author_data and isinstance(author_data["id"], str):
+                    if author_data["id"].startswith("http"):
+                        # Extract ID from URL
+                        parsed = urlparse(author_data["id"])
+                        author_id = parsed.path.rstrip("/").split("/")[-1]
+                        data["author"] = author_id
+                    else:
+                        data["author"] = author_data["id"]
+                else:
+                    # If no valid ID found, don't include author in data
+                    # The view will handle setting the author
+                    data.pop("author", None)
+
+        # Handle published field - convert to datetime if string
+        if "published" in data and isinstance(data["published"], str):
+            try:
+                # Parse ISO 8601 timestamp
+                data["published"] = date_parser.isoparse(data["published"])
+            except (ValueError, TypeError):
+                # If parsing fails, remove the field to let model handle it
+                data.pop("published", None)
+        
         return super().to_internal_value(data)

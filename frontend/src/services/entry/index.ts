@@ -77,12 +77,14 @@ export class EntryService extends BaseApiService {
 
     // Prepare data for API - convert to API format
     const apiData = {
+      type: "entry",
       title: data.title,
       description: data.description || "",
       content: data.content,
       contentType: data.contentType || "text/plain",
       visibility: data.visibility,
       categories: data.categories || [],
+      // published field will be set by the server if not provided
     };
 
     // Regular JSON request for text entries
@@ -98,12 +100,14 @@ export class EntryService extends BaseApiService {
   async createAuthorEntry(authorId: string, data: CreateEntryData): Promise<Entry> {
     // Use the new endpoint: /api/authors/{AUTHOR_SERIAL}/entries/
     const apiData = {
+      type: "entry",
       title: data.title,
       description: data.description || "",
       content: data.content,
       contentType: data.contentType || "text/plain",
       visibility: data.visibility,
       categories: data.categories || [],
+      // published field will be set by the server if not provided
     };
 
     return this.request<Entry>(`/api/authors/${authorId}/entries/`, {
@@ -136,12 +140,14 @@ export class EntryService extends BaseApiService {
       }
 
       const apiData = {
+        type: "entry",
         title: data.title,
         description: data.description || "",
         content: base64Content,
         contentType: contentType,
         visibility: data.visibility,
         categories: data.categories || [],
+        // published field will be set by the server if not provided
       };
 
       return this.request<Entry>("/api/entries/", {

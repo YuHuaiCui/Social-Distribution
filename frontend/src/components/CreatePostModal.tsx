@@ -43,6 +43,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
   // Form state
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState<ContentType>("text/markdown");
   const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
@@ -57,6 +58,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   React.useEffect(() => {
     if (editingPost) {
       setTitle(editingPost.title || "");
+      setDescription(editingPost.description || "");
       setContent(editingPost.content || "");
       setContentType((editingPost.contentType || "text/markdown") as ContentType);
 
@@ -73,6 +75,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setImages([]);
     } else {
       setTitle("");
+      setDescription("");
       setContent("");
       setContentType("text/markdown");
       setVisibility(defaultVisibility);
@@ -122,7 +125,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     try {
       const entryData: CreateEntryData = {
         title,
-        description: editingPost?.description || "", // Include description for API spec
+        description, // Use the form description field
         content: contentType.startsWith("image/")
           ? content || "Image post" // Use caption for image posts
           : content,
@@ -155,6 +158,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         setContent(updatedPost.content);
         setContentType((updatedPost.contentType || "text/markdown") as ContentType);
         setTitle(updatedPost.title);
+        setDescription(updatedPost.description || "");
         setCategories(updatedPost.categories || []);
         setVisibility(updatedPost.visibility as Visibility);
       } else {
@@ -182,6 +186,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     if (!isLoading) {
       // Reset form
       setTitle("");
+      setDescription("");
       setContent("");
       setContentType("text/markdown");
       setVisibility(defaultVisibility);
@@ -289,6 +294,17 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                     placeholder="Give your post a title..."
                     className="w-full px-4 py-3 bg-input-bg border border-border-1 rounded-lg text-lg font-medium text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200"
                     autoFocus
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Brief description for preview (optional)..."
+                    className="w-full px-4 py-2 bg-input-bg border border-border-1 rounded-lg text-sm text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200"
                   />
                 </div>
 

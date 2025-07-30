@@ -11,7 +11,6 @@ import {
   MessageCircle,
   Share2,
   MoreHorizontal,
-  Bookmark,
   Edit,
   Trash2,
   FileText,
@@ -46,27 +45,22 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
 interface PostCardProps {
   post: Entry;
   onLike?: (isLiked: boolean) => void;
-  onSave?: (isSaved: boolean) => void;
   onDelete?: (postId: string) => void;
   onUpdate?: (post: Entry) => void;
   isLiked?: boolean;
-  isSaved?: boolean;
 }
 
 const PostCardComponent: React.FC<PostCardProps> = ({
   post,
   onLike,
-  onSave,
   onDelete,
   isLiked = false,
-  isSaved = false,
 }) => {
   const { user } = useAuth();
   const { openCreatePost } = useCreatePost();
   const { showSuccess, showError, showInfo } = useToast();
   const navigate = useNavigate();
   const [liked, setLiked] = useState(isLiked);
-  const [saved, setSaved] = useState(isSaved);
   const [likeCount, setLikeCount] = useState(
     post.likes?.count || post.likes_count || 0
   );
@@ -99,7 +93,6 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   useEffect(() => {
     // Initialize state from props and post data
     setLiked(isLiked || post.is_liked || false);
-    setSaved(isSaved || post.is_saved || false);
     setCommentCount(post.comments?.count || post.comments_count || 0);
 
     // Fetch like data if we have a valid post ID
@@ -150,9 +143,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     post.likes?.count,
     post.likes_count,
     post.is_liked,
-    post.is_saved,
     isLiked,
-    isSaved,
     debouncedFetchLikeData,
   ]);
 
@@ -171,7 +162,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     [post.author]
   );
 
-  const date = new Date(post.created_at);
+  const date = new Date(post.published || post.created_at);
   const timeAgo = getTimeAgo(date);
 
   const handleLike = useCallback(async () => {
@@ -201,26 +192,6 @@ const PostCardComponent: React.FC<PostCardProps> = ({
     }
   }, [liked, post.id, showSuccess, showInfo, showError, onLike]);
 
-  const handleSave = useCallback(async () => {
-    const extractedId = extractUUID(post.id);
-    const newSavedState = !saved;
-    setSaved(newSavedState);
-
-    try {
-      if (newSavedState) {
-        await socialService.savePost(extractedId);
-        showSuccess("Post saved to your collection");
-      } else {
-        await socialService.unsavePost(extractedId);
-        showInfo("Post removed from collection");
-      }
-      onSave?.(newSavedState);
-    } catch (error) {
-      // Revert on error
-      setSaved(!newSavedState);
-      showError("Failed to update saved status");
-    }
-  }, [saved, post.id, showSuccess, showInfo, showError, onSave]);
 
   const handleShare = useCallback(() => {
     // For public posts, show the share modal with social media options
@@ -666,31 +637,6 @@ const PostCardComponent: React.FC<PostCardProps> = ({
               </div>
             </button>
 
-            {/* Save Button */}
-            <button
-              onClick={handleSave}
-              className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
-              aria-label={saved ? "Unsave this post" : "Save this post"}
-            >
-              {/* Gradient background on hover or when saved */}
-              <div
-                className={`absolute inset-0 transition-opacity duration-300 ${
-                  saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                }`}
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--primary-violet) 0%, var(--primary-purple) 100%)",
-                }}
-              />
-              <div
-                className={`relative z-10 flex items-center gap-2 ${
-                  saved ? "text-white" : "text-text-2 group-hover:text-white"
-                } transition-colors save-button ${saved ? "saved" : ""}`}
-              >
-                <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
-                <span className="text-sm font-medium">Save</span>
-              </div>
-            </button>
           </div>
         </div>
       </Card>
@@ -738,7 +684,7 @@ export const PostCard = React.memo(
       prevProps.post.comments_count === nextProps.post.comments_count &&
       prevProps.post.visibility === nextProps.post.visibility &&
       prevProps.isLiked === nextProps.isLiked &&
-      prevProps.isSaved === nextProps.isSaved
+      true // removed saved functionality
     );
   }
 );
