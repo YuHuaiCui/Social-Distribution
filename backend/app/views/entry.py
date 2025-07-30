@@ -358,33 +358,39 @@ class EntryViewSet(viewsets.ModelViewSet):
     
     def _serialize_entry_for_inbox(self, entry):
         """Serialize entry in the format expected by remote inboxes."""
-        return {
+        # Ensure all required fields for ActivitySerializer validation are present
+        entry_data = {
             "type": "entry",
-            "id": entry.url,
-            "web": entry.web,
-            "title": entry.title,
-            "description": entry.description,
-            "content": entry.content,
-            "contentType": entry.content_type,
+            "id": entry.url or f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}/",
+            "web": entry.web or f"{settings.FRONTEND_URL or settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+            "title": entry.title or "",
+            "description": entry.description or "",
+            "content": entry.content or "",
+            "contentType": entry.content_type or "text/plain",
             "visibility": entry.visibility,
-            "source": entry.source,
-            "origin": entry.origin,
-            "published": entry.published.isoformat() if entry.published else None,
+            "source": entry.source or "",
+            "origin": entry.origin or "",
+            "published": entry.published.isoformat() if entry.published else timezone.now().isoformat(),
             "author": {
                 "type": "author",
-                "id": entry.author.url,
-                "web": entry.author.web,
-                "host": entry.author.host,
-                "displayName": entry.author.displayName,
-                "profileImage": entry.author.profileImage,
+                "id": entry.author.url or f"{settings.SITE_URL}/api/authors/{entry.author.id}/",
+                "web": entry.author.web or f"{settings.FRONTEND_URL or settings.SITE_URL}/authors/{entry.author.id}",
+                "host": entry.author.host or f"{settings.SITE_URL}/api/",
+                "displayName": entry.author.displayName or entry.author.username,
+                "profileImage": entry.author.profileImage or "",
             }
         }
+        
+        # Log the serialized data for debugging
+        logger.debug(f"Serialized entry for inbox: {json.dumps(entry_data, indent=2)}")
+        
+        return entry_data
     
     def _send_entry_to_author_inbox(self, entry_data, author, node):
         """Send entry data to a specific author's inbox on a remote node."""
         try:
-            # Construct the inbox URL
-            inbox_url = f"{node.host.rstrip('/')}/api/authors/{author.id}/inbox"
+            # Construct the inbox URL (ensure trailing slash for Django URL routing)
+            inbox_url = f"{node.host.rstrip('/')}/api/authors/{author.id}/inbox/"
             
             headers = {
                 'Content-Type': 'application/json',
@@ -396,18 +402,34 @@ class EntryViewSet(viewsets.ModelViewSet):
             if node.username and node.password:
                 auth = (node.username, node.password)
             
+            # Log detailed request information for debugging
+            logger.info(f"Sending entry to inbox: {inbox_url}")
+            logger.debug(f"Entry data: {json.dumps(entry_data, indent=2)}")
+            logger.debug(f"Headers: {headers}")
+            logger.debug(f"Using auth: {'Yes' if auth else 'No'}")
+            logger.debug(f"Node credentials - username: {node.username}, has_password: {'Yes' if node.password else 'No'}")
+            
             response = requests.post(
                 inbox_url,
                 json=entry_data,
                 headers=headers,
                 auth=auth,
-                timeout=10
+                timeout=30  # Increased timeout for debugging
             )
             
             if response.status_code in [200, 201]:
                 logger.info(f"Successfully sent entry to {author.displayName} at {node.name}")
             else:
                 logger.warning(f"Failed to send entry to {author.displayName} at {node.name}: {response.status_code}")
+                logger.warning(f"Response headers: {dict(response.headers)}")
+                try:
+                    response_text = response.text
+                    logger.warning(f"Response body: {response_text}")
+                    if response.headers.get('content-type', '').startswith('application/json'):
+                        response_json = response.json()
+                        logger.warning(f"Response JSON: {json.dumps(response_json, indent=2)}")
+                except Exception as parse_error:
+                    logger.warning(f"Could not parse response body: {parse_error}")
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error sending entry to {author.displayName} at {node.name}: {str(e)}")
