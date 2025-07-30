@@ -674,6 +674,9 @@ class EntryViewSet(viewsets.ModelViewSet):
         - friends-only entries: must be authenticated
         - public/unlisted entries: no authentication required
         """
+        # Override permission check for this specific endpoint
+        self.permission_classes = [AllowAny]
+        self.check_permissions(request)
         if not entry_fqid:
             return Response(
                 {"error": "Entry FQID is required"}, status=status.HTTP_400_BAD_REQUEST
