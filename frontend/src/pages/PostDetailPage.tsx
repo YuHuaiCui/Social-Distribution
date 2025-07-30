@@ -179,17 +179,13 @@ export const PostDetailPage: React.FC = () => {
       // Continue with other operations even if comments fail
     }
 
-    // Get like status using the API
+    // Get like status using the SocialService
     if (user?.id) {
       try {
-        const response = await fetch(`/api/entries/${validPostId}/likes/`);
-        if (response.ok) {
-          const likeData = await response.json();
-          setIsLiked(likeData.liked_by_current_user);
-        } else {
-          // If the API call fails, use the is_liked property from the post
-          setIsLiked(fetchedPost.is_liked || false);
-        }
+        const likeData = await socialService.getEntryLikes(validPostId);
+        // Check if current user liked this entry by looking through the likes
+        const liked_by_current_user = likeData.src.some(like => like.author.id === user.id);
+        setIsLiked(liked_by_current_user);
       } catch (error) {
         console.error("Error fetching like status:", error);
         // Fallback to post data
