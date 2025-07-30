@@ -59,6 +59,11 @@ export function isRemoteAuthor(author: { id: string; url?: string; node?: any; i
       return true;
     }
     
+    // If it starts with http/https, it's definitely a FQID (remote)
+    if (authorId.startsWith('http://') || authorId.startsWith('https://')) {
+      return true;
+    }
+    
     // If it's just a UUID, it's local
     if (isValidUUID(authorId)) {
       return false;
