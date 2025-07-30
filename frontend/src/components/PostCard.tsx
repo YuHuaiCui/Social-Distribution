@@ -271,27 +271,22 @@ const PostCardComponent: React.FC<PostCardProps> = ({
         contentType === 'image/jpeg;base64' ||
         contentType === 'application/base64') {
       
-      // For base64 content, the content field contains the base64 data
-      let imageDataUrl = post.content;
-      
-      // If content doesn't start with data:, construct the data URL
-      if (!imageDataUrl.startsWith('data:')) {
-        const mimeType = contentType === 'image/png;base64' ? 'image/png' :
-                        contentType === 'image/jpeg;base64' ? 'image/jpeg' :
-                        'image/png'; // default fallback
-        imageDataUrl = `data:${mimeType};base64,${imageDataUrl}`;
-      }
+      // Use the new image API endpoint
+      const authorId = extractUUID(post.author.id);
+      const entryId = extractUUID(post.id);
+      const imageUrl = `/api/authors/${authorId}/entries/${entryId}/image`;
       
       return (
         <div className="mb-4 rounded-lg overflow-hidden">
-          <img
-            src={imageDataUrl}
+          <LoadingImage
+            src={imageUrl}
             alt={post.title || "Post image"}
             className="w-full h-auto max-h-96 object-contain rounded-lg"
-            onError={(e) => {
-              console.error('Failed to load base64 image');
-              e.currentTarget.style.display = 'none';
-            }}
+            fallback={
+              <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
+                <FileText size={48} />
+              </div>
+            }
           />
           {/* Show description as caption if it exists */}
           {post.description && (
