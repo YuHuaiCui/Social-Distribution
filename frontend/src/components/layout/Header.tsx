@@ -300,8 +300,13 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                       <span className="font-medium">
                                         {senderName}
                                       </span>
-                                      {notif.item_type === "follow" &&
-                                        " wants to follow you"}
+                                      {notif.item_type === "follow" && (
+                                        <>
+                                          {notif.content_data?.data?.status === "requesting" && " wants to follow you"}
+                                          {notif.content_data?.data?.status === "accepted" && " is now following you"}
+                                          {notif.content_data?.data?.status === "rejected" && "'s follow request was rejected"}
+                                        </>
+                                      )}
                                       {notif.item_type === "like" &&
                                         " liked your post"}
                                       {notif.item_type === "comment" &&

@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Search, Filter, FileText, Users, Hash, 
-  Loader2 
+  Loader2, Shield 
 } from 'lucide-react';
 import type { Entry, Author } from '../types/models';
 import { api } from '../services/api';
@@ -39,6 +39,8 @@ export const SearchResultsPage: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [pendingAuthors, setPendingAuthors] = useState<Author[]>([]);
+  const [showPendingAuthors, setShowPendingAuthors] = useState(false);
 
   const { user } = useAuth();
   const isAdmin = user?.is_staff || user?.is_superuser;
@@ -49,6 +51,22 @@ export const SearchResultsPage: React.FC = () => {
       performSearch();
     }
   }, [query, tag, searchType, showUnapprovedOnly]);
+
+  // Fetch pending authors for admins
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPendingAuthors();
+    }
+  }, [isAdmin]);
+
+  const fetchPendingAuthors = async () => {
+    try {
+      const pending = await api.getPendingAuthors();
+      setPendingAuthors(pending);
+    } catch (error) {
+      console.error('Error fetching pending authors:', error);
+    }
+  };
 
   const performSearch = async () => {
     setIsLoading(true);
@@ -155,9 +173,43 @@ export const SearchResultsPage: React.FC = () => {
         </form>
       </motion.div>
 
+      {/* Admin Pending Users Button */}
+      {isAdmin && pendingAuthors.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4"
+        >
+          <Card variant="prominent" className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded-lg bg-[var(--primary-yellow)]/20">
+                  <Shield size={20} className="text-[var(--primary-yellow)]" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-text-1">
+                    Pending User Approvals
+                  </h3>
+                  <p className="text-sm text-text-2">
+                    {pendingAuthors.length} user{pendingAuthors.length !== 1 ? 's' : ''} waiting for approval
+                  </p>
+                </div>
+              </div>
+              <AnimatedButton
+                onClick={() => setShowPendingAuthors(!showPendingAuthors)}
+                variant="secondary"
+                size="sm"
+              >
+                {showPendingAuthors ? 'Hide' : 'Show'}
+              </AnimatedButton>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Results Header */}
       <div className="flex items-center justify-between mb-6">
-        {isAdmin && searchType === "authors" && (
+        {isAdmin && searchType === "authors" && !showPendingAuthors && (
         <label className="flex items-center space-x-2 text-sm text-text-2 ml-4">
           <input
             type="checkbox"
@@ -170,9 +222,9 @@ export const SearchResultsPage: React.FC = () => {
       )}
         <div>
           <h1 className="text-2xl font-bold text-text-1">
-            {tag ? `Posts tagged with #${tag}` : `Search results for "${query}"`}
+            {showPendingAuthors ? 'Pending User Approvals' : tag ? `Posts tagged with #${tag}` : `Search results for "${query}"`}
           </h1>
-          {!isLoading && (
+          {!isLoading && !showPendingAuthors && (
             <p className="text-text-2 mt-1">
               Found {getTotalResults()} result{getTotalResults() !== 1 ? 's' : ''}
             </p>
@@ -223,7 +275,7 @@ export const SearchResultsPage: React.FC = () => {
       </div>
 
       {/* Loading State */}
-      {isLoading ? (
+      {isLoading && !showPendingAuthors ? (
         <div className="flex justify-center items-center py-12">
           <motion.div
             animate={{ rotate: 360 }}
@@ -232,6 +284,35 @@ export const SearchResultsPage: React.FC = () => {
             <Loader2 size={32} className="text-[var(--primary-violet)]" />
           </motion.div>
         </div>
+      ) : showPendingAuthors && isAdmin ? (
+        // Show pending authors for admin
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingAuthors.map((author) => (
+              <motion.div
+                key={author.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
+                <AuthorCard author={author} variant="default" />
+              </motion.div>
+            ))}
+          </div>
+          {pendingAuthors.length === 0 && (
+            <Card variant="prominent" className="text-center py-12">
+              <Users size={48} className="text-text-2 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-text-1 mb-2">
+                No pending approvals
+              </h3>
+              <p className="text-text-2">
+                All users have been approved
+              </p>
+            </Card>
+          )}
+        </motion.div>
       ) : (
         <div className="space-y-6">
           {/* Posts Results */}

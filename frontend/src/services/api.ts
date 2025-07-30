@@ -513,6 +513,10 @@ class ApiService {
     return this.request(`/api/authors/${id}/`, { method: "DELETE" });
   }
 
+  async getPendingAuthors(): Promise<Author[]> {
+    return this.request<Author[]>("/api/authors/pending/");
+  }
+
   async promoteToAdmin(authorId: string): Promise<void> {
     // Extract ID from URL if full URL is passed
     const id = authorId.includes("/")

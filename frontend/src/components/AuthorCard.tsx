@@ -83,15 +83,25 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
 
       try {
         // Use URLs instead of IDs for the follow status check
+        // Extract UUID to ensure consistent format
+        const currentUserId = extractUUID(currentUser.id);
+        const authorId = extractUUID(author.id);
+        
         const currentUserUrl =
           currentUser.url ||
-          `${window.location.origin}/api/authors/${currentUser.id}`;
+          `${window.location.origin}/api/authors/${currentUserId}/`;
         const authorUrl =
-          author.url || `${window.location.origin}/api/authors/${author.id}`;
+          author.url || `${window.location.origin}/api/authors/${authorId}/`;
         const status = await socialService.checkFollowStatus(
           currentUserUrl,
           authorUrl
         );
+        console.log('Follow status check:', {
+          currentUserUrl,
+          authorUrl,
+          status,
+          author
+        });
         setIsFollowing(status.is_following);
         setFollowStatus(status.follow_status || "none");
       } catch (error) {
@@ -158,6 +168,22 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         await socialService.followAuthor(extractUUID(author.id));
         setFollowStatus("requesting");
         onFollow?.(false);
+        
+        // Re-check status after a short delay to ensure backend is updated
+        setTimeout(async () => {
+          try {
+            const currentUserId = extractUUID(currentUser.id);
+            const authorId = extractUUID(author.id);
+            const currentUserUrl = currentUser.url || `${window.location.origin}/api/authors/${currentUserId}/`;
+            const authorUrl = author.url || `${window.location.origin}/api/authors/${authorId}/`;
+            const updatedStatus = await socialService.checkFollowStatus(currentUserUrl, authorUrl);
+            setFollowStatus(updatedStatus.follow_status || "none");
+            setIsFollowing(updatedStatus.is_following);
+          } catch (error) {
+            console.error("Error re-checking follow status:", error);
+          }
+        }, 500);
+        
         // Dispatch event for other components
         window.dispatchEvent(new Event("follow-update"));
       }

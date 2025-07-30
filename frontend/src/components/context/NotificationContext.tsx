@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { NotificationService } from '../../services/notification';
+import { useAuth } from './AuthContext';
 
 interface NotificationContextType {
   unreadCount: number;
@@ -18,22 +20,56 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [pendingFollows, setPendingFollows] = useState(0);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  
+  const notificationService = new NotificationService();
 
-  // Stub implementation - inbox functionality removed
   const refreshNotifications = useCallback(async () => {
-    // No-op - inbox functionality removed
-  }, []);
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const allNotifications = await notificationService.getAllNotifications();
+      setNotifications(allNotifications);
+      
+      // Count unread (all are unread since we removed read tracking)
+      setUnreadCount(allNotifications.length);
+      
+      // Count pending follows
+      const pendingCount = allNotifications.filter(
+        n => n.item_type === 'follow' && n.content_data?.data?.status === 'requesting'
+      ).length;
+      setPendingFollows(pendingCount);
+    } catch (error) {
+      console.error('Error refreshing notifications:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Refresh notifications when user changes
+  useEffect(() => {
+    if (user) {
+      refreshNotifications();
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
+      setPendingFollows(0);
+    }
+  }, [user, refreshNotifications]);
 
   const markAsRead = useCallback(async (ids: string[]) => {
-    // No-op - inbox functionality removed
+    // Since we don't track read status anymore, just decrease the count
+    setUnreadCount(prev => Math.max(0, prev - ids.length));
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    // No-op - inbox functionality removed
+    setUnreadCount(0);
   }, []);
 
   const clearNotification = useCallback((id: string) => {
-    // No-op - inbox functionality removed
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    setUnreadCount(prev => Math.max(0, prev - 1));
   }, []);
 
   const value: NotificationContextType = {

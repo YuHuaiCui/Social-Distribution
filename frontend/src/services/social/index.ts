@@ -245,13 +245,17 @@ export class SocialService extends BaseApiService {
     is_friends: boolean;
     follow_status?: "requesting" | "accepted" | "rejected" | "none";
   }> {
+    // Properly encode URLs for query parameters
+    const encodedFollowerId = encodeURIComponent(followerId);
+    const encodedFollowedId = encodeURIComponent(followedId);
+    
     const response = await this.request<{
       follower: string;
       followed: string;
       status: string;
       created_at?: string;
     }>(
-      `/api/follows/status/?follower_url=${followerId}&followed_url=${followedId}`
+      `/api/follows/status/?follower_url=${encodedFollowerId}&followed_url=${encodedFollowedId}`
     );
 
     // Map backend response to frontend expected format
