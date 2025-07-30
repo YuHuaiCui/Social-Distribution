@@ -11,6 +11,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 from app.models import Node
 from app.serializers.comment import CommentSerializer
+from django.conf import settings
 
 
 @api_view(["GET"])
@@ -122,11 +123,11 @@ class CommentListCreateView(generics.ListCreateAPIView):
         # Handle different URL patterns
         if "entry_id" in self.kwargs:
             entry_id = self.kwargs["entry_id"]
-            return Comment.objects.filter(entry__id=entry_id)
+            return Comment.objects.filter(entry__id=entry_id).order_by("-created_at")
         elif "author_id" in self.kwargs:
             # For /api/authors/{author_id}/commented/ endpoint
             author_id = self.kwargs["author_id"]
-            return Comment.objects.filter(author__id=author_id)
+            return Comment.objects.filter(author__id=author_id).order_by("-created_at")
         elif "author_fqid" in self.kwargs:
             # For /api/authors/{author_fqid}/commented/ endpoint
             from urllib.parse import unquote
@@ -135,12 +136,81 @@ class CommentListCreateView(generics.ListCreateAPIView):
             author_fqid = unquote(self.kwargs["author_fqid"])
             try:
                 author = Author.objects.get(url=author_fqid)
-                return Comment.objects.filter(author=author)
+                return Comment.objects.filter(author=author).order_by("-created_at")
             except Author.DoesNotExist:
                 return Comment.objects.none()
         else:
             # Return all comments if no specific filter
-            return Comment.objects.all()
+            return Comment.objects.all().order_by("-created_at")
+
+    def list(self, request, *args, **kwargs):
+        """Override list to return comments in the correct format"""
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Apply visibility rules
+        if "entry_id" in self.kwargs:
+            entry_id = self.kwargs["entry_id"]
+            try:
+                entry = Entry.objects.get(id=entry_id)
+                # Check if user can see comments based on entry visibility
+                viewing_author = request.user if request.user.is_authenticated else None
+                if not self._should_include_comment_details(entry, viewing_author):
+                    # Return empty comments object if not visible
+                    return Response({
+                        "type": "comments",
+                        "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+                        "id": f"{entry.url}/comments",
+                        "page_number": 1,
+                        "size": 5,
+                        "count": 0,
+                        "src": [],
+                    })
+            except Entry.DoesNotExist:
+                return Response(
+                    {"detail": "Entry not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        
+        # Serialize comments
+        serializer = self.get_serializer(queryset[:5], many=True)
+        
+        # Return in the correct format
+        return Response({
+            "type": "comments",
+            "web": f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}" if 'entry' in locals() else None,
+            "id": f"{entry.url}/comments" if 'entry' in locals() else None,
+            "page_number": 1,
+            "size": 5,
+            "count": queryset.count(),
+            "src": serializer.data,
+        })
+
+    def _should_include_comment_details(self, instance, viewing_author):
+        """
+        Determine if comment details should be included based on visibility rules.
+        Comments details are included for:
+        - public entries
+        - unlisted entries
+        - friends-only entries when sending to a friend
+        """
+        if instance.visibility == Entry.PUBLIC:
+            return True
+        elif instance.visibility == Entry.UNLISTED:
+            return True
+        elif instance.visibility == Entry.FRIENDS_ONLY:
+            # Check if viewing_author is a friend of the entry author
+            if viewing_author and instance.author:
+                from app.models.friendship import Friendship
+
+                return (
+                    Friendship.objects.filter(
+                        author1=viewing_author, author2=instance.author
+                    ).exists()
+                    or Friendship.objects.filter(
+                        author1=instance.author, author2=viewing_author
+                    ).exists()
+                )
+        return False
 
     def perform_create(self, serializer):
         # Handle different URL patterns
@@ -151,7 +221,6 @@ class CommentListCreateView(generics.ListCreateAPIView):
             except Entry.DoesNotExist:
                 raise NotFound(f"Entry with ID {entry_id} not found")
         else:
-
             entry_url = serializer.validated_data.get("entry")
             if not entry_url:
                 raise ValidationError({"entry": "Entry field is required"})
@@ -161,10 +230,13 @@ class CommentListCreateView(generics.ListCreateAPIView):
                 raise NotFound(f"Entry not found")
 
         # Ensure required fields are present
-        if not serializer.validated_data.get("content"):
+        content = serializer.validated_data.get("content")
+        if not content:
             raise serializers.ValidationError({"content": "Content field is required"})
-            # Make sure content_type is valid
-        if serializer.validated_data.get("content_type") not in [
+        
+        # Make sure content_type is valid
+        content_type = serializer.validated_data.get("content_type")
+        if content_type not in [
             Entry.TEXT_PLAIN,
             Entry.TEXT_MARKDOWN,
         ]:

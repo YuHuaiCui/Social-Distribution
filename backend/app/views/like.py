@@ -384,7 +384,7 @@ class EntryLikeView(APIView):
 
         serializer = LikeSerializer(likes, many=True, context={"request": request})
 
-        return Response({"type": "liked", "items": serializer.data})
+        return Response({"type": "likes", "items": serializer.data})
 
 
 class CommentLikeView(APIView):

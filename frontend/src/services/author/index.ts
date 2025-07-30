@@ -130,6 +130,19 @@ export class AuthorService extends BaseApiService {
   }
 
   /**
+   * Change password for current author
+   */
+  async changePassword(data: {
+    password: string;
+    password_confirm: string;
+  }): Promise<Author> {
+    return this.request<Author>("/api/authors/me/", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
    * Search authors by query
    */
   async searchAuthors(
@@ -182,6 +195,114 @@ export class AuthorService extends BaseApiService {
    */
   isLocal(author: Author): boolean {
     return !this.isRemote(author);
+  }
+
+  /**
+   * Admin method: Approve an author
+   */
+  async approveAuthor(authorId: string): Promise<void> {
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/approve/`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * Admin method: Deactivate an author
+   */
+  async deactivateAuthor(authorId: string): Promise<void> {
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/deactivate/`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * Admin method: Activate an author
+   */
+  async activateAuthor(authorId: string): Promise<void> {
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/activate/`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * Admin method: Delete an author
+   */
+  async deleteAuthor(authorId: string): Promise<void> {
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/`, { method: "DELETE" });
+  }
+
+  /**
+   * Admin method: Promote author to admin
+   */
+  async promoteToAdmin(authorId: string): Promise<void> {
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+    return this.request(`/api/authors/${id}/promote_to_admin/`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * Get author entries
+   */
+  async getAuthorEntries(authorId: string): Promise<any[]> {
+    // Check if this looks like a remote author URL
+    if (
+      authorId.includes("http") ||
+      (authorId.includes("/") && authorId.split("/").length > 2)
+    ) {
+      // For remote authors, we need to get their local cached data first to find their entries
+      // Since we can't directly fetch entries from remote nodes in this implementation
+      try {
+        // Get the remote author first to check if they exist locally
+        const author = await this.getAuthor(authorId);
+        if (author && author.node) {
+          // This is a remote author - we can't fetch their entries directly
+          // Return empty array for now since remote entries fetching isn't implemented
+          console.warn("Remote author entries fetching not yet implemented");
+          return [];
+        }
+      } catch (error) {
+        console.warn(
+          "Could not fetch remote author for entries lookup:",
+          error
+        );
+        return [];
+      }
+    }
+
+    // Extract ID from URL if full URL is passed (for local authors)
+    const id = authorId.includes("/")
+      ? authorId.split("/").filter(Boolean).pop()
+      : authorId;
+
+    try {
+      const response = await this.request<{
+        type: "entries";
+        page_number: number;
+        size: number;
+        count: number;
+        src: any[];
+      }>(`/api/authors/${id}/entries/`);
+      // Return the entries from the CMPUT 404 compliant format
+      return response.src;
+    } catch (error) {
+      console.warn("Failed to fetch author entries:", error);
+      return [];
+    }
   }
 }
 

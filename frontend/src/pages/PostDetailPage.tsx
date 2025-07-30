@@ -103,7 +103,7 @@ export const PostDetailPage: React.FC = () => {
         try {
           // Try fetching through author's endpoint which might have different permissions
           const response = await entryService.getEntriesByAuthor(user.id);
-          const authorPost = response.results.find(
+          const authorPost = response.src.find(
             (entry) => entry.id === validPostId
           );
 
@@ -161,14 +161,19 @@ export const PostDetailPage: React.FC = () => {
       const commentsWithLikes = await Promise.all(
         parentComments.map(async (comment) => {
           try {
-            const likeStatus = await socialService.getCommentLikeStatus(comment.id);
+            const likeStatus = await socialService.getCommentLikeStatus(
+              comment.id
+            );
             return {
               ...comment,
               likes_count: likeStatus.like_count,
               is_liked: likeStatus.liked_by_current_user,
             };
           } catch (error) {
-            console.error(`Error fetching like status for comment ${comment.id}:`, error);
+            console.error(
+              `Error fetching like status for comment ${comment.id}:`,
+              error
+            );
             return comment;
           }
         })
@@ -185,7 +190,9 @@ export const PostDetailPage: React.FC = () => {
       try {
         const likeData = await socialService.getEntryLikes(validPostId);
         // Check if current user liked this entry by looking through the likes
-        const liked_by_current_user = likeData.src.some(like => like.author.id === user.id);
+        const liked_by_current_user = likeData.src.some(
+          (like) => like.author.id === user.id
+        );
         setIsLiked(liked_by_current_user);
       } catch (error) {
         console.error("Error fetching like status:", error);
@@ -193,7 +200,6 @@ export const PostDetailPage: React.FC = () => {
         setIsLiked(fetchedPost.is_liked || false);
       }
     }
-
 
     // Always set loading to false at the end
     setIsLoading(false);
@@ -303,10 +309,10 @@ export const PostDetailPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Create the comment data with the correct type format
+      // Create the comment data with the correct API specification format
       const commentData = {
         content: commentText,
-        content_type: commentContentType,
+        contentType: commentContentType,
       };
 
       // If replying to another comment, add it as parent
@@ -668,7 +674,7 @@ export const PostDetailPage: React.FC = () => {
                 <span>•</span>
                 <span className="flex items-center">
                   <Clock size={14} className="mr-1" />
-                  {formatDate(post.published || post.created_at)}
+                  {formatDate(post.published)}
                 </span>
               </div>
             </div>
@@ -700,7 +706,7 @@ export const PostDetailPage: React.FC = () => {
 
           {/* Content */}
           <div className="mb-8">
-            {renderContent(post.content, post.content_type)}
+                    {renderContent(post.content, post.contentType)}
           </div>
 
           {/* Actions */}
@@ -752,7 +758,6 @@ export const PostDetailPage: React.FC = () => {
                 <Share2 size={20} />
               </motion.button>
             </div>
-
           </div>
         </Card>
 
@@ -870,12 +875,14 @@ export const PostDetailPage: React.FC = () => {
                   <Avatar
                     imgSrc={
                       isAuthorObject(comment.author)
-                        ? comment.author.profileImage || comment.author.profile_image
+                        ? comment.author.profileImage ||
+                          comment.author.profile_image
                         : undefined
                     }
                     alt={
                       isAuthorObject(comment.author)
-                        ? comment.author.displayName || comment.author.display_name
+                        ? comment.author.displayName ||
+                          comment.author.display_name
                         : "Author"
                     }
                     size="md"
@@ -886,11 +893,12 @@ export const PostDetailPage: React.FC = () => {
                         <div>
                           <span className="font-medium text-text-1">
                             {isAuthorObject(comment.author)
-                              ? comment.author.displayName || comment.author.display_name
+                              ? comment.author.displayName ||
+                                comment.author.display_name
                               : "Unknown Author"}
                           </span>
                           <span className="text-sm text-text-2 ml-2">
-                            {formatTime(comment.created_at)}
+                            {formatTime(comment.published)}
                           </span>
                         </div>
                         <button
@@ -900,17 +908,17 @@ export const PostDetailPage: React.FC = () => {
                           Reply
                         </button>
                       </div>
-                      {comment.content_type === "text/markdown" ? (
+                      {comment.contentType === "text/markdown" ? (
                         <div
                           className="prose prose-sm max-w-none text-text-1"
                           dangerouslySetInnerHTML={{
-                            __html: renderMarkdown(comment.content),
+                            __html: renderMarkdown(comment.comment),
                           }}
                         />
                       ) : (
-                        <p className="text-text-1">{comment.content}</p>
+                        <p className="text-text-1">{comment.comment}</p>
                       )}
-                      
+
                       {/* Comment Actions */}
                       <div className="flex items-center space-x-4 mt-3">
                         <button
@@ -920,7 +928,9 @@ export const PostDetailPage: React.FC = () => {
                           {/* Gradient background on hover or when liked */}
                           <motion.div
                             className={`absolute inset-0 transition-opacity ${
-                              comment.is_liked ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                              comment.is_liked
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
                             }`}
                             style={{
                               background:
@@ -929,7 +939,9 @@ export const PostDetailPage: React.FC = () => {
                           />
                           <motion.div
                             className={`relative z-10 flex items-center gap-1.5 ${
-                              comment.is_liked ? "text-white" : "text-text-2 group-hover:text-white"
+                              comment.is_liked
+                                ? "text-white"
+                                : "text-text-2 group-hover:text-white"
                             } transition-colors`}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.95 }}
@@ -947,7 +959,9 @@ export const PostDetailPage: React.FC = () => {
                               size={16}
                               fill={comment.is_liked ? "currentColor" : "none"}
                             />
-                            <span className="text-sm font-medium">{comment.likes_count || 0}</span>
+                            <span className="text-sm font-medium">
+                              {comment.likes_count || 0}
+                            </span>
                           </motion.div>
                         </button>
                       </div>
@@ -966,12 +980,14 @@ export const PostDetailPage: React.FC = () => {
                             <Avatar
                               imgSrc={
                                 isAuthorObject(reply.author)
-                                  ? reply.author.profileImage || reply.author.profile_image
+                                  ? reply.author.profileImage ||
+                                    reply.author.profile_image
                                   : undefined
                               }
                               alt={
                                 isAuthorObject(reply.author)
-                                  ? reply.author.displayName || reply.author.display_name
+                                  ? reply.author.displayName ||
+                                    reply.author.display_name
                                   : "Author"
                               }
                               size="sm"
@@ -980,23 +996,24 @@ export const PostDetailPage: React.FC = () => {
                               <div className="mb-1">
                                 <span className="font-medium text-sm text-text-1">
                                   {isAuthorObject(reply.author)
-                                    ? reply.author.displayName || reply.author.display_name
+                                    ? reply.author.displayName ||
+                                      reply.author.display_name
                                     : "Unknown Author"}
                                 </span>
                                 <span className="text-xs text-text-2 ml-2">
-                                  {formatTime(reply.created_at)}
+                                  {formatTime(reply.published)}
                                 </span>
                               </div>
-                              {reply.content_type === "text/markdown" ? (
+                              {reply.contentType === "text/markdown" ? (
                                 <div
                                   className="prose prose-sm max-w-none text-text-1 text-sm"
                                   dangerouslySetInnerHTML={{
-                                    __html: renderMarkdown(reply.content),
+                                    __html: renderMarkdown(reply.comment),
                                   }}
                                 />
                               ) : (
                                 <p className="text-sm text-text-1">
-                                  {reply.content}
+                                  {reply.comment}
                                 </p>
                               )}
                             </div>
