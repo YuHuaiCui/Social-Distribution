@@ -85,17 +85,10 @@ export interface CreateCommentData {
 // Like interface for the nested likes data
 export interface Like {
   type: "like";
-  id: string; // Full URL as ID per spec
-  author: Author | string;
+  id: string; // Full URL as ID per spec (e.g. "http://nodeaaaa/api/authors/111/liked/166")
+  author: Author; // Full author object
   published: string; // ISO 8601 timestamp
   object: string; // URL of the liked object (entry or comment)
-  
-  // Additional fields for frontend compatibility
-  url?: string;
-  entry?: string;
-  comment?: string;
-  author_url?: string;
-  created_at?: string;
 }
 
 // Response format for paginated entries as per API spec

@@ -5,12 +5,8 @@
 import type { Author } from '../author';
 import type { TimestampedModel } from '../common';
 
-export interface Like extends TimestampedModel {
-  id: string;
-  author: Author | string; // Can be URL reference
-  target_type: 'entry' | 'comment';
-  target_id: string;
-}
+// Re-export Like from entry types for backward compatibility
+export type { Like } from '../entry';
 
 export interface Follow extends TimestampedModel {
   id: string;

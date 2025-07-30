@@ -385,12 +385,37 @@ class ApiService {
     const id = entryId.includes("/")
       ? entryId.split("/").filter(Boolean).pop()
       : entryId;
-    return this.request<{ like_count: number; liked_by_current_user: boolean }>(
-      `/api/entries/${id}/likes/`,
-      {
-        method: "GET",
-      }
-    );
+    const response = await this.request<{
+      type: "likes";
+      web: string;
+      id: string;
+      page_number: number;
+      size: number;
+      count: number;
+      src: Array<{
+        type: "like";
+        author: any;
+        published: string;
+        id: string;
+        object: string;
+      }>;
+    }>(`/api/entries/${id}/likes/`, {
+      method: "GET",
+    });
+
+    // Get current user info from context (if available) to check if user liked the entry
+    const currentUserResponse = await this.request<any>('/api/author/me/');
+    const currentUserId = currentUserResponse?.id;
+
+    // Check if current user has liked this entry
+    const liked_by_current_user = currentUserId 
+      ? response.src.some(like => like.author.id === currentUserId)
+      : false;
+
+    return {
+      like_count: response.count,
+      liked_by_current_user
+    };
   }
 
   // Follow endpoints - backend implemented

@@ -3,13 +3,12 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import get_object_or_404
+from django.conf import settings
 from uuid import UUID
 
-from app.models import Like, Entry, Comment
-from app.serializers.like import LikeSerializer
+from app.models import Like, Entry, Comment, Node
+from app.serializers.like import LikeSerializer, LikesCollectionSerializer
 from requests.auth import HTTPBasicAuth
-from app.models import Node
-from app.serializers.like import LikeSerializer
 import requests
 from app.utils.remote import RemoteActivitySender
 from app.utils.remote import entry_is_remote
@@ -31,29 +30,10 @@ def received_likes(request):
         .order_by("-created_at")
     )
 
-    # Create response data with entry information
-    likes_data = []
-    for like in likes:
-        likes_data.append(
-            {
-                "id": like.id,
-                "author": {
-                    "id": like.author.id,
-                    "url": like.author.url,
-                    "display_name": like.author.displayName,
-                    "username": like.author.username,
-                    "profile_image": like.author.profile_image,
-                },
-                "entry": {
-                    "id": like.entry.id,
-                    "title": like.entry.title,
-                    "url": like.entry.url,
-                },
-                "created_at": like.created_at,
-            }
-        )
+    # Use LikeSerializer to format the response
+    serializer = LikeSerializer(likes, many=True, context={"request": request})
 
-    return Response({"type": "likes", "likes": likes_data})
+    return Response({"type": "likes", "items": serializer.data})
 
 
 def send_like_to_remote_inbox(like):
@@ -342,22 +322,34 @@ class EntryLikeView(APIView):
                         status=status.HTTP_404_NOT_FOUND,
                     )
 
-            like_count = Like.objects.filter(entry=entry).count()
-
-            # Check if current user has liked this entry
-            liked_by_current_user = False
-
-            if request.user.is_authenticated:
-                liked_by_current_user = Like.objects.filter(
-                    author=request.user, entry=entry
-                ).exists()
-
-            return Response(
-                {
-                    "like_count": like_count,
-                    "liked_by_current_user": liked_by_current_user,
-                }
-            )
+            # Get pagination parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('size', 50))
+            
+            # Get all likes for this entry, ordered newest first
+            likes_queryset = Like.objects.filter(entry=entry).select_related('author').order_by('-created_at')
+            total_count = likes_queryset.count()
+            
+            # Calculate pagination
+            start_idx = (page_number - 1) * page_size
+            end_idx = start_idx + page_size
+            likes_page = likes_queryset[start_idx:end_idx]
+            
+            # Serialize likes
+            likes_serializer = LikeSerializer(likes_page, many=True, context={'request': request})
+            
+            # Build response according to spec
+            response_data = {
+                "type": "likes",
+                "web": entry.url.replace('/api/', '/') if entry.url else f"{settings.SITE_URL}/authors/{entry.author.id}/entries/{entry.id}",
+                "id": f"{entry.url}/likes" if entry.url else f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}/likes",
+                "page_number": page_number,
+                "size": page_size,
+                "count": total_count,
+                "src": likes_serializer.data
+            }
+            
+            return Response(response_data)
 
         # Otherwise, handle liked entries by author
         # Check if this is an author FQID request
@@ -389,7 +381,6 @@ class EntryLikeView(APIView):
         likes = Like.objects.filter(author=author, entry__isnull=False).select_related(
             "entry"
         )
-        from app.serializers.like import LikeSerializer
 
         serializer = LikeSerializer(likes, many=True, context={"request": request})
 

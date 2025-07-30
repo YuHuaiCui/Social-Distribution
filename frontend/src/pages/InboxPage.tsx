@@ -139,18 +139,28 @@ export const InboxPage: React.FC = () => {
       if (filter === "all" || filter === "like") {
         try {
           const likesResponse = await socialService.getReceivedLikes();
-          const likeItems: LikeItem[] = likesResponse.likes.map((like) => ({
-            type: "like" as const,
-            id: like.id,
-            from_author: {
-              id: like.author.id,
-              displayName: like.author.displayName || like.author.display_name,
-              username: like.author.username,
-              profile_image: like.author.profile_image,
-            },
-            entry: like.entry,
-            created_at: like.created_at,
-          }));
+          const likeItems: LikeItem[] = likesResponse.items.map((like) => {
+            // Extract entry ID from the object URL
+            const entryId = like.object.split('/').filter(Boolean).pop() || '';
+            const entryUrl = like.object;
+            
+            return {
+              type: "like" as const,
+              id: like.id,
+              from_author: {
+                id: like.author.id,
+                displayName: like.author.displayName,
+                username: like.author.username || '',
+                profileImage: like.author.profileImage,
+              },
+              entry: {
+                id: entryId,
+                title: "Post", // We don't have the title in the like object
+                url: entryUrl,
+              },
+              created_at: like.published,
+            };
+          });
           allItems.push(...likeItems);
         } catch (error) {
           console.error("Error fetching received likes:", error);

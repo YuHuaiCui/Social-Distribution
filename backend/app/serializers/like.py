@@ -4,6 +4,19 @@ from app.models import Like, Entry, Comment
 from app.serializers.author import AuthorSerializer
 
 
+class LikesCollectionSerializer(serializers.Serializer):
+    """
+    Serializer for the likes collection response format according to spec.
+    """
+    type = serializers.CharField(default="likes")
+    web = serializers.CharField()
+    id = serializers.CharField()
+    page_number = serializers.IntegerField()
+    size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    src = serializers.ListField()
+
+
 class LikeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Like
@@ -21,7 +34,7 @@ class LikeSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """
-        Customize the representation to match CMPUT 404 spec format while maintaining compatibility.
+        Customize the representation to match CMPUT 404 spec format.
         Returns like objects in the required format:
         {
             "type": "like",
@@ -31,8 +44,6 @@ class LikeSerializer(serializers.ModelSerializer):
             "object": "http://nodebbbb/api/authors/222/entries/249"
         }
         """
-        data = super().to_representation(instance)
-
         # Determine the object URL
         object_url = None
         if instance.entry:
@@ -40,23 +51,13 @@ class LikeSerializer(serializers.ModelSerializer):
         elif instance.comment:
             object_url = instance.comment.url
 
-        # CMPUT 404 compliant format with compatibility fields
+        # CMPUT 404 compliant format
         result = {
-            # CMPUT 404 required fields
             "type": "like",
             "author": AuthorSerializer(instance.author, context=self.context).data,
-            "published": (
-                instance.created_at.isoformat() if instance.created_at else None
-            ),
+            "published": instance.created_at.isoformat() if instance.created_at else None,
             "id": instance.url,
             "object": object_url,
-            # Additional fields for frontend compatibility
-            "url": instance.url,
-            "entry": instance.entry.url if instance.entry else None,
-            "comment": instance.comment.url if instance.comment else None,
-            "created_at": data.get("created_at"),
-            # Also include author URL for backward compatibility
-            "author_url": instance.author.url,
         }
 
         return result

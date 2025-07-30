@@ -67,12 +67,26 @@ export class SocialService extends BaseApiService {
    */
   async getEntryLikes(
     entryId: string,
-    params?: { page?: number; page_size?: number }
-  ): Promise<PaginatedResponse<Like>> {
+    params?: { page?: number; size?: number }
+  ): Promise<{
+    type: "likes";
+    web: string;
+    id: string;
+    page_number: number;
+    size: number;
+    count: number;
+    src: Like[];
+  }> {
     const queryString = this.buildQueryString(params || {});
-    return this.request<PaginatedResponse<Like>>(
-      `/api/entries/${entryId}/likes/${queryString}`
-    );
+    return this.request<{
+      type: "likes";
+      web: string;
+      id: string;
+      page_number: number;
+      size: number;
+      count: number;
+      src: Like[];
+    }>(`/api/entries/${entryId}/likes/${queryString}`);
   }
 
   /**
@@ -266,21 +280,7 @@ export class SocialService extends BaseApiService {
    */
   async getReceivedLikes(): Promise<{
     type: string;
-    likes: Array<{
-      id: string;
-      author: {
-        id: string;
-        displayName: string;
-        username: string;
-        profileImage?: string;
-      };
-      entry: {
-        id: string;
-        title: string;
-        url: string;
-      };
-      created_at: string;
-    }>;
+    items: Like[];
   }> {
     return this.request('/api/likes/received/');
   }
