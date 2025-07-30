@@ -14,7 +14,7 @@ class FollowSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Follow
-        fields = ["type", "summary", "actor", "object", "status"]
+        fields = ["id", "type", "summary", "actor", "object", "status", "created_at"]
 
     def get_summary(self, obj):
         """Generate the summary text"""

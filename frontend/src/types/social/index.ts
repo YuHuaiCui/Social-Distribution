@@ -14,9 +14,30 @@ export interface Like extends TimestampedModel {
 
 export interface Follow extends TimestampedModel {
   id: string;
-  follower: Author | string; // Can be URL reference
-  followed: Author | string; // Can be URL reference
+  type: string;
+  summary: string;
   status: 'requesting' | 'accepted' | 'rejected';
+  actor: {
+    type: string;
+    id: string;
+    host: string;
+    displayName: string;
+    github?: string;
+    profileImage?: string;
+    web?: string;
+  };
+  object: {
+    type: string;
+    id: string;
+    host: string;
+    displayName: string;
+    github?: string;
+    profileImage?: string;
+    web?: string;
+  };
+  // Legacy fields for backward compatibility
+  follower?: Author | string; 
+  followed?: Author | string;
 }
 
 export interface Friendship extends TimestampedModel {

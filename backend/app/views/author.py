@@ -374,31 +374,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     follow.status = Follow.REQUESTING
                     follow.save()
 
-            # Create inbox item for the followed user (for local authors)
-            if author_to_follow.is_local:
-                from app.models.inbox import Inbox
-
-                Inbox.objects.create(
-                    recipient=follow.followed,
-                    item_type=Inbox.FOLLOW,
-                    follow=follow,
-                    raw_data={
-                        "type": "Follow",
-                        "actor": {
-                            "id": follow.follower.url,
-                            "display_name": follow.follower.display_name,
-                            "username": follow.follower.username,
-                            "profile_image": (
-                                follow.follower.profile_image
-                                if follow.follower.profile_image
-                                else None
-                            ),
-                        },
-                        "object": follow.followed.url,
-                        "status": follow.status,
-                    },
-                )
-
             serializer = FollowSerializer(follow)
             return Response(
                 {"success": True, "follow": serializer.data},
@@ -847,33 +822,8 @@ class AuthorViewSet(viewsets.ModelViewSet):
             follower=current_user, followed=remote_author, status=Follow.REQUESTING
         )
 
-        # Create inbox item for the followed user
-        from app.models.inbox import Inbox
-
-        Inbox.objects.create(
-            recipient=follow.followed,
-            item_type=Inbox.FOLLOW,
-            follow=follow,
-            raw_data={
-                "type": "Follow",
-                "actor": {
-                    "id": follow.follower.url,
-                    "display_name": follow.follower.display_name,
-                    "username": follow.follower.username,
-                    "profile_image": (
-                        follow.follower.profile_image
-                        if follow.follower.profile_image
-                        else None
-                    ),
-                },
-                "object": follow.followed.url,
-                "status": follow.status,
-            },
-        )
-
-        # Send follow request to remote node
-        if remote_author.node:
-            self._send_follow_to_remote(follow, remote_author, node)
+        # Send follow request to remote node (don't create local inbox item for remote author)
+        self._send_follow_to_remote(follow, remote_author, node)
 
         serializer = FollowSerializer(follow)
         return Response(

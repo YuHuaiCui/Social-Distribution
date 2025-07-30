@@ -161,6 +161,20 @@ export class SocialService extends BaseApiService {
   }
 
   /**
+   * Get all follow requests for current user (all statuses)
+   */
+  async getAllFollowRequests(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<Follow[]> {
+    const queryParams = { ...params, all_statuses: true };
+    const queryString = this.buildQueryString(queryParams);
+    return this.request<Follow[]>(
+      `/api/follows/requests/${queryString}`
+    );
+  }
+
+  /**
    * Accept a follow request
    */
   async acceptFollowRequest(followId: string): Promise<Follow> {
@@ -275,6 +289,55 @@ export class SocialService extends BaseApiService {
   }): Promise<PaginatedResponse<Entry>> {
     const queryString = this.buildQueryString(params || {});
     return this.request(`/api/entries/saved/${queryString}`);
+  }
+
+  /**
+   * Get likes received on current user's entries
+   */
+  async getReceivedLikes(): Promise<{
+    type: string;
+    likes: Array<{
+      id: string;
+      author: {
+        id: string;
+        display_name: string;
+        username: string;
+        profile_image?: string;
+      };
+      entry: {
+        id: string;
+        title: string;
+        url: string;
+      };
+      created_at: string;
+    }>;
+  }> {
+    return this.request('/api/likes/received/');
+  }
+
+  /**
+   * Get comments received on current user's entries
+   */
+  async getReceivedComments(): Promise<{
+    type: string;
+    comments: Array<{
+      id: string;
+      author: {
+        id: string;
+        display_name: string;
+        username: string;
+        profile_image?: string;
+      };
+      entry: {
+        id: string;
+        title: string;
+        url: string;
+      };
+      content: string;
+      created_at: string;
+    }>;
+  }> {
+    return this.request('/api/comments/received/');
   }
 }
 

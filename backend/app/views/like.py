@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from rest_framework.decorators import api_view, permission_classes
 from django.shortcuts import get_object_or_404
 from uuid import UUID
 
@@ -12,6 +13,47 @@ from app.serializers.like import LikeSerializer
 import requests
 from app.utils.remote import RemoteActivitySender
 from app.utils.remote import entry_is_remote
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def received_likes(request):
+    """
+    Get likes received by the current user on their entries.
+    Returns a list of likes on entries authored by the current user.
+    """
+    user = request.user
+
+    # Get all likes on entries authored by the current user
+    likes = (
+        Like.objects.filter(entry__author=user)
+        .select_related("author", "entry")
+        .order_by("-created_at")
+    )
+
+    # Create response data with entry information
+    likes_data = []
+    for like in likes:
+        likes_data.append(
+            {
+                "id": like.id,
+                "author": {
+                    "id": like.author.id,
+                    "url": like.author.url,
+                    "display_name": like.author.display_name,
+                    "username": like.author.username,
+                    "profile_image": like.author.profile_image,
+                },
+                "entry": {
+                    "id": like.entry.id,
+                    "title": like.entry.title,
+                    "url": like.entry.url,
+                },
+                "created_at": like.created_at,
+            }
+        )
+
+    return Response({"type": "likes", "likes": likes_data})
 
 
 def send_like_to_remote_inbox(like):
@@ -56,7 +98,7 @@ class EntryLikeView(APIView):
                 # Validate UUID format
                 UUID(entry_id)
                 kwargs["entry_id"] = entry_id
-                
+
                 # Remove the entry_fqid parameter since view methods expect entry_id
                 del kwargs["entry_fqid"]
             except (ValueError, IndexError):
@@ -103,38 +145,42 @@ class EntryLikeView(APIView):
         print(f"[DEBUG] User agent: {request.META.get('HTTP_USER_AGENT', 'Unknown')}")
         print(f"[DEBUG] Remote addr: {request.META.get('REMOTE_ADDR', 'Unknown')}")
         print(f"[DEBUG] ======================================")
-        
+
         # Try to find the entry by UUID first, then by URL/FQID
         entry = None
-        
+
         # First, try to find by UUID (for local likes)
         try:
             entry = Entry.objects.get(id=entry_id)
             print(f"[DEBUG] Entry found by UUID: {entry.title}")
         except Entry.DoesNotExist:
             print(f"[DEBUG] Entry not found by UUID, trying by URL/FQID")
-            
+
             # If not found by UUID, try to find by URL/FQID (for remote likes)
             try:
                 # Convert entry_id to string for string operations
                 entry_id_str = str(entry_id)
-                
+
                 # Check if entry_id looks like a URL/FQID
-                if entry_id_str.startswith('http') or '/' in entry_id_str:
+                if entry_id_str.startswith("http") or "/" in entry_id_str:
                     # Try to find by URL
-                    entry = Entry.objects.get(url__icontains=entry_id_str.split('/')[-1])
+                    entry = Entry.objects.get(
+                        url__icontains=entry_id_str.split("/")[-1]
+                    )
                     print(f"[DEBUG] Entry found by URL/FQID: {entry.title}")
                 else:
                     # Try to find by URL that contains this ID
                     entry = Entry.objects.get(url__icontains=entry_id_str)
                     print(f"[DEBUG] Entry found by URL containing ID: {entry.title}")
             except Entry.DoesNotExist:
-                print(f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database")
-                return Response(
-                    {"detail": f"Entry with ID {entry_id} not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
+                print(
+                    f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database"
                 )
-        
+                return Response(
+                    {"detail": f"Entry with ID {entry_id} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
         author = request.user
 
         # Check if user has already liked this entry to prevent duplicates
@@ -146,11 +192,15 @@ class EntryLikeView(APIView):
         like = Like.objects.create(author=author, entry=entry)
         serializer = LikeSerializer(like)
         print(f"[DEBUG] Like created successfully: {like.id}")
-        print(f"[DEBUG] Like author: {like.author.username} (local: {like.author.is_local})")
+        print(
+            f"[DEBUG] Like author: {like.author.username} (local: {like.author.is_local})"
+        )
         print(f"[DEBUG] Like entry: {like.entry.title}")
-        print(f"[DEBUG] Entry author: {like.entry.author.username} (local: {like.entry.author.is_local})")
+        print(
+            f"[DEBUG] Entry author: {like.entry.author.username} (local: {like.entry.author.is_local})"
+        )
         print(f"[DEBUG] About to call RemoteActivitySender.send_like")
-        
+
         # Send like to remote nodes (but don't fail if this doesn't work)
         try:
             RemoteActivitySender.send_like(like)
@@ -159,11 +209,12 @@ class EntryLikeView(APIView):
             print(f"[DEBUG] Error in RemoteActivitySender.send_like: {e}")
             print(f"[DEBUG] Exception type: {type(e)}")
             import traceback
+
             print(f"[DEBUG] Traceback: {traceback.format_exc()}")
             # Don't fail the like operation if federation fails
             # The like was still created successfully locally
             print(f"[DEBUG] Continuing with like creation despite federation error")
-        
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, entry_id):
@@ -195,38 +246,44 @@ class EntryLikeView(APIView):
         print(f"[DEBUG] User agent: {request.META.get('HTTP_USER_AGENT', 'Unknown')}")
         print(f"[DEBUG] Remote addr: {request.META.get('REMOTE_ADDR', 'Unknown')}")
         print(f"[DEBUG] ======================================")
-        
+
         author = request.user
-        
+
         # Try to find the entry by UUID first, then by URL/FQID (same logic as post method)
         entry = None
-        
+
         # First, try to find by UUID (for local likes)
         try:
             entry = Entry.objects.get(id=entry_id)
             print(f"[DEBUG] Entry found by UUID for unlike: {entry.title}")
         except Entry.DoesNotExist:
             print(f"[DEBUG] Entry not found by UUID for unlike, trying by URL/FQID")
-            
+
             # If not found by UUID, try to find by URL/FQID (for remote likes)
             try:
                 # Convert entry_id to string for string operations
                 entry_id_str = str(entry_id)
-                
+
                 # Check if entry_id looks like a URL/FQID
-                if entry_id_str.startswith('http') or '/' in entry_id_str:
+                if entry_id_str.startswith("http") or "/" in entry_id_str:
                     # Try to find by URL
-                    entry = Entry.objects.get(url__icontains=entry_id_str.split('/')[-1])
+                    entry = Entry.objects.get(
+                        url__icontains=entry_id_str.split("/")[-1]
+                    )
                     print(f"[DEBUG] Entry found by URL/FQID for unlike: {entry.title}")
                 else:
                     # Try to find by URL that contains this ID
                     entry = Entry.objects.get(url__icontains=entry_id_str)
-                    print(f"[DEBUG] Entry found by URL containing ID for unlike: {entry.title}")
+                    print(
+                        f"[DEBUG] Entry found by URL containing ID for unlike: {entry.title}"
+                    )
             except Entry.DoesNotExist:
-                print(f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database for unlike")
+                print(
+                    f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database for unlike"
+                )
                 return Response(
-                    {"detail": f"Entry with ID {entry_id} not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
+                    {"detail": f"Entry with ID {entry_id} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
                 )
 
         # Find and delete the like if it exists
@@ -250,35 +307,41 @@ class EntryLikeView(APIView):
         if entry_id:
             # Try to find the entry by UUID first, then by URL/FQID (same logic as post/delete methods)
             entry = None
-            
+
             # First, try to find by UUID (for local likes)
             try:
                 entry = Entry.objects.get(id=entry_id)
                 print(f"[DEBUG] Entry found by UUID for GET: {entry.title}")
             except Entry.DoesNotExist:
                 print(f"[DEBUG] Entry not found by UUID for GET, trying by URL/FQID")
-                
+
                 # If not found by UUID, try to find by URL/FQID (for remote likes)
                 try:
                     # Convert entry_id to string for string operations
                     entry_id_str = str(entry_id)
-                    
+
                     # Check if entry_id looks like a URL/FQID
-                    if entry_id_str.startswith('http') or '/' in entry_id_str:
+                    if entry_id_str.startswith("http") or "/" in entry_id_str:
                         # Try to find by URL
-                        entry = Entry.objects.get(url__icontains=entry_id_str.split('/')[-1])
+                        entry = Entry.objects.get(
+                            url__icontains=entry_id_str.split("/")[-1]
+                        )
                         print(f"[DEBUG] Entry found by URL/FQID for GET: {entry.title}")
                     else:
                         # Try to find by URL that contains this ID
                         entry = Entry.objects.get(url__icontains=entry_id_str)
-                        print(f"[DEBUG] Entry found by URL containing ID for GET: {entry.title}")
+                        print(
+                            f"[DEBUG] Entry found by URL containing ID for GET: {entry.title}"
+                        )
                 except Entry.DoesNotExist:
-                    print(f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database for GET")
-                    return Response(
-                        {"detail": f"Entry with ID {entry_id} not found"}, 
-                        status=status.HTTP_404_NOT_FOUND
+                    print(
+                        f"[DEBUG] Entry with ID/FQID {entry_id} does not exist in database for GET"
                     )
-            
+                    return Response(
+                        {"detail": f"Entry with ID {entry_id} not found"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
             like_count = Like.objects.filter(entry=entry).count()
 
             # Check if current user has liked this entry
@@ -394,7 +457,7 @@ class CommentLikeView(APIView):
         # Create new like record
         like = Like.objects.create(author=author, comment=comment)
         serializer = LikeSerializer(like)
-        
+
         # Send like to remote nodes (but don't fail if this doesn't work)
         try:
             RemoteActivitySender.send_like(like)
@@ -402,7 +465,7 @@ class CommentLikeView(APIView):
             print(f"[DEBUG] Error in RemoteActivitySender.send_like for comment: {e}")
             # Don't fail the like operation if federation fails
             # The like was still created successfully locally
-        
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, comment_id=None, **kwargs):

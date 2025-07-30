@@ -87,35 +87,37 @@ class FollowViewSet(viewsets.ModelViewSet):
         try:
             follow = serializer.save()
 
-            # Create inbox item for the followed user
-            Inbox.objects.create(
-                recipient=follow.followed,
-                item_type=Inbox.FOLLOW,
-                follow=follow,
-                raw_data={
-                    "type": "Follow",
-                    "actor": {
-                        "id": follow.follower.url,
-                        "display_name": follow.follower.display_name,
-                        "username": follow.follower.username,
-                        "profile_image": (
-                            follow.follower.profile_image.url
-                            if follow.follower.profile_image
-                            else None
-                        ),
+            # Only create inbox item for LOCAL authors (so they can see the request)
+            # Remote authors will receive the request via their node's inbox API
+            if follow.followed.is_local:
+                Inbox.objects.create(
+                    recipient=follow.followed,
+                    item_type=Inbox.FOLLOW,
+                    follow=follow,
+                    raw_data={
+                        "type": "Follow",
+                        "actor": {
+                            "id": follow.follower.url,
+                            "display_name": follow.follower.display_name,
+                            "username": follow.follower.username,
+                            "profile_image": (
+                                follow.follower.profile_image.url
+                                if follow.follower.profile_image
+                                else None
+                            ),
+                        },
+                        "object": {
+                            "id": follow.followed.url,
+                            "display_name": follow.followed.display_name,
+                            "username": follow.followed.username,
+                            "profile_image": (
+                                follow.followed.profile_image.url
+                                if follow.followed.profile_image
+                                else None
+                            ),
+                        },
                     },
-                    "object": {
-                        "id": follow.followed.url,
-                        "display_name": follow.followed.display_name,
-                        "username": follow.followed.username,
-                        "profile_image": (
-                            follow.followed.profile_image.url
-                            if follow.followed.profile_image
-                            else None
-                        ),
-                    },
-                },
-            )
+                )
 
             # If following a remote author, send the follow request to their node
             if follow.followed.is_remote:
@@ -242,13 +244,32 @@ class FollowViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def requests(self, request):
         """
-        Get requesting follow requests for the authenticated user
+        Get follow requests for the authenticated user
+        Query parameter 'all_statuses=true' returns all follow requests regardless of status
+        Otherwise returns only requesting follow requests
         """
-        requesting_requests = Follow.objects.filter(
-            followed__url=request.user.url, status=Follow.REQUESTING
-        ).select_related("follower")
+        all_statuses = (
+            request.query_params.get("all_statuses", "false").lower() == "true"
+        )
 
-        serializer = self.get_serializer(requesting_requests, many=True)
+        if all_statuses:
+            # Return all follow requests regardless of status
+            follow_requests = (
+                Follow.objects.filter(followed__url=request.user.url)
+                .select_related("follower")
+                .order_by("-created_at")
+            )
+        else:
+            # Return only requesting follow requests (default behavior)
+            follow_requests = (
+                Follow.objects.filter(
+                    followed__url=request.user.url, status=Follow.REQUESTING
+                )
+                .select_related("follower")
+                .order_by("-created_at")
+            )
+
+        serializer = self.get_serializer(follow_requests, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["post"])

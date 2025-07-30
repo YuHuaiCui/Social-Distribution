@@ -4,35 +4,29 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Inbox,
   UserPlus,
-  Share2,
   Heart,
   MessageCircle,
   Check,
   X,
   Clock,
   Bell,
-  Shield,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import AnimatedButton from "../components/ui/AnimatedButton";
 import Card from "../components/ui/Card";
 import Avatar from "../components/Avatar/Avatar";
 import Loader from "../components/ui/Loader";
-import { inboxService } from "../services/inbox";
-import type { InboxItem as ApiInboxItem } from "../types/inbox";
+import { socialService } from "../services/social";
 import { useAuth } from "../components/context/AuthContext";
 import { extractUUID } from "../utils/extractId";
+import type { Follow } from "../types/social";
 
-type InboxItemType =
-  | "follow_request"
-  | "post_share"
-  | "like"
-  | "comment"
-  | "mention"
-  | "report";
+type InboxItemType = "follow_request" | "like" | "comment";
 
-interface FrontendInboxItem {
+interface FollowRequestItem {
+  type: "follow_request";
   id: string;
-  type: InboxItemType;
   from_author: {
     id: string;
     display_name: string;
@@ -40,18 +34,45 @@ interface FrontendInboxItem {
     profile_image?: string;
   };
   created_at: string;
-  is_read: boolean;
-  data?: {
-    post_id?: string;
-    post_title?: string;
-    comment_text?: string;
-    // Report-specific fields
-    reported_user_id?: string;
-    reported_user_name?: string;
-    report_type?: string;
-    report_time?: string;
-  };
+  status: "requesting" | "accepted" | "rejected";
 }
+
+interface LikeItem {
+  type: "like";
+  id: string;
+  from_author: {
+    id: string;
+    display_name: string;
+    username: string;
+    profile_image?: string;
+  };
+  entry: {
+    id: string;
+    title: string;
+    url: string;
+  };
+  created_at: string;
+}
+
+interface CommentItem {
+  type: "comment";
+  id: string;
+  from_author: {
+    id: string;
+    display_name: string;
+    username: string;
+    profile_image?: string;
+  };
+  entry: {
+    id: string;
+    title: string;
+    url: string;
+  };
+  content: string;
+  created_at: string;
+}
+
+type InboxItem = FollowRequestItem | LikeItem | CommentItem;
 
 const inboxTypeConfig = {
   follow_request: {
@@ -59,12 +80,6 @@ const inboxTypeConfig = {
     color: "text-[var(--primary-purple)]",
     bgColor: "bg-[var(--primary-purple)]/10",
     title: "sent you a follow request",
-  },
-  post_share: {
-    icon: Share2,
-    color: "text-[var(--primary-teal)]",
-    bgColor: "bg-[var(--primary-teal)]/10",
-    title: "shared a post with you",
   },
   like: {
     icon: Heart,
@@ -78,211 +93,99 @@ const inboxTypeConfig = {
     bgColor: "bg-[var(--primary-blue)]/10",
     title: "commented on your post",
   },
-  mention: {
-    icon: Bell,
-    color: "text-[var(--primary-coral)]",
-    bgColor: "bg-[var(--primary-coral)]/10",
-    title: "mentioned you",
-  },
-  report: {
-    icon: Shield,
-    color: "text-red-500",
-    bgColor: "bg-red-500/10",
-    title: "reported a user",
-  },
 };
 
 export const InboxPage: React.FC = () => {
   const { user } = useAuth();
-  const [items, setItems] = useState<FrontendInboxItem[]>([]);
+  const [items, setItems] = useState<InboxItem[]>([]);
   const [filter, setFilter] = useState<InboxItemType | "all">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [processingItems, setProcessingItems] = useState<Set<string>>(
     new Set()
   );
-  const [markingAsRead, setMarkingAsRead] = useState<Set<string>>(new Set());
-  const [showAllRequests, setShowAllRequests] = useState(false);
-
-  // Check if current user is admin
-  const isAdmin = user?.is_staff || user?.is_superuser;
 
   useEffect(() => {
     fetchInboxItems();
-  }, [filter, showAllRequests]);
+  }, [filter]);
 
   const fetchInboxItems = async () => {
     setIsLoading(true);
     try {
-      // Prepare filter parameters
-      const params: any = {};
-      if (filter !== "all") {
-        // Map frontend filter types to backend content types
-        const typeMapping = {
-          follow_request: "follow",
-          post_share: "entry_link",
-          like: "like",
-          comment: "comment",
-          mention: "entry", // mentions would be entries that mention the user
-          report: "report",
-        };
-        params.content_type = typeMapping[filter as keyof typeof typeMapping];
-      }
+      const allItems: InboxItem[] = [];
 
-      // If admin and showing all requests, use a different endpoint
-      if (isAdmin && showAllRequests && filter === "follow_request") {
-        // For now, we'll use the same endpoint but you could add a backend endpoint
-        // to fetch all follow requests across the system
-        params.all_requests = true;
-      }
-
-      const response = await inboxService.getInbox(params);
-
-      // Transform API response to frontend format
-      const transformedItems: FrontendInboxItem[] = response.results.map(
-        (apiItem: ApiInboxItem) => {
-          let type: InboxItemType;
-          let from_author = {
-            id: "",
-            display_name: "Unknown",
-            username: "unknown",
-            profile_image: undefined as string | undefined,
-          };
-          let data: any = {};
-
-          // Map backend content types to frontend types
-          switch (apiItem.content_type) {
-            case "follow":
-              type = "follow_request";
-              if (apiItem.content_data?.type === "follow" && apiItem.sender) {
-                if (typeof apiItem.sender === "object") {
-                  from_author = {
-                    id: apiItem.sender.id || apiItem.sender.url,
-                    display_name:
-                      apiItem.sender.display_name ||
-                      apiItem.sender.username ||
-                      "Unknown",
-                    username: apiItem.sender.username || "unknown",
-                    profile_image: apiItem.sender.profile_image || undefined,
-                  };
-                }
-              }
-              break;
-            case "like":
-              type = "like";
-              if (apiItem.content_data?.type === "like" && apiItem.sender) {
-                if (typeof apiItem.sender === "object") {
-                  from_author = {
-                    id: apiItem.sender.id || apiItem.sender.url,
-                    display_name:
-                      apiItem.sender.display_name ||
-                      apiItem.sender.username ||
-                      "Unknown",
-                    username: apiItem.sender.username || "unknown",
-                    profile_image: apiItem.sender.profile_image || undefined,
-                  };
-                }
-              }
-              break;
-            case "comment":
-              type = "comment";
-              if (apiItem.content_data?.type === "comment" && apiItem.sender) {
-                if (typeof apiItem.sender === "object") {
-                  from_author = {
-                    id: apiItem.sender.id || apiItem.sender.url,
-                    display_name:
-                      apiItem.sender.display_name ||
-                      apiItem.sender.username ||
-                      "Unknown",
-                    username: apiItem.sender.username || "unknown",
-                    profile_image: apiItem.sender.profile_image || undefined,
-                  };
-                }
-                if (apiItem.content_data.data) {
-                  data.comment_text = (
-                    apiItem.content_data.data as any
-                  )?.comment;
-                }
-              }
-              break;
-            case "entry":
-              type = "mention";
-              if (apiItem.content_data?.type === "entry" && apiItem.sender) {
-                if (typeof apiItem.sender === "object") {
-                  from_author = {
-                    id: apiItem.sender.id || apiItem.sender.url,
-                    display_name:
-                      apiItem.sender.display_name ||
-                      apiItem.sender.username ||
-                      "Unknown",
-                    username: apiItem.sender.username || "unknown",
-                    profile_image: apiItem.sender.profile_image || undefined,
-                  };
-                }
-                if (apiItem.content_data.data) {
-                  data.post_title = (apiItem.content_data.data as any)?.title;
-                }
-              }
-              break;
-            case "entry_link":
-              type = "post_share";
-              if (apiItem.sender && typeof apiItem.sender === "object") {
-                from_author = {
-                  id: apiItem.sender.id || apiItem.sender.url,
-                  display_name:
-                    apiItem.sender.display_name ||
-                    apiItem.sender.username ||
-                    "Unknown",
-                  username: apiItem.sender.username || "unknown",
-                  profile_image: apiItem.sender.profile_image || undefined,
-                };
-              }
-              if (apiItem.content_data?.type === "entry_link") {
-                data.post_title = (apiItem.content_data.data as any)?.title;
-              }
-              break;
-            case "report":
-              type = "report";
-              // For reports, extract reporter and reported user info from content_data
-              if (apiItem.content_data) {
-                from_author = {
-                  id: apiItem.content_data.reporter_id || "",
-                  display_name:
-                    apiItem.content_data.reporter_name || "Unknown Reporter",
-                  username: apiItem.content_data.reporter_name || "unknown",
-                  profile_image: undefined,
-                };
-                data = {
-                  reported_user_id: apiItem.content_data.reported_user_id,
-                  reported_user_name: apiItem.content_data.reported_user_name,
-                  report_time: apiItem.content_data.report_time,
-                  report_type: apiItem.content_data.report_type,
-                };
-              }
-              break;
-            default:
-              type = "mention";
-          }
-
-          return {
-            id: String(apiItem.id), // Convert to string to ensure consistency
-            type,
-            from_author,
-            created_at: apiItem.created_at,
-            is_read: apiItem.read || false,
-            data,
-          };
+      // Fetch follow requests if showing all or follow requests
+      if (filter === "all" || filter === "follow_request") {
+        try {
+          const followRequests = await socialService.getAllFollowRequests();
+          const followItems: FollowRequestItem[] = followRequests.map((follow: Follow) => ({
+            type: "follow_request" as const,
+            id: follow.id,
+            from_author: {
+              id: follow.actor.id,
+              display_name: follow.actor.displayName,
+              username: follow.actor.displayName, // Use displayName as fallback
+              profile_image: follow.actor.profileImage,
+            },
+            created_at: follow.created_at || new Date().toISOString(),
+            status: follow.status,
+          }));
+          allItems.push(...followItems);
+        } catch (error) {
+          console.error("Error fetching follow requests:", error);
         }
-      );
+      }
 
-      // Filter out report items for non-admin users
-      const filteredItems = isAdmin
-        ? transformedItems
-        : transformedItems.filter((item) => item.type !== "report");
+      // Fetch likes if showing all or likes
+      if (filter === "all" || filter === "like") {
+        try {
+          const likesResponse = await socialService.getReceivedLikes();
+          const likeItems: LikeItem[] = likesResponse.likes.map((like) => ({
+            type: "like" as const,
+            id: like.id,
+            from_author: {
+              id: like.author.id,
+              display_name: like.author.display_name,
+              username: like.author.username,
+              profile_image: like.author.profile_image,
+            },
+            entry: like.entry,
+            created_at: like.created_at,
+          }));
+          allItems.push(...likeItems);
+        } catch (error) {
+          console.error("Error fetching received likes:", error);
+        }
+      }
 
-      setItems(filteredItems);
+      // Fetch comments if showing all or comments
+      if (filter === "all" || filter === "comment") {
+        try {
+          const commentsResponse = await socialService.getReceivedComments();
+          const commentItems: CommentItem[] = commentsResponse.comments.map((comment) => ({
+            type: "comment" as const,
+            id: comment.id,
+            from_author: {
+              id: comment.author.id,
+              display_name: comment.author.display_name,
+              username: comment.author.username,
+              profile_image: comment.author.profile_image,
+            },
+            entry: comment.entry,
+            content: comment.content,
+            created_at: comment.created_at,
+          }));
+          allItems.push(...commentItems);
+        } catch (error) {
+          console.error("Error fetching received comments:", error);
+        }
+      }
+
+      // Sort all items by created_at (newest first)
+      allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setItems(allItems);
     } catch (error) {
       console.error("Error fetching inbox:", error);
-      // Fallback to empty array on error
       setItems([]);
     } finally {
       setIsLoading(false);
@@ -292,87 +195,29 @@ export const InboxPage: React.FC = () => {
   const handleFollowRequest = async (itemId: string, accept: boolean) => {
     setProcessingItems((prev) => new Set(prev).add(itemId));
     try {
-      console.log(
-        `${
-          accept ? "Accepting" : "Rejecting"
-        } follow request with inbox item ID:`,
-        itemId
-      );
-      console.log("itemId type:", typeof itemId);
-      console.log("itemId value:", itemId);
-      console.log("itemId is string:", typeof itemId === "string");
-
-      // Convert itemId to string if it's not already (defensive programming)
-      const stringItemId = String(itemId);
-
-      // Check if itemId is valid before proceeding
-      if (
-        !stringItemId ||
-        stringItemId === "undefined" ||
-        stringItemId === "null"
-      ) {
-        throw new Error(`Invalid itemId: ${itemId} (type: ${typeof itemId})`);
-      }
-
-      console.log("Using stringItemId:", stringItemId);
-
-      // Simple approach: directly call the inbox service methods
       if (accept) {
-        await inboxService.acceptFollowRequest(stringItemId);
-        console.log("Accept request sent successfully");
+        await socialService.acceptFollowRequest(itemId);
       } else {
-        await inboxService.rejectFollowRequest(stringItemId);
-        console.log("Reject request sent successfully");
+        await socialService.rejectFollowRequest(itemId);
       }
 
-      // Remove item after processing
-      setItems((prev) => prev.filter((item) => item.id !== stringItemId));
-      console.log("Item removed from inbox successfully");
-    } catch (error) {
-      console.error("Error processing follow request:", error);
-
-      // Log more detailed error information
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      }
-
-      // Check if it's a network error
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        alert("Network error. Please check if the backend server is running.");
-      } else {
-        alert(
-          `Failed to ${accept ? "accept" : "reject"} follow request. Error: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-      }
-    } finally {
-      setProcessingItems((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(itemId);
-        return newSet;
-      });
-    }
-  };
-
-  const markAsRead = async (itemId: string) => {
-    // Don't mark as read if already processing or already read
-    if (markingAsRead.has(itemId)) return;
-
-    setMarkingAsRead((prev) => new Set(prev).add(itemId));
-    try {
-      await inboxService.markItemAsRead(itemId);
+      // Update the item status locally
       setItems((prev) =>
         prev.map((item) =>
-          item.id === itemId ? { ...item, is_read: true } : item
+          item.id === itemId && item.type === "follow_request"
+            ? { ...item, status: accept ? "accepted" : "rejected" }
+            : item
         )
       );
     } catch (error) {
-      console.error("Error marking as read:", error);
-      // Don't show error to user, just log it
+      console.error("Error processing follow request:", error);
+      alert(
+        `Failed to ${accept ? "accept" : "reject"} follow request. Error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
-      setMarkingAsRead((prev) => {
+      setProcessingItems((prev) => {
         const newSet = new Set(prev);
         newSet.delete(itemId);
         return newSet;
@@ -396,13 +241,9 @@ export const InboxPage: React.FC = () => {
   const filterButtons = [
     { value: "all", label: "All" },
     { value: "follow_request", label: "Follow Requests" },
-    { value: "post_share", label: "Shared Posts" },
     { value: "like", label: "Likes" },
     { value: "comment", label: "Comments" },
-    ...(isAdmin ? [{ value: "report", label: "Reports" }] : []),
   ];
-
-  const unreadCount = items.filter((item) => !item.is_read).length;
 
   return (
     <div className="w-full px-4 lg:px-6 py-6 flex flex-col flex-1">
@@ -418,11 +259,9 @@ export const InboxPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-text-1">Inbox</h1>
-            {unreadCount > 0 && (
-              <p className="text-sm text-text-2">
-                {unreadCount} unread notifications
-              </p>
-            )}
+            <p className="text-sm text-text-2">
+              {items.length} notifications
+            </p>
           </div>
         </div>
       </motion.div>
@@ -445,52 +284,10 @@ export const InboxPage: React.FC = () => {
             }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            animate={
-              filter === btn.value
-                ? {
-                    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
-                  }
-                : {}
-            }
-            transition={
-              filter === btn.value
-                ? {
-                    backgroundPosition: {
-                      duration: 20,
-                      repeat: Infinity,
-                    },
-                  }
-                : {}
-            }
-            style={
-              filter === btn.value
-                ? {
-                    background: "var(--gradient-primary)",
-                    backgroundSize: "200% 200%",
-                  }
-                : {}
-            }
           >
             {btn.label}
           </motion.button>
         ))}
-
-        {/* Admin toggle for viewing all follow requests */}
-        {isAdmin && filter === "follow_request" && (
-          <motion.button
-            onClick={() => setShowAllRequests(!showAllRequests)}
-            className={`ml-auto px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 ${
-              showAllRequests
-                ? "bg-gradient-to-r from-[var(--primary-purple)] to-[var(--primary-pink)] text-white"
-                : "glass-card-subtle text-text-2 hover:text-text-1"
-            }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Shield size={14} />
-            <span>{showAllRequests ? "All Requests" : "My Requests"}</span>
-          </motion.button>
-        )}
       </motion.div>
 
       {/* Inbox Items */}
@@ -518,6 +315,8 @@ export const InboxPage: React.FC = () => {
               <p className="text-text-2">
                 {filter === "all"
                   ? "You're all caught up!"
+                  : filter === "follow_request"
+                  ? "No follow requests yet"
                   : `No ${filter.replace("_", " ")} notifications`}
               </p>
             </Card>
@@ -536,18 +335,11 @@ export const InboxPage: React.FC = () => {
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ delay: index * 0.05 }}
                   className="mb-3"
-                  onMouseEnter={() => !item.is_read && markAsRead(item.id)}
                 >
                   <Card
-                    variant={item.is_read ? "subtle" : "main"}
+                    variant="main"
                     hoverable
-                    className={`${
-                      !item.is_read
-                        ? "border-l-4 border-[var(--primary-purple)]"
-                        : ""
-                    } bg-[rgba(var(--glass-rgb),${
-                      item.is_read ? "0.3" : "0.4"
-                    })] backdrop-blur-lg`}
+                    className="bg-[rgba(var(--glass-rgb),0.4)] backdrop-blur-lg"
                   >
                     <div className="flex items-start space-x-4 h-full">
                       {/* Author Avatar */}
@@ -555,10 +347,12 @@ export const InboxPage: React.FC = () => {
                         whileHover={{ scale: 1.05 }}
                         className="flex-shrink-0"
                       >
-                        <Avatar
-                          imgSrc={item.from_author.profile_image}
-                          alt={item.from_author.display_name}
-                        />
+                        <Link to={`/authors/${extractUUID(item.from_author.id)}`}>
+                          <Avatar
+                            imgSrc={item.from_author.profile_image}
+                            alt={item.from_author.display_name}
+                          />
+                        </Link>
                       </motion.div>
 
                       {/* Content */}
@@ -566,56 +360,32 @@ export const InboxPage: React.FC = () => {
                         <div className="flex items-start justify-between">
                           <div className="flex-1 mr-4">
                             <p className="text-text-1">
-                              <span className="font-semibold">
+                              <Link 
+                                to={`/authors/${extractUUID(item.from_author.id)}`}
+                                className="font-semibold text-[var(--primary-purple)] hover:underline"
+                              >
                                 {item.from_author.display_name}
-                              </span>{" "}
+                              </Link>{" "}
                               <span className="text-text-2">
                                 {config.title}
                               </span>
                             </p>
 
-                            {item.data?.post_title && (
-                              <p className="text-sm text-text-2 mt-1">
-                                "{item.data.post_title}"
-                              </p>
+                            {/* Entry title for likes and comments */}
+                            {(item.type === "like" || item.type === "comment") && (
+                              <Link 
+                                to={`/entries/${extractUUID(item.entry.id)}`}
+                                className="text-sm text-[var(--primary-purple)] hover:underline mt-1 block"
+                              >
+                                "{item.entry.title}"
+                              </Link>
                             )}
 
-                            {item.data?.comment_text && (
+                            {/* Comment content */}
+                            {item.type === "comment" && (
                               <p className="text-sm text-text-1 mt-2 p-3 glass-card-subtle rounded-lg">
-                                {item.data.comment_text}
+                                {item.content}
                               </p>
-                            )}
-
-                            {/* Report Details */}
-                            {item.type === "report" && item.data && (
-                              <div className="mt-2 p-3 glass-card-subtle rounded-lg space-y-2">
-                                <p className="text-sm text-text-2">
-                                  Reported User:{" "}
-                                  <Link
-                                    to={`/authors/${extractUUID(
-                                      item.data.reported_user_id
-                                    )}`}
-                                    className="text-[var(--primary-purple)] hover:underline font-medium"
-                                  >
-                                    {item.data.reported_user_name}
-                                  </Link>
-                                </p>
-                                <p className="text-sm text-text-2">
-                                  Reporter:{" "}
-                                  <Link
-                                    to={`/authors/${extractUUID(
-                                      item.from_author.id
-                                    )}`}
-                                    className="text-[var(--primary-purple)] hover:underline font-medium"
-                                  >
-                                    {item.from_author.display_name}
-                                  </Link>
-                                </p>
-                                <p className="text-xs text-text-2">
-                                  Type:{" "}
-                                  {item.data.report_type?.replace("_", " ")}
-                                </p>
-                              </div>
                             )}
                           </div>
 
@@ -633,11 +403,6 @@ export const InboxPage: React.FC = () => {
                                 <Clock className="w-3 h-3 mr-1" />
                                 {formatTime(item.created_at)}
                               </span>
-                              {!item.is_read && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--primary-purple)]/20 text-[var(--primary-purple)]">
-                                  New
-                                </span>
-                              )}
                             </div>
 
                             {/* Actions for follow requests */}
@@ -647,31 +412,49 @@ export const InboxPage: React.FC = () => {
                                 animate={{ opacity: 1 }}
                                 className="flex space-x-2"
                               >
-                                <AnimatedButton
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() =>
-                                    handleFollowRequest(item.id, true)
-                                  }
-                                  disabled={processingItems.has(item.id)}
-                                  loading={processingItems.has(item.id)}
-                                  icon={<Check size={16} />}
-                                  className="!outline-none !ring-0"
-                                >
-                                  Accept
-                                </AnimatedButton>
-                                <AnimatedButton
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() =>
-                                    handleFollowRequest(item.id, false)
-                                  }
-                                  disabled={processingItems.has(item.id)}
-                                  icon={<X size={16} />}
-                                  className="!outline-none !ring-0"
-                                >
-                                  Decline
-                                </AnimatedButton>
+                                {item.status === "requesting" ? (
+                                  <>
+                                    <AnimatedButton
+                                      size="sm"
+                                      variant="primary"
+                                      onClick={() =>
+                                        handleFollowRequest(item.id, true)
+                                      }
+                                      disabled={processingItems.has(item.id)}
+                                      loading={processingItems.has(item.id)}
+                                      icon={<Check size={16} />}
+                                      className="!outline-none !ring-0"
+                                    >
+                                      Accept
+                                    </AnimatedButton>
+                                    <AnimatedButton
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() =>
+                                        handleFollowRequest(item.id, false)
+                                      }
+                                      disabled={processingItems.has(item.id)}
+                                      icon={<X size={16} />}
+                                      className="!outline-none !ring-0"
+                                    >
+                                      Decline
+                                    </AnimatedButton>
+                                  </>
+                                ) : (
+                                  <div className="flex items-center space-x-2">
+                                    {item.status === "accepted" ? (
+                                      <>
+                                        <CheckCircle className="w-4 h-4 text-green-500" />
+                                        <span className="text-sm text-green-500">Accepted</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <XCircle className="w-4 h-4 text-red-500" />
+                                        <span className="text-sm text-red-500">Rejected</span>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </motion.div>
                             )}
                           </div>
