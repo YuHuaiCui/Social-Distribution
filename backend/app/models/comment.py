@@ -44,8 +44,8 @@ class Comment(models.Model):
         Save the comment and auto-generate URL if not provided.
         
         For comments by local authors, automatically generates the API URL
-        based on the site URL, author ID, entry ID, and comment ID. This
-        follows the hierarchical URL structure of the social distribution API.
+        based on the site URL, author ID, and comment ID. This follows the
+        hierarchical URL structure of the social distribution API.
         
         Args:
             *args: Variable length argument list
@@ -56,7 +56,8 @@ class Comment(models.Model):
         
         # Then update the URL if not provided
         if not self.url and self.author.is_local:
-            self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/entries/{self.entry.id}/comments/{self.id}"
+            # Format: http://nodeaaaa/api/authors/111/commented/130
+            self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/commented/{self.id}"
             # Save again to update the URL
             super().save(update_fields=['url'])
 

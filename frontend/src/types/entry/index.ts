@@ -58,7 +58,7 @@ export interface EntrySearchParams {
 // Updated Comment interface to match the new API specification
 export interface Comment extends TimestampedModel {
   type: "comment";
-  id: string; // Full URL as ID per spec
+  id: string; // Full URL as ID per spec (e.g. "http://nodeaaaa/api/authors/111/commented/130")
   author: Author | string; // Can be URL reference
   comment: string; // Content field renamed to comment per spec
   contentType: string; // Always use camelCase as per API spec

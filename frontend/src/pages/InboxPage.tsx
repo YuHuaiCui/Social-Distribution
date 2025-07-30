@@ -181,7 +181,7 @@ export const InboxPage: React.FC = () => {
               profile_image: comment.author.profile_image,
             },
             entry: comment.entry,
-            content: comment.content,
+            content: comment.comment,
             created_at: comment.created_at,
           }));
           allItems.push(...commentItems);

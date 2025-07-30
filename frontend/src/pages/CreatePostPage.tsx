@@ -65,14 +65,13 @@ export const CreatePostPage: React.FC = () => {
     const entryData: CreateEntryData = {
       title: title.trim(),
       content: content.trim(),
-      content_type: contentType,
+      contentType: contentType,
       visibility,
       categories: categories.length > 0 ? categories : undefined,
       image: images.length > 0 ? images[0] : undefined, // Only send first image if multiple
     };
 
     try {
-
       const response = await entryService.createEntry(entryData);
 
       // Mock success
