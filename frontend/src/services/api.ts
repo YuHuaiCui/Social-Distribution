@@ -648,6 +648,13 @@ class ApiService {
       body: JSON.stringify({ host }),
     });
   }
+
+  async refreshNode(host: string): Promise<any> {
+    return this.request("/api/nodes/refresh/", {
+      method: "POST",
+      body: JSON.stringify({ host }),
+    });
+  }
 }
 
 // Export a singleton instance
