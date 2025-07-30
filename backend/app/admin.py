@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from app.models import Author, Node, Entry, Comment, Like, Follow, Friendship
+from app.models import Author, Node, Entry, Comment, Like, Follow, Friendship, Inbox
 
 
 @admin.register(Author)
@@ -131,5 +131,113 @@ class FriendshipAdmin(admin.ModelAdmin):
     list_filter = ["created_at"]
     search_fields = ["author1__username", "author2__username"]
     ordering = ["-created_at"]
+
+
+@admin.register(Inbox)
+class InboxAdmin(admin.ModelAdmin):
+    """Admin configuration for Inbox model"""
+
+    list_display = [
+        "recipient",
+        "activity_type",
+        "content_object_display",
+        "is_read",
+        "delivered_at",
+    ]
+    list_filter = ["activity_type", "is_read", "delivered_at"]
+    search_fields = ["recipient__username", "recipient__displayName"]
+    ordering = ["-delivered_at"]
+    readonly_fields = [
+        "id",
+        "content_type",
+        "object_id",
+        "content_object",
+        "delivered_at",
+        "raw_data_display",
+    ]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {
+                "fields": (
+                    "recipient",
+                    "activity_type",
+                    "is_read",
+                    "delivered_at",
+                )
+            },
+        ),
+        (
+            "Content Object",
+            {
+                "fields": ("content_type", "object_id", "content_object"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Raw Data",
+            {
+                "fields": ("raw_data_display",),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    actions = ["mark_as_read", "mark_as_unread", "delete_old_items"]
+
+    def content_object_display(self, obj):
+        """Display the linked content object in a readable format"""
+        if obj.content_object:
+            content_obj = obj.content_object
+            if hasattr(content_obj, "title"):  # Entry
+                return f"Entry: {content_obj.title}"
+            elif hasattr(content_obj, "follower") and hasattr(content_obj, "followed"):  # Follow
+                return f"Follow: {content_obj.follower} → {content_obj.followed}"
+            elif hasattr(content_obj, "author") and hasattr(content_obj, "entry"):  # Like
+                return f"Like: {content_obj.author} liked {content_obj.entry.title if content_obj.entry else 'comment'}"
+            elif hasattr(content_obj, "content"):  # Comment
+                return f"Comment: {content_obj.content[:50]}..."
+            else:
+                return str(content_obj)
+        return "No content object"
+
+    content_object_display.short_description = "Content"
+
+    def raw_data_display(self, obj):
+        """Display raw JSON data in a formatted way"""
+        import json
+        try:
+            return json.dumps(obj.raw_data, indent=2)
+        except:
+            return str(obj.raw_data)
+
+    raw_data_display.short_description = "Raw Federation Data"
+
+    def mark_as_read(self, request, queryset):
+        """Mark selected inbox items as read"""
+        updated = queryset.update(is_read=True)
+        self.message_user(request, f"{updated} inbox items marked as read.")
+
+    mark_as_read.short_description = "Mark selected items as read"
+
+    def mark_as_unread(self, request, queryset):
+        """Mark selected inbox items as unread"""
+        updated = queryset.update(is_read=False)
+        self.message_user(request, f"{updated} inbox items marked as unread.")
+
+    mark_as_unread.short_description = "Mark selected items as unread"
+
+    def delete_old_items(self, request, queryset):
+        """Delete selected inbox items"""
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f"{count} inbox items deleted.")
+
+    delete_old_items.short_description = "Delete selected items"
+
+    def has_add_permission(self, request):
+        """Disable adding inbox items through admin (they should come from federation)"""
+        return False
 
 

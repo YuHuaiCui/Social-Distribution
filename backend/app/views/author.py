@@ -7,14 +7,19 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404
 from urllib.parse import unquote
 
-from app.models import Author, Entry, Follow
+from app.models import Author, Entry, Follow, Like, Comment, Inbox
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
 from app.serializers.follow import FollowSerializer
+from app.serializers.inbox import ActivitySerializer
 
 from django.http import HttpResponse
 import base64
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
@@ -573,18 +578,337 @@ class AuthorViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
-    @action(detail=True, methods=["post"], url_path="inbox")
+    @action(detail=True, methods=["get", "post"], url_path="inbox")
     def post_to_inbox(self, request, pk=None):
         """
-        Post an item to an author's inbox for federation support.
+        GET [local]: retrieve the author's inbox contents
+        POST [remote]: send an activity to the author's inbox
         
-        Note: Inbox functionality has been removed from the system.
-        This endpoint now returns a 410 Gone status.
+        GET: Returns all activities (entries, follows, likes, comments) in the author's inbox.
+             Only the author themselves can access their own inbox.
+        
+        POST: The inbox receives activities from remote nodes:
+        - if the type is "entry" then add that entry to AUTHOR_SERIAL's inbox
+        - if the type is "follow" then add that follow to AUTHOR_SERIAL's inbox to approve later
+        - if the type is "Like" then add that like to AUTHOR_SERIAL's inbox  
+        - if the type is "comment" then add that comment to AUTHOR_SERIAL's inbox
+        
+        URL: /api/authors/{AUTHOR_SERIAL}/inbox
         """
-        return Response(
-            {"error": "Inbox functionality has been removed"},
-            status=status.HTTP_410_GONE
-        )
+        if request.method == "GET":
+            return self._get_inbox(request, pk)
+        elif request.method == "POST":
+            return self._post_to_inbox(request, pk)
+
+    def _get_inbox(self, request, pk=None):
+        """Handle GET requests to retrieve inbox contents."""
+        try:
+            author = self.get_object()
+            
+            # Only allow authors to access their own inbox
+            if request.user != author:
+                return Response(
+                    {"error": "You can only access your own inbox"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get all inbox items for this author
+            from app.serializers.inbox import InboxSerializer
+            inbox_items = Inbox.objects.filter(recipient=author).order_by('-delivered_at')
+            
+            # Apply pagination
+            page = self.paginate_queryset(inbox_items)
+            if page is not None:
+                serializer = InboxSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            serializer = InboxSerializer(inbox_items, many=True)
+            return Response({"type": "inbox", "items": serializer.data})
+            
+        except Exception as e:
+            logger.error(f"Error retrieving inbox for author {pk}: {str(e)}")
+            return Response(
+                {"error": "Failed to retrieve inbox"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _post_to_inbox(self, request, pk=None):
+        """Handle POST requests to add activities to inbox."""
+        try:
+            # Get the recipient author
+            author = self.get_object()
+            
+            # Validate the incoming activity
+            serializer = ActivitySerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response(
+                    {"errors": serializer.errors}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            activity_data = serializer.validated_data
+            activity_type = activity_data.get('type', '')
+            
+            # Process the activity based on its type
+            content_object = None
+            
+            if activity_type == 'entry':
+                content_object = self._process_entry_activity(activity_data, author)
+            elif activity_type == 'follow':
+                content_object = self._process_follow_activity(activity_data, author)
+            elif activity_type == 'like':
+                content_object = self._process_like_activity(activity_data, author)
+            elif activity_type == 'comment':
+                content_object = self._process_comment_activity(activity_data, author)
+            
+            if content_object is None:
+                return Response(
+                    {"error": f"Failed to process {activity_type} activity"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create inbox entry
+            content_type = ContentType.objects.get_for_model(content_object)
+            
+            inbox_item, created = Inbox.objects.get_or_create(
+                recipient=author,
+                content_type=content_type,
+                object_id=content_object.id,
+                defaults={
+                    'activity_type': activity_type,
+                    'raw_data': request.data
+                }
+            )
+            
+            if created:
+                logger.info(f"Added {activity_type} to {author.username}'s inbox")
+                return Response({"message": "Activity added to inbox"}, status=status.HTTP_201_CREATED)
+            else:
+                logger.info(f"Duplicate {activity_type} for {author.username}'s inbox - ignored")
+                return Response({"message": "Activity already in inbox"}, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            logger.error(f"Error processing inbox activity: {str(e)}")
+            return Response(
+                {"error": "Failed to process inbox activity"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _process_entry_activity(self, activity_data, recipient):
+        """Process an entry activity and create/update the entry per spec."""
+        try:
+            # Get or create the entry author
+            author_data = activity_data.get('author', {})
+            author_url = author_data.get('id')
+            
+            if not author_url:
+                logger.error("Entry activity missing author id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = author_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            author, _ = Author.objects.get_or_create(
+                url=author_url,
+                defaults={
+                    'username': username,
+                    'displayName': author_data.get('displayName', ''),
+                    'profileImage': author_data.get('profileImage', ''),
+                    'host': author_data.get('host', ''),
+                    'web': author_data.get('web', ''),
+                }
+            )
+            
+            # Create or update the entry
+            entry_url = activity_data.get('id')
+            entry, _ = Entry.objects.get_or_create(
+                url=entry_url,
+                defaults={
+                    'author': author,
+                    'title': activity_data.get('title', ''),
+                    'description': activity_data.get('description', ''),
+                    'content': activity_data.get('content', ''),
+                    'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                    'visibility': activity_data.get('visibility', Entry.PUBLIC),
+                    'source': activity_data.get('source', ''),
+                    'origin': activity_data.get('origin', ''),
+                    'web': activity_data.get('web', ''),
+                    'published': activity_data.get('published'),
+                }
+            )
+            
+            return entry
+            
+        except Exception as e:
+            logger.error(f"Error processing entry activity: {str(e)}")
+            return None
+
+    def _process_follow_activity(self, activity_data, recipient):
+        """Process a follow activity and create the follow request per spec."""
+        try:
+            # Get follower information from actor
+            actor_data = activity_data.get('actor', {})
+            actor_url = actor_data.get('id')
+            
+            if not actor_url:
+                logger.error("Follow activity missing actor id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = actor_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            follower, _ = Author.objects.get_or_create(
+                url=actor_url,
+                defaults={
+                    'username': username,
+                    'displayName': actor_data.get('displayName', ''),
+                    'profileImage': actor_data.get('profileImage', ''),
+                    'host': actor_data.get('host', ''),
+                    'web': actor_data.get('web', ''),
+                }
+            )
+            
+            # Verify the object matches the recipient
+            object_data = activity_data.get('object', {})
+            object_url = object_data.get('id')
+            
+            if object_url != recipient.url:
+                logger.warning(f"Follow object {object_url} doesn't match recipient {recipient.url}")
+            
+            # Create the follow request
+            follow, _ = Follow.objects.get_or_create(
+                follower=follower,
+                followed=recipient,
+                defaults={
+                    'status': Follow.REQUESTING
+                }
+            )
+            
+            return follow
+            
+        except Exception as e:
+            logger.error(f"Error processing follow activity: {str(e)}")
+            return None
+
+    def _process_like_activity(self, activity_data, recipient):
+        """Process a like activity and create the like per spec."""
+        try:
+            # Get liker information
+            author_data = activity_data.get('author', {})
+            author_url = author_data.get('id')
+            
+            if not author_url:
+                logger.error("Like activity missing author id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = author_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            liker, _ = Author.objects.get_or_create(
+                url=author_url,
+                defaults={
+                    'username': username,
+                    'displayName': author_data.get('displayName', ''),
+                    'profileImage': author_data.get('profileImage', ''),
+                    'host': author_data.get('host', ''),
+                    'web': author_data.get('web', ''),
+                }
+            )
+            
+            # Get the liked object URL
+            object_url = activity_data.get('object')
+            if not object_url:
+                logger.error("Like activity missing object URL")
+                return None
+            
+            # Try to find the entry or comment being liked
+            entry = None
+            comment = None
+            
+            try:
+                entry = Entry.objects.get(url=object_url)
+            except Entry.DoesNotExist:
+                try:
+                    comment = Comment.objects.get(url=object_url)
+                except Comment.DoesNotExist:
+                    logger.error(f"Like object not found: {object_url}")
+                    return None
+            
+            # Create the like
+            like_url = activity_data.get('id')
+            like, _ = Like.objects.get_or_create(
+                url=like_url,
+                defaults={
+                    'author': liker,
+                    'entry': entry,
+                    'comment': comment,
+                }
+            )
+            
+            return like
+            
+        except Exception as e:
+            logger.error(f"Error processing like activity: {str(e)}")
+            return None
+
+    def _process_comment_activity(self, activity_data, recipient):
+        """Process a comment activity and create the comment per spec."""
+        try:
+            # Get commenter information
+            author_data = activity_data.get('author', {})
+            author_url = author_data.get('id')
+            
+            if not author_url:
+                logger.error("Comment activity missing author id")
+                return None
+            
+            # Extract username from displayName or URL
+            display_name = author_data.get('displayName', '')
+            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
+            
+            commenter, _ = Author.objects.get_or_create(
+                url=author_url,
+                defaults={
+                    'username': username,
+                    'displayName': author_data.get('displayName', ''),
+                    'profileImage': author_data.get('profileImage', ''),
+                    'host': author_data.get('host', ''),
+                    'web': author_data.get('web', ''),
+                }
+            )
+            
+            # Get the entry being commented on (from 'entry' field per spec)
+            entry_url = activity_data.get('entry')
+            if not entry_url:
+                logger.error("Comment activity missing entry URL")
+                return None
+            
+            try:
+                entry = Entry.objects.get(url=entry_url)
+            except Entry.DoesNotExist:
+                logger.error(f"Comment target entry not found: {entry_url}")
+                return None
+            
+            # Create the comment
+            comment_url = activity_data.get('id')
+            comment, _ = Comment.objects.get_or_create(
+                url=comment_url,
+                defaults={
+                    'author': commenter,
+                    'entry': entry,
+                    'content': activity_data.get('comment', ''),
+                    'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                }
+            )
+            
+            return comment
+            
+        except Exception as e:
+            logger.error(f"Error processing comment activity: {str(e)}")
+            return None
 
     # CMPUT 404 Compliant API Endpoints
 
@@ -621,31 +945,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """
         instance = self.get_object()
 
-        # If this is a remote author, try to fetch fresh data from the remote node
-        if instance.node is not None:
-            from app.utils.remote import RemoteObjectFetcher
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.info(
-                f"Fetching remote author data for {instance.username} from {instance.node.host}"
-            )
-
-            # Try to fetch fresh data from the remote node
-            remote_data = RemoteObjectFetcher.fetch_author_by_url(instance.url)
-
-            if remote_data:
-                logger.info(
-                    f"Successfully fetched remote author data for {instance.username}"
-                )
-                return Response(remote_data)
-            else:
-                logger.warning(
-                    f"Failed to fetch remote author data for {instance.username}, falling back to local cache"
-                )
-            # If remote fetch fails, fall through to return local cached data
-
-        # Return local data (either for local authors or as fallback for remote authors)
+        # Return author data (remote authors should use retrieve_by_fqid for fresh data)
         serializer = AuthorSerializer(instance, context={"request": request})
         return Response(serializer.data)
 
@@ -911,59 +1211,15 @@ class AuthorViewSet(viewsets.ModelViewSet):
             try:
                 author = Author.objects.get(url=decoded_url)
 
-                # If this is a remote author, try to fetch fresh data from the remote node
-                if author.node is not None:
-                    from app.utils.remote import RemoteObjectFetcher
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.info(
-                        f"Fetching fresh remote author data for {author.username} from {author.node.host}"
-                    )
-
-                    # Try to fetch fresh data from the remote node
-                    remote_data = RemoteObjectFetcher.fetch_author_by_url(author.url)
-
-                    if remote_data:
-                        logger.info(
-                            f"Successfully fetched fresh remote author data for {author.username}"
-                        )
-                        return Response(remote_data)
-                    else:
-                        logger.warning(
-                            f"Failed to fetch fresh remote author data for {author.username}, falling back to local cache"
-                        )
-                        # Fall through to return local cached data
-
-                # Return local data (either for local authors or as fallback for remote authors)
+                # Return local cached data
                 serializer = AuthorSerializer(author, context={"request": request})
                 return Response(serializer.data)
 
             except Author.DoesNotExist:
-                # Author not found locally, try to fetch from remote node
-                from app.utils.remote import RemoteObjectFetcher
-                import logging
-
-                logger = logging.getLogger(__name__)
-                logger.info(
-                    f"Author not found locally, attempting to fetch from remote: {decoded_url}"
+                # Author not found locally - return 404
+                return Response(
+                    {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
                 )
-
-                # Try to fetch fresh data from the remote node
-                remote_data = RemoteObjectFetcher.fetch_author_by_url(decoded_url)
-
-                if remote_data:
-                    logger.info(
-                        f"Successfully fetched remote author data from URL: {decoded_url}"
-                    )
-                    return Response(remote_data)
-                else:
-                    logger.warning(
-                        f"Failed to fetch remote author data for URL: {decoded_url}"
-                    )
-                    return Response(
-                        {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
-                    )
 
         except Exception as e:
             import logging
@@ -974,3 +1230,205 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 {"error": "Could not retrieve author"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def retrieve_by_fqid(self, request, author_fqid=None):
+        """
+        GET [remote]: retrieve AUTHOR_FQID's profile
+        
+        This endpoint retrieves an author by their FQID (Fully Qualified ID),
+        which is their complete URL. It supports fetching both local and remote authors.
+        
+        For remote authors, it attempts to fetch fresh data from the remote node
+        and falls back to local cached data if the remote fetch fails.
+        """
+        if not author_fqid:
+            return Response(
+                {"error": "Author FQID is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Decode the URL-encoded FQID
+            decoded_fqid = unquote(author_fqid)
+
+            # Try to find the author by URL first (handles both local and remote)
+            try:
+                author = Author.objects.get(url=decoded_fqid)
+                
+                # If this is a remote author, try to fetch fresh data
+                if author.node is not None:
+                    import requests
+                    from requests.auth import HTTPBasicAuth
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    
+                    try:
+                        # Make request to the remote author endpoint for fresh data
+                        response = requests.get(
+                            decoded_fqid,
+                            auth=HTTPBasicAuth(author.node.username, author.node.password),
+                            timeout=5,
+                            headers={'Accept': 'application/json'}
+                        )
+                        
+                        if response.status_code == 200:
+                            logger.info(f"Successfully fetched fresh remote author data from {decoded_fqid}")
+                            
+                            # Update local cached data with fresh remote data
+                            try:
+                                remote_data = response.json()
+                                
+                                # Update the local author record with fresh data
+                                author.displayName = remote_data.get("displayName", author.displayName)
+                                author.github_username = self._extract_github_username(remote_data.get("github", ""))
+                                author.profileImage = remote_data.get("profileImage", "") or ""
+                                author.host = remote_data.get("host", author.host)
+                                author.web = remote_data.get("web", author.web)
+                                author.save()
+                                
+                                logger.info(f"Updated local cache for remote author: {author.displayName}")
+                                
+                            except Exception as e:
+                                logger.error(f"Failed to update local cache for remote author: {str(e)}")
+                                # Continue with returning the remote data even if cache update fails
+                            
+                            return Response(response.json())
+                        else:
+                            logger.warning(f"Failed to fetch fresh remote author data from {decoded_fqid}: {response.status_code}")
+                            # Fall back to local cached data
+                            
+                    except requests.RequestException as e:
+                        logger.error(f"Network error fetching fresh remote author data from {decoded_fqid}: {str(e)}")
+                        # Fall back to local cached data
+                
+                # Return local cached data (for local authors or as fallback for remote authors)
+                serializer = AuthorSerializer(author, context={"request": request})
+                return Response(serializer.data)
+
+            except Author.DoesNotExist:
+                # Author not found locally, try to fetch from remote node
+                import requests
+                from requests.auth import HTTPBasicAuth
+                from urllib.parse import urlparse
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    f"Author not found locally, attempting to fetch from remote: {decoded_fqid}"
+                )
+
+                try:
+                    # Extract the base host from the FQID
+                    parsed_url = urlparse(decoded_fqid)
+                    base_host = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                    
+                    # Find the corresponding node in our database
+                    from app.models import Node
+                    try:
+                        node = Node.objects.get(host__icontains=parsed_url.netloc, is_active=True)
+                    except Node.DoesNotExist:
+                        logger.warning(f"No active node found for host {parsed_url.netloc}")
+                        return Response(
+                            {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                        )
+                    
+                    # Make request to the remote author endpoint
+                    response = requests.get(
+                        decoded_fqid,
+                        auth=HTTPBasicAuth(node.username, node.password),
+                        timeout=5,
+                        headers={'Accept': 'application/json'}
+                    )
+                    
+                    if response.status_code == 200:
+                        logger.info(f"Successfully fetched remote author data from {decoded_fqid}")
+                        
+                        # Save the newly fetched remote author to our local database for caching
+                        try:
+                            remote_data = response.json()
+                            
+                            # Extract author ID from the FQID
+                            author_id_str = decoded_fqid.split("/")[-2] if decoded_fqid.endswith("/") else decoded_fqid.split("/")[-1]
+                            
+                            # Create new remote author record
+                            from app.models import Author
+                            import uuid
+                            
+                            try:
+                                author_id = uuid.UUID(author_id_str)
+                            except ValueError:
+                                logger.warning(f"Could not extract valid UUID from FQID: {decoded_fqid}")
+                                # Return the data without caching if we can't parse the ID
+                                return Response(response.json())
+                            
+                            remote_author = Author(
+                                id=author_id,
+                                url=decoded_fqid,
+                                username=remote_data.get("displayName", f"remote_user_{str(author_id)[:8]}"),
+                                displayName=remote_data.get("displayName", ""),
+                                github_username=self._extract_github_username(remote_data.get("github", "")),
+                                profileImage=remote_data.get("profileImage") or "",
+                                host=remote_data.get("host", base_host),
+                                web=remote_data.get("web", ""),
+                                node=node,
+                                is_approved=True,  # Remote authors are auto-approved
+                                is_active=False,   # Remote authors can't log in
+                                password="!",      # Unusable password
+                            )
+                            remote_author.save()
+                            logger.info(f"Cached new remote author: {remote_author.displayName}")
+                            
+                        except Exception as e:
+                            logger.error(f"Failed to cache new remote author: {str(e)}")
+                            # Continue with returning the remote data even if caching fails
+                        
+                        return Response(response.json())
+                    else:
+                        logger.warning(f"Failed to fetch remote author from {decoded_fqid}: {response.status_code}")
+                        return Response(
+                            {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                        )
+                        
+                except requests.RequestException as e:
+                    logger.error(f"Network error fetching remote author from {decoded_fqid}: {str(e)}")
+                    return Response(
+                        {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                    )
+                except Exception as e:
+                    logger.error(f"Unexpected error fetching remote author from {decoded_fqid}: {str(e)}")
+                    return Response(
+                        {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                    )
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error retrieving author by FQID {author_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve author"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _extract_github_username(self, github_url):
+        """
+        Extract GitHub username from GitHub URL.
+        
+        Args:
+            github_url: GitHub URL or username
+            
+        Returns:
+            str: GitHub username or empty string
+        """
+        if not github_url:
+            return ""
+        
+        # If it's already just a username, return it
+        if "/" not in github_url:
+            return github_url
+        
+        # Extract username from GitHub URL
+        if "github.com/" in github_url:
+            return github_url.split("github.com/")[-1].rstrip("/")
+        
+        return ""

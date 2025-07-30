@@ -106,6 +106,32 @@ export const NodeManagementPage: React.FC = () => {
     }
   };
 
+  const refreshAllNodes = async () => {
+    try {
+      setIsLoading(true);
+      const activeNodes = nodes.filter(node => node.is_active);
+      
+      showSuccess(`Refreshing authors from ${activeNodes.length} active nodes...`);
+      
+      for (const node of activeNodes) {
+        try {
+          await api.refreshNode(node.host);
+          console.log(`Successfully refreshed node: ${node.host}`);
+        } catch (error) {
+          console.error(`Failed to refresh node ${node.host}:`, error);
+          showError(`Failed to refresh node: ${node.name}`);
+        }
+      }
+      
+      showSuccess("Node refresh completed! Check logs for details.");
+    } catch (error) {
+      console.error("Error refreshing nodes:", error);
+      showError("Failed to refresh nodes");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleAddNode = async () => {
     try {
       if (
@@ -119,7 +145,7 @@ export const NodeManagementPage: React.FC = () => {
       }
 
       await api.addNode(formData);
-      showSuccess("Node added successfully");
+      showSuccess("Node added successfully. Remote authors are being synced in the background.");
       setIsAddingNode(false);
       setFormData({
         name: "",
@@ -492,12 +518,15 @@ export const NodeManagementPage: React.FC = () => {
               Connected Nodes
             </h2>
             <AnimatedButton
-              onClick={fetchNodes}
+              onClick={async () => {
+                await fetchNodes();
+                await refreshAllNodes();
+              }}
               variant="ghost"
               icon={<RefreshCw size={16} />}
               loading={isLoading}
             >
-              Refresh
+              Refresh Authors
             </AnimatedButton>
           </div>
 
@@ -599,6 +628,22 @@ export const NodeManagementPage: React.FC = () => {
 
                     <div className="flex items-center space-x-2 ml-4">
                       <AnimatedButton
+                        onClick={async () => {
+                          try {
+                            await api.refreshNode(node.host);
+                            showSuccess(`Refreshed authors from ${node.name}`);
+                          } catch (error) {
+                            showError(`Failed to refresh ${node.name}`);
+                          }
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        icon={<RefreshCw size={14} />}
+                        title="Refresh authors from this node"
+                      >
+                        Refresh
+                      </AnimatedButton>
+                      <AnimatedButton
                         onClick={() => startEdit(node)}
                         variant="ghost"
                         size="sm"
@@ -635,7 +680,7 @@ export const NodeManagementPage: React.FC = () => {
                 <div>
                   <span className="text-text-2">URL:</span>
                   <p className="text-text-1 font-mono">
-                    {window.location.origin}
+                    {import.meta.env.VITE_API_URL || "http://localhost:8000"}
                   </p>
                 </div>
                 <div>

@@ -6,12 +6,16 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import models
 from django.db.models import Q
-from app.models import Entry, Author
+from django.contrib.contenttypes.models import ContentType
+from app.models import Entry, Author, Node, Follow, Friendship, Inbox
 from app.serializers.entry import EntrySerializer
 from app.permissions import IsAuthorSelfOrReadOnly
 import uuid
 import os
 import logging
+import requests
+from django.conf import settings
+import json
 from app.models import Like, InboxDelivery
 from django.db.models import Count, F
 from django.utils import timezone
@@ -110,10 +114,33 @@ class EntryViewSet(viewsets.ModelViewSet):
                     return obj
                 raise PermissionDenied("You cannot edit this post.")
 
-            # For GET/read operations, enforce visibility
-            if obj in Entry.objects.visible_to_author(user_author):
-                return obj
-            raise PermissionDenied("You do not have permission to view this post.")
+            # For GET/read operations
+            if request.method in ["GET", "HEAD", "OPTIONS"]:
+                if obj.visibility == Entry.PUBLIC:
+                    return obj
+
+                if obj.visibility == Entry.UNLISTED:
+                    return obj  # Anyone with the link can view
+
+                # FRIENDS_ONLY or UNLISTED (if not author) require relationship
+                if user.is_authenticated:
+                    is_author = obj.author == user_author
+                    from app.models import Friendship, Follow
+                    is_friend = Friendship.objects.filter(
+                        Q(author1=obj.author, author2=user_author)
+                        | Q(author1=user_author, author2=obj.author)
+                    ).exists()
+                    is_follower = Follow.objects.filter(
+                        follower=user_author, followed=obj.author, status=Follow.ACCEPTED
+                    ).exists()
+
+                    if obj.visibility == Entry.UNLISTED and (is_author or is_friend or is_follower):
+                        return obj
+
+                    if obj.visibility == Entry.FRIENDS_ONLY and (is_author or is_friend):
+                        return obj
+
+                raise PermissionDenied("You do not have permission to view this post.")
 
         # Remote functionality removed
 
@@ -246,13 +273,208 @@ class EntryViewSet(viewsets.ModelViewSet):
         # Save the entry with the user's author
         entry = serializer.save(author=user_author)
 
-        # Remote functionality removed
+        # Send to remote nodes based on visibility
+        self._send_to_remote_nodes(entry)
 
     def _send_to_remote_nodes(self, entry):
         """
-        Remote functionality removed.
+        Send entry to remote nodes' inboxes based on visibility rules:
+        - PUBLIC: Send to all remote authors
+        - UNLISTED: Send to remote authors that follow the entry author  
+        - FRIENDS: Send to remote authors that are friends with the entry author
         """
-        pass
+        if not entry.author.is_local:
+            # Only federate entries from local authors
+            return
+            
+        # Get remote authors based on visibility
+        remote_authors = self._get_remote_authors_for_entry(entry)
+        
+        if not remote_authors:
+            logger.info(f"No remote authors to send entry {entry.id} to")
+            return
+            
+        # Prepare the entry data according to the inbox spec
+        entry_data = self._serialize_entry_for_inbox(entry)
+        
+        # Group authors by their node to batch requests
+        authors_by_node = {}
+        for author in remote_authors:
+            if author.node and author.node.is_active:
+                if author.node not in authors_by_node:
+                    authors_by_node[author.node] = []
+                authors_by_node[author.node].append(author)
+        
+        # Send to each node
+        for node, authors in authors_by_node.items():
+            for author in authors:
+                self._send_entry_to_author_inbox(entry_data, author, node)
+                
+        logger.info(f"Sent entry {entry.id} to {len(remote_authors)} remote authors")
+
+    def _get_remote_authors_for_entry(self, entry):
+        """Get list of remote authors who should receive this entry."""
+        remote_authors = []
+        
+        if entry.visibility == Entry.PUBLIC:
+            # Send to all remote authors
+            remote_authors = Author.objects.filter(node__isnull=False, node__is_active=True)
+            
+        elif entry.visibility == Entry.UNLISTED:
+            # Send to remote authors that follow the entry author
+            follower_ids = Follow.objects.filter(
+                followed=entry.author,
+                status=Follow.ACCEPTED
+            ).values_list('follower__url', flat=True)
+            
+            remote_authors = Author.objects.filter(
+                url__in=follower_ids,
+                node__isnull=False,
+                node__is_active=True
+            )
+            
+        elif entry.visibility == Entry.FRIENDS_ONLY:
+            # Send to remote authors that are friends with the entry author
+            # Friends are mutual followers
+            friend_ids = Friendship.objects.filter(
+                Q(author1=entry.author) | Q(author2=entry.author)
+            ).values_list('author1__url', 'author2__url')
+            
+            # Flatten the friend IDs and exclude the entry author
+            all_friend_ids = []
+            for author1_url, author2_url in friend_ids:
+                if author1_url != entry.author.url:
+                    all_friend_ids.append(author1_url)
+                if author2_url != entry.author.url:
+                    all_friend_ids.append(author2_url)
+            
+            remote_authors = Author.objects.filter(
+                url__in=all_friend_ids,
+                node__isnull=False,
+                node__is_active=True
+            )
+        
+        return remote_authors
+    
+    def _serialize_entry_for_inbox(self, entry):
+        """Serialize entry in the format expected by remote inboxes."""
+        # Generate the entry ID (required field for ActivitySerializer)
+        entry_id = entry.url
+        if not entry_id:
+            # Fallback: generate the URL if not set
+            entry_id = f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}/"
+        
+        # Generate the web URL
+        web_url = entry.web
+        if not web_url:
+            frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+            web_url = f"{frontend_url}/authors/{entry.author.id}/entries/{entry.id}"
+        
+        # Generate author ID
+        author_id = entry.author.url
+        if not author_id:
+            author_id = f"{settings.SITE_URL}/api/authors/{entry.author.id}/"
+        
+        # Log what we're working with
+        logger.debug(f"Entry serialization - entry.url: '{entry.url}', entry.id: '{entry.id}', generated entry_id: '{entry_id}'")
+        logger.debug(f"Author serialization - author.url: '{entry.author.url}', author.id: '{entry.author.id}', generated author_id: '{author_id}'")
+        
+        # Ensure all required fields for ActivitySerializer validation are present
+        entry_data = {
+            "type": "entry",
+            "id": entry_id,
+            "web": web_url,
+            "title": entry.title or "",
+            "description": entry.description or "",
+            "content": entry.content or "",
+            "contentType": entry.content_type or "text/plain",
+            "visibility": entry.visibility,
+            "source": entry.source or "",
+            "origin": entry.origin or "",
+            "published": entry.published.isoformat() if entry.published else timezone.now().isoformat(),
+            "author": {
+                "type": "author",
+                "id": author_id,
+                "web": entry.author.web or f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}",
+                "host": entry.author.host or f"{settings.SITE_URL}/api/",
+                "displayName": entry.author.displayName or entry.author.username,
+                "profileImage": entry.author.profileImage or "",
+            }
+        }
+        
+        # Validate that required fields are present before sending
+        required_fields = ['type', 'id', 'title', 'content', 'contentType']
+        missing_fields = [field for field in required_fields if not entry_data.get(field)]
+        if missing_fields:
+            logger.error(f"Missing required fields in entry data: {missing_fields}")
+            logger.error(f"Entry data: {json.dumps(entry_data, indent=2)}")
+            raise ValueError(f"Cannot send entry with missing required fields: {missing_fields}")
+        
+        # Validate author has required fields
+        if not entry_data['author'].get('id'):
+            logger.error(f"Missing author id in entry data")
+            logger.error(f"Author data: {json.dumps(entry_data['author'], indent=2)}")
+            raise ValueError("Cannot send entry with missing author id")
+        
+        # Final safety check - ensure ID is not None/empty string
+        if not entry_data['id'] or entry_data['id'] == 'None':
+            logger.error(f"Invalid entry ID: '{entry_data['id']}'")
+            raise ValueError(f"Entry ID is invalid: '{entry_data['id']}'")
+        
+        # Log the serialized data for debugging
+        logger.debug(f"Serialized entry for inbox: {json.dumps(entry_data, indent=2)}")
+        
+        return entry_data
+    
+    def _send_entry_to_author_inbox(self, entry_data, author, node):
+        """Send entry data to a specific author's inbox on a remote node."""
+        try:
+            # Construct the inbox URL (ensure trailing slash for Django URL routing)
+            inbox_url = f"{node.host.rstrip('/')}/api/authors/{author.id}/inbox/"
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': f'social-distribution-node/{settings.SITE_URL}'
+            }
+            
+            # Use basic auth if credentials are provided
+            auth = None
+            if node.username and node.password:
+                auth = (node.username, node.password)
+            
+            # Log detailed request information for debugging
+            logger.info(f"Sending entry to inbox: {inbox_url}")
+            logger.debug(f"Entry data: {json.dumps(entry_data, indent=2)}")
+            logger.debug(f"Headers: {headers}")
+            logger.debug(f"Using auth: {'Yes' if auth else 'No'}")
+            logger.debug(f"Node credentials - username: {node.username}, has_password: {'Yes' if node.password else 'No'}")
+            
+            response = requests.post(
+                inbox_url,
+                json=entry_data,
+                headers=headers,
+                auth=auth,
+                timeout=30  # Increased timeout for debugging
+            )
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"Successfully sent entry to {author.displayName} at {node.name}")
+            else:
+                logger.warning(f"Failed to send entry to {author.displayName} at {node.name}: {response.status_code}")
+                logger.warning(f"Response headers: {dict(response.headers)}")
+                try:
+                    response_text = response.text
+                    logger.warning(f"Response body: {response_text}")
+                    if response.headers.get('content-type', '').startswith('application/json'):
+                        response_json = response.json()
+                        logger.warning(f"Response JSON: {json.dumps(response_json, indent=2)}")
+                except Exception as parse_error:
+                    logger.warning(f"Could not parse response body: {parse_error}")
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error sending entry to {author.displayName} at {node.name}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error sending entry to {author.displayName} at {node.name}: {str(e)}")
 
     def _broadcast_to_node(self, entry, node):
         """
@@ -438,19 +660,31 @@ class EntryViewSet(viewsets.ModelViewSet):
             friends_ids = following_ids & followers_ids
 
             # Get all entries from friends, excluding deleted entries
-            entries = (
+            friend_entries = (
                 Entry.objects.filter(author__id__in=friends_ids)
                 .exclude(visibility=Entry.DELETED)
-                .order_by("-created_at")
             )
 
+            # Get entries from inbox (federated entries from remote nodes)
+            entry_content_type = ContentType.objects.get_for_model(Entry)
+            inbox_entry_ids = Inbox.objects.filter(
+                recipient=current_author,
+                activity_type='entry',
+                content_type=entry_content_type
+            ).values_list('object_id', flat=True)
+            
+            inbox_entries = Entry.objects.filter(id__in=inbox_entry_ids)
+
+            # Combine friend entries and inbox entries, remove duplicates
+            combined_entries = friend_entries.union(inbox_entries).order_by("-created_at")
+
             # Apply pagination
-            page = self.paginate_queryset(entries)
+            page = self.paginate_queryset(combined_entries)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = self.get_serializer(entries, many=True)
+            serializer = self.get_serializer(combined_entries, many=True)
             return Response(serializer.data)
 
         except Exception as e:
@@ -651,6 +885,9 @@ class EntryViewSet(viewsets.ModelViewSet):
         - friends-only entries: must be authenticated
         - public/unlisted entries: no authentication required
         """
+        # Override permission check for this specific endpoint
+        self.permission_classes = [AllowAny]
+        self.check_permissions(request)
         if not entry_fqid:
             return Response(
                 {"error": "Entry FQID is required"}, status=status.HTTP_400_BAD_REQUEST

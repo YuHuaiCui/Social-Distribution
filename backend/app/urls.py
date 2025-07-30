@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from app.views import AuthorViewSet
 from app.views.entry import EntryViewSet
-from app.views.follow import FollowViewSet
+from app.views.follow import FollowViewSet, remote_followers
 from app.views.like import EntryLikeView, CommentLikeView, received_likes
 from app.views.auth import auth_status, github_callback, author_me, logout_view
 from app.views.image import ImageUploadView
@@ -16,6 +16,7 @@ from app.views.node import (
     GetNodesView,
     UpdateNodeView,
     AddNodeView,
+    RefreshNodeView,
     DeleteNodeView,
     RemoteFolloweeView,
     RemoteAuthorsView,
@@ -255,6 +256,7 @@ urlpatterns = [
     path("nodes/", GetNodesView.as_view(), name="get-nodes"),
     path("nodes/add/", AddNodeView.as_view(), name="add-node"),
     path("nodes/update/", UpdateNodeView.as_view(), name="update-node"),
+    path("nodes/refresh/", RefreshNodeView.as_view(), name="refresh-node"),
     path("nodes/remove/", DeleteNodeView.as_view(), name="delete-node"),
     # Remote API endpoints
     path(
@@ -279,4 +281,16 @@ urlpatterns = [
     # Inbox notification endpoints
     path("api/likes/received/", received_likes, name="received-likes"),
     path("api/comments/received/", received_comments, name="received-comments"),
+    # Remote followers endpoint: /api/authors/{AUTHOR_SERIAL}/followers/{FOREIGN_AUTHOR_FQID}
+    path(
+        "authors/<uuid:author_serial>/followers/<path:foreign_author_fqid>/",
+        remote_followers,
+        name="remote-followers",
+    ),
+    # Author by FQID: /api/authors/{AUTHOR_FQID}/ (most general, should be last)
+    path(
+        "authors/<path:author_fqid>/",
+        AuthorViewSet.as_view({"get": "retrieve_by_fqid"}),
+        name="author-by-fqid",
+    ),
 ]

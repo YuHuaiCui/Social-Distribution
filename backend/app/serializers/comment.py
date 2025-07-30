@@ -53,7 +53,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "type": "likes",
             "id": f"{instance.url}/likes",
             # in this example nodebbbb has a html page just for the likes
-            "web": f"{settings.SITE_URL}/authors/{instance.author.id}/commented/{instance.id}/likes",
+            "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{instance.author.id}/commented/{instance.id}/likes",
             "page_number": 1,
             "size": 50,
             "count": likes_count,

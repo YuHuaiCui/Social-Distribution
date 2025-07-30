@@ -128,6 +128,14 @@ export const routes: RouteObject[] = [
           </Protected>
         ),
       },
+      {
+        path: "/authors/*",
+        element: (
+          <Protected>
+            <AuthorProfilePage />
+          </Protected>
+        ),
+      },
 
       {
         path: "/liked",

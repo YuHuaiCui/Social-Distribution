@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, FileText, Hash, ArrowRight } from "lucide-react";
+import { Search, FileText, Hash, ArrowRight, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "../services/api";
 import AnimatedGradient from "./ui/AnimatedGradient";
 import type { Entry, Author, Comment } from "../types/models";
 import { useAuth } from "./context/AuthContext"; // adjust path as needed
-import { extractUUID } from "../utils/extractId";
+import { extractUUID, getAuthorUrl, isRemoteAuthor } from "../utils/extractId";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -80,7 +80,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         try {
           const authorsResponse = await api.getAuthors({
             search: searchQuery,
-            is_active: true,
+            // Don't filter by is_active to include remote authors (they have is_active=False)
             ...(isAdmin ? {} : { is_approved: true }),
           });
           // Handle both paginated and direct array responses
@@ -112,7 +112,15 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
         navigate(`/posts/${id}`);
         break;
       case "author":
-        navigate(`/authors/${extractUUID(id)}`);
+        // For author navigation, we need the author object to determine the correct URL
+        // Find the author from the current results
+        const author = results?.authors.find(a => a.id === id);
+        if (author) {
+          navigate(getAuthorUrl(author));
+        } else {
+          // Fallback to UUID extraction for backwards compatibility
+          navigate(`/authors/${extractUUID(id)}`);
+        }
         break;
       case "tag":
         navigate(`/explore?tag=${id}`);
@@ -302,8 +310,11 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                                       .toUpperCase() || "U"}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors">
+                                    <h4 className="font-medium text-[var(--search-results-primary)] truncate group-hover:text-[var(--search-results-accent)] transition-colors flex items-center gap-1">
                                       {author.displayName || author.display_name || "Unknown Author"}
+                                      {isRemoteAuthor(author) && (
+                                        <Globe size={12} className="text-blue-400 shrink-0" title="Remote Author" />
+                                      )}
                                     </h4>
                                   </div>
                                   <ArrowRight

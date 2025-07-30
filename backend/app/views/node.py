@@ -150,10 +150,13 @@ class AddNodeView(APIView):
 
             # Fetch and store all authors from the remote node
             try:
+                print(f"Starting to fetch authors from new node: {host}")
                 self._fetch_and_store_remote_authors(node)
             except Exception as e:
                 # Log the error but don't fail the node creation
                 print(f"Warning: Failed to fetch authors from new node {host}: {str(e)}")
+                import traceback
+                traceback.print_exc()
 
             return Response(
                 {"message": "Node added successfully"}, status=status.HTTP_201_CREATED
@@ -182,37 +185,62 @@ class AddNodeView(APIView):
             
             while True:
                 # Fetch authors from remote node with pagination
+                url = f"{node.host.rstrip('/')}/api/authors/"
+                print(f"Fetching authors from URL: {url}, page: {page}")
+                
                 response = requests.get(
-                    f"{node.host.rstrip('/')}/api/authors/",
+                    url,
                     auth=HTTPBasicAuth(node.username, node.password),
                     params={"page": page, "size": 50},  # Fetch 50 at a time
                     timeout=10,
                 )
                 
+                print(f"Response status: {response.status_code}")
+                
                 if response.status_code != 200:
                     print(f"Failed to fetch authors from {node.host}: {response.status_code}")
+                    print(f"Response content: {response.text[:500]}")  # First 500 chars
                     break
                 
                 data = response.json()
-                authors = data.get("authors", [])
+                print(f"Response data keys: {data.keys()}")
+                
+                # Handle both formats: CMPUT 404 spec format and DRF pagination format
+                if "authors" in data:
+                    # CMPUT 404 spec format
+                    authors = data.get("authors", [])
+                elif "results" in data:
+                    # Django REST Framework pagination format
+                    authors = data.get("results", [])
+                else:
+                    print(f"Unexpected response format. Keys: {data.keys()}")
+                    authors = []
+                
+                print(f"Found {len(authors)} authors on page {page}")
                 
                 if not authors:
+                    print("No more authors to fetch")
                     break  # No more authors to fetch
                 
                 # Store each author locally
                 for author_data in authors:
                     try:
-                        self._store_remote_author(author_data, node)
-                        authors_stored += 1
+                        stored = self._store_remote_author(author_data, node)
+                        if stored:
+                            authors_stored += 1
                     except Exception as e:
                         print(f"Failed to store author {author_data.get('id', 'unknown')}: {str(e)}")
                         continue
                 
                 # Check if there are more pages
-                if len(authors) < 50:
+                if "next" in data and data["next"]:
+                    # DRF pagination - use next URL if available
+                    page += 1
+                elif len(authors) < 50:
+                    # CMPUT 404 format - check by count
                     break  # Last page
-                
-                page += 1
+                else:
+                    page += 1
             
             print(f"Successfully stored {authors_stored} authors from {node.host}")
             
@@ -238,15 +266,23 @@ class AddNodeView(APIView):
             author_url = author_data.get("id", "")
             if not author_url:
                 print(f"Author data missing ID: {author_data}")
-                return
+                return False
             
             # Try to parse UUID from the URL
-            author_id_str = author_url.split("/")[-1].rstrip("/")
+            # Remove trailing slash and split
+            url_parts = author_url.rstrip("/").split("/")
+            author_id_str = url_parts[-1]
+            
+            print(f"Extracting UUID from URL: {author_url}")
+            print(f"Extracted ID string: {author_id_str}")
+            
             try:
                 author_id = UUID(author_id_str)
+                print(f"Successfully parsed UUID: {author_id}")
             except ValueError:
                 print(f"Invalid UUID in author URL: {author_url}")
-                return
+                print(f"Failed to parse: '{author_id_str}'")
+                return False
             
             # Check if author already exists
             existing_author = Author.objects.filter(id=author_id).first()
@@ -256,7 +292,7 @@ class AddNodeView(APIView):
                 existing_author.url = author_url
                 existing_author.displayName = author_data.get("displayName", "")
                 existing_author.github_username = self._extract_github_username(author_data.get("github", ""))
-                existing_author.profileImage = author_data.get("profileImage", "")
+                existing_author.profileImage = author_data.get("profileImage") or ""  # Ensure empty string instead of None
                 existing_author.host = author_data.get("host", node.host)
                 existing_author.web = author_data.get("web", "")
                 existing_author.node = node
@@ -271,7 +307,7 @@ class AddNodeView(APIView):
                     username=author_data.get("displayName", f"remote_user_{author_id_str[:8]}"),
                     displayName=author_data.get("displayName", ""),
                     github_username=self._extract_github_username(author_data.get("github", "")),
-                    profileImage=author_data.get("profileImage", ""),
+                    profileImage=author_data.get("profileImage") or "",  # Ensure empty string instead of None
                     host=author_data.get("host", node.host),
                     web=author_data.get("web", ""),
                     node=node,
@@ -281,6 +317,8 @@ class AddNodeView(APIView):
                 )
                 remote_author.save()
                 print(f"Created new remote author: {remote_author.displayName}")
+            
+            return True
                 
         except Exception as e:
             print(f"Error storing remote author: {str(e)}")
@@ -413,6 +451,13 @@ class UpdateNodeView(APIView):
             node_obj.is_active = is_auth
             node_obj.save()
 
+            # Refetch authors from the updated node
+            try:
+                print(f"Refetching authors from updated node: {host}")
+                AddNodeView()._fetch_and_store_remote_authors(node_obj)
+            except Exception as e:
+                print(f"Warning: Failed to refetch authors from updated node {host}: {str(e)}")
+
             return Response(
                 {"message": "Node updated successfully!"}, status=status.HTTP_200_OK
             )
@@ -420,6 +465,82 @@ class UpdateNodeView(APIView):
             print(f"Unable to edit node: {str(e)}")
             return Response(
                 {"error": "Failed to update node. Please try again later."}, status=500
+            )
+
+
+class RefreshNodeView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    @extend_schema(
+        summary="Refresh authors from a Node.",
+        description="Refetch and update all authors from an existing Node.",
+        request={
+            "type": "object",
+            "properties": {
+                "host": {"type": "string", "example": "http://192.168.1.72:8000"}
+            },
+            "required": ["host"]
+        },
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Authors refreshed successfully.",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "example": "Authors refreshed successfully! Stored 5 authors.",
+                        }
+                    },
+                },
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                description="Node not found.",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "Node not found."}
+                    },
+                },
+            ),
+        },
+        tags=["Node API"],
+    )
+    def post(self, request):
+        """
+        Refresh authors from an existing node.
+        """
+        try:
+            host = request.data.get("host")
+            
+            if not host:
+                return Response(
+                    {"error": "Host is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            node_obj = get_object_or_404(Node, host=host)
+            
+            # Fetch and store authors from the node
+            try:
+                print(f"Refreshing authors from node: {host}")
+                AddNodeView()._fetch_and_store_remote_authors(node_obj)
+                return Response(
+                    {"message": "Authors refreshed successfully!"}, 
+                    status=status.HTTP_200_OK
+                )
+            except Exception as e:
+                print(f"Failed to refresh authors from node {host}: {str(e)}")
+                return Response(
+                    {"error": "Failed to refresh authors from node."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            print(f"Unable to refresh node: {str(e)}")
+            return Response(
+                {"error": "Failed to refresh node. Please try again later."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 

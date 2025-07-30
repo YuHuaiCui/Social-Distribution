@@ -16,7 +16,7 @@ class EntryManager(models.Manager):
 
         Visibility logic:
         - PUBLIC: Visible to everyone (including anonymous users)
-        - UNLISTED: Visible to the author, their followers, and friends
+        - UNLISTED: Visible to the author, their followers, and friends (including anonymous users with the link)
         - FRIENDS_ONLY: Visible only to the author and their friends
         - DELETED: Not visible to anyone (soft-deleted entries)
 
@@ -35,7 +35,7 @@ class EntryManager(models.Manager):
         # Anonymous users: only show PUBLIC and UNLISTED entries
         if viewing_author is None:
             return self.filter(
-                Q(visibility=Entry.PUBLIC) | Q(visibility=Entry.UNLISTED)
+                Q(visibility=Entry.PUBLIC)
             ).exclude(visibility=Entry.DELETED)
 
         # Use EXISTS subqueries for better performance on large datasets
@@ -54,12 +54,8 @@ class EntryManager(models.Manager):
             Q(visibility=Entry.PUBLIC)  # Public entries visible to all
             | Q(visibility=Entry.UNLISTED, author=viewing_author)  # Own unlisted posts
             | Q(visibility=Entry.UNLISTED)
-            & (
-                Exists(follower_exists) | Exists(friendship_exists)
-            )  # Unlisted posts visible to followers and friends
-            | Q(
-                visibility=Entry.FRIENDS_ONLY, author=viewing_author
-            )  # Own friends-only posts
+            & (Exists(follower_exists) | Exists(friendship_exists))  # Unlisted posts visible to followers and friends
+            | Q(visibility=Entry.FRIENDS_ONLY, author=viewing_author)  # Own friends-only posts
             | Q(visibility=Entry.FRIENDS_ONLY)
             & Exists(friendship_exists)  # Friends-only posts from friends
         ).exclude(visibility=Entry.DELETED)
@@ -222,24 +218,32 @@ class Entry(models.Model):
         # Determine if this is a new entry
         is_new_entry = not self.pk
 
-        # Auto-generate URL for local entries
-        if not self.url and self.author.is_local:
-            self.url = (
-                f"{settings.SITE_URL}/api/authors/{self.author.id}/entries/{self.id}"
-            )
-
-        # Auto-generate web URL for local entries
-        if not self.web and self.author.is_local:
-            self.web = f"{settings.SITE_URL}/authors/{self.author.id}/entries/{self.id}"
-
-        # Save the entry first to get created_at timestamp
+        # Save the entry first to get the ID for URL generation
         super().save(*args, **kwargs)
 
-        # Set published timestamp to match created_at for new entries
-        if is_new_entry and not self.published and self.created_at:
-            self.published = self.created_at
-            # Update only the published field to avoid triggering save signals again
-            super().save(update_fields=["published"])
+        # Auto-generate URLs for local entries AFTER saving to get the ID
+        if is_new_entry and self.author.is_local:
+            update_fields = []
+            
+            # Auto-generate URL if not set
+            if not self.url:
+                self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/entries/{self.id}/"
+                update_fields.append("url")
+
+            # Auto-generate web URL if not set
+            if not self.web:
+                frontend_url = getattr(settings, 'FRONTEND_URL', settings.SITE_URL)
+                self.web = f"{frontend_url}/authors/{self.author.id}/entries/{self.id}"
+                update_fields.append("web")
+
+            # Set published timestamp to match created_at for new entries
+            if not self.published and self.created_at:
+                self.published = self.created_at
+                update_fields.append("published")
+
+            # Only save again if we actually updated fields to avoid infinite recursion
+            if update_fields:
+                super().save(update_fields=update_fields)
 
     @property
     def is_deleted(self):
