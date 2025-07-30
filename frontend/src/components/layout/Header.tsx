@@ -14,6 +14,8 @@ import {
   Heart,
   UserPlus,
   Server,
+  Check,
+  X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../../lib/theme";
@@ -23,6 +25,7 @@ import Button from "../ui/Button";
 import AnimatedGradient from "../ui/AnimatedGradient";
 import { NotificationBadge } from "../NotificationBadge";
 import { extractUUID } from "../../utils/extractId";
+import { socialService } from "../../services/social";
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -33,6 +36,9 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
   const { theme, toggleTheme } = useTheme();
   const { notifications, unreadCount, markAsRead, refreshNotifications } =
     useNotifications();
+  
+  // Debug: log notifications
+  console.log('Header notifications:', notifications, 'unreadCount:', unreadCount);
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -78,6 +84,26 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
   const handleUserMenuClick = () => {
     setShowUserMenu(!showUserMenu);
     setShowNotifications(false);
+  };
+
+  const handleAcceptFollowRequest = async (followId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      await socialService.acceptFollowRequest(followId.replace('follow-', ''));
+      refreshNotifications();
+    } catch (error) {
+      console.error('Failed to accept follow request:', error);
+    }
+  };
+
+  const handleRejectFollowRequest = async (followId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      await socialService.rejectFollowRequest(followId.replace('follow-', ''));
+      refreshNotifications();
+    } catch (error) {
+      console.error('Failed to reject follow request:', error);
+    }
   };
 
   // Helper function to format time ago
@@ -195,11 +221,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                       {notifications.length > 0 ? (
                         <div>
                           {notifications.map((notif) => {
-                            const senderName =
-                              typeof notif.sender === "object" && notif.sender
-                                ? notif.sender.displayName || notif.sender.display_name
-                                : "Someone";
-
+                            console.log('Rendering notification:', notif);
                             const timeAgo = formatTimeAgo(notif.created_at);
 
                             return (
@@ -213,49 +235,22 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                   if (!notif.is_read) {
                                     markAsRead([notif.id]);
                                   }
-                                  if (notif.item_type === "follow") {
-                                    // Removed inbox navigation
-                                  } else if (
-                                    notif.item_type === "comment" ||
-                                    notif.item_type === "like"
-                                  ) {
-                                    // Navigate to the related post if we have the data
-                                    if (
-                                      notif.content_data &&
-                                      notif.content_data.type ===
-                                        notif.item_type
-                                    ) {
-                                      const data = notif.content_data
-                                        .data as any;
-                                      const entryId =
-                                        typeof data.entry === "string"
-                                          ? data.entry
-                                              .split("/")
-                                              .filter(Boolean)
-                                              .pop()
-                                          : data.entry?.id;
-                                      if (entryId) {
-                                        navigate(`/posts/${entryId}`);
-                                      }
+                                  
+                                  if (notif.type === "like") {
+                                    // Navigate to the liked entry
+                                    const entryId = notif.entry.id.includes("/")
+                                      ? notif.entry.id.split("/").filter(Boolean).pop()
+                                      : notif.entry.id;
+                                    if (entryId) {
+                                      navigate(`/posts/${entryId}`);
                                     }
-                                  } else if (notif.item_type === "entry") {
-                                    // For entry notifications, navigate to the entry itself
-                                    if (
-                                      notif.content_data &&
-                                      notif.content_data.type === "entry"
-                                    ) {
-                                      const entryData = notif.content_data
-                                        .data as any;
-                                      const entryId =
-                                        typeof entryData.id === "string"
-                                          ? entryData.id
-                                              .split("/")
-                                              .filter(Boolean)
-                                              .pop()
-                                          : entryData.id;
-                                      if (entryId) {
-                                        navigate(`/posts/${entryId}`);
-                                      }
+                                  } else if (notif.type === "follow") {
+                                    // Always navigate to the follower's profile page
+                                    const authorId = notif.follower.id.includes("/")
+                                      ? notif.follower.id.split("/").filter(Boolean).pop()
+                                      : notif.follower.id;
+                                    if (authorId) {
+                                      navigate(`/authors/${authorId}`);
                                     }
                                   }
                                   setShowNotifications(false);
@@ -264,56 +259,68 @@ export const Header: React.FC<HeaderProps> = ({ onSearchClick }) => {
                                 <div className="flex items-start space-x-3">
                                   <div
                                     className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                      notif.item_type === "follow"
+                                      notif.type === "follow"
                                         ? "bg-[var(--primary-purple)]/20"
-                                        : notif.item_type === "like"
-                                        ? "bg-[var(--primary-pink)]/20"
-                                        : notif.item_type === "comment"
-                                        ? "bg-[var(--primary-teal)]/20"
-                                        : "bg-[var(--primary-yellow)]/20"
+                                        : "bg-[var(--primary-pink)]/20"
                                     }`}
                                   >
-                                    {notif.item_type === "follow" ? (
+                                    {notif.type === "follow" ? (
                                       <UserPlus
                                         size={16}
                                         className="text-[var(--primary-purple)]"
                                       />
-                                    ) : notif.item_type === "like" ? (
+                                    ) : (
                                       <Heart
                                         size={16}
                                         className="text-[var(--primary-pink)]"
-                                      />
-                                    ) : notif.item_type === "comment" ? (
-                                      <MessageCircle
-                                        size={16}
-                                        className="text-[var(--primary-teal)]"
-                                      />
-                                    ) : (
-                                      <Bell
-                                        size={16}
-                                        className="text-[var(--primary-yellow)]"
                                       />
                                     )}
                                   </div>
                                   <div className="flex-1">
                                     <p className="text-sm text-text-1">
                                       <span className="font-medium">
-                                        {senderName}
+                                        {notif.type === "like" 
+                                          ? notif.author.displayName || notif.author.display_name || notif.author.username
+                                          : notif.follower.displayName || notif.follower.display_name || notif.follower.username || "Someone"
+                                        }
                                       </span>
-                                      {notif.item_type === "follow" &&
-                                        " wants to follow you"}
-                                      {notif.item_type === "like" &&
-                                        " liked your post"}
-                                      {notif.item_type === "comment" &&
-                                        " commented on your post"}
-                                      {notif.item_type === "entry" &&
-                                        " shared a post with you"}
-                                      {notif.item_type === "entry_link" &&
-                                        " shared a link"}
+                                      {notif.type === "follow" && (
+                                        <>
+                                          {notif.status === "requesting" && " wants to follow you"}
+                                          {notif.status === "accepted" && " is now following you"}
+                                          {notif.status === "rejected" && "'s follow request was rejected by you"}
+                                        </>
+                                      )}
+                                      {notif.type === "like" && " liked your post"}
+                                      {notif.type === "like" && notif.entry.title && (
+                                        <span className="text-text-2"> "{notif.entry.title}"</span>
+                                      )}
                                     </p>
                                     <p className="text-xs text-text-2 mt-1">
                                       {timeAgo}
                                     </p>
+                                    {notif.type === "follow" && notif.status === "requesting" && (
+                                      <div className="flex space-x-2 mt-2">
+                                        <Button
+                                          size="sm"
+                                          variant="primary"
+                                          onClick={(e) => handleAcceptFollowRequest(notif.id, e)}
+                                          className="flex items-center space-x-1 text-xs px-2 py-1"
+                                        >
+                                          <Check size={12} />
+                                          <span>Accept</span>
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={(e) => handleRejectFollowRequest(notif.id, e)}
+                                          className="flex items-center space-x-1 text-xs px-2 py-1"
+                                        >
+                                          <X size={12} />
+                                          <span>Reject</span>
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </motion.div>

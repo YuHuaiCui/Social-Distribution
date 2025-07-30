@@ -1,15 +1,15 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from app.models import Follow, Author
 from app.serializers.follow import FollowSerializer, FollowCreateSerializer
-from rest_framework.decorators import api_view
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
 from requests.auth import HTTPBasicAuth
 import requests
 import json
+from app.utils import url_utils
 
 
 class IsAuthenticatedOrReadOnly(permissions.BasePermission):
@@ -336,3 +336,105 @@ class FollowViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             print(f"Error sending follow response: {str(e)}")
+
+
+@api_view(['DELETE', 'PUT', 'GET'])
+def remote_followers(request, author_serial, foreign_author_fqid):
+    """
+    Remote followers endpoint for foreign authors
+    /api/authors/{AUTHOR_SERIAL}/followers/{FOREIGN_AUTHOR_FQID}
+    
+    DELETE: Remove FOREIGN_AUTHOR_FQID as a follower of AUTHOR_SERIAL (must be authenticated)
+    PUT: Add FOREIGN_AUTHOR_FQID as a follower of AUTHOR_SERIAL (must be authenticated) 
+    GET: Check if FOREIGN_AUTHOR_FQID is a follower of AUTHOR_SERIAL (returns 404 if not following)
+    """
+    if request.method in ['DELETE', 'PUT'] and not request.user.is_authenticated:
+        return Response(
+            {"error": "Authentication required"}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Get the local author
+    try:
+        local_author = Author.objects.get(id=author_serial)
+    except Author.DoesNotExist:
+        return Response(
+            {"error": "Author not found"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Decode the foreign author FQID
+    foreign_author_url = url_utils.percent_decode_url(foreign_author_fqid)
+    
+    # Get or create the foreign author
+    try:
+        foreign_author = Author.objects.get(url=foreign_author_url)
+    except Author.DoesNotExist:
+        return Response(
+            {"error": "Foreign author not found"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    if request.method == 'DELETE':
+        # Remove foreign author as follower
+        try:
+            follow = Follow.objects.get(
+                follower=foreign_author, 
+                followed=local_author
+            )
+            follow.delete()
+            return Response(
+                {"message": "Foreign author removed as follower"}, 
+                status=status.HTTP_200_OK
+            )
+        except Follow.DoesNotExist:
+            return Response(
+                {"error": "Follow relationship not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    elif request.method == 'PUT':
+        # Add foreign author as follower
+        try:
+            follow, created = Follow.objects.get_or_create(
+                follower=foreign_author,
+                followed=local_author,
+                defaults={'status': Follow.ACCEPTED}
+            )
+            if not created:
+                # Update existing follow to accepted
+                follow.status = Follow.ACCEPTED
+                follow.save()
+            
+            return Response(
+                {"message": "Foreign author added as follower"}, 
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to add follower: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    elif request.method == 'GET':
+        # Check if foreign author is a follower
+        try:
+            follow = Follow.objects.get(
+                follower=foreign_author, 
+                followed=local_author,
+                status=Follow.ACCEPTED
+            )
+            return Response(
+                {
+                    "follower": foreign_author_url,
+                    "followed": local_author.url,
+                    "status": follow.status,
+                    "created_at": follow.created_at
+                },
+                status=status.HTTP_200_OK
+            )
+        except Follow.DoesNotExist:
+            return Response(
+                {"error": "Follow relationship not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )

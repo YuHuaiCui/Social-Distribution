@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import type { Entry, Author } from "../types/models";
 import { api } from "../services/api";
 import AuthorCard from "../components/AuthorCard";
@@ -16,6 +16,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 const AuthorProfilePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -43,13 +44,18 @@ const AuthorProfilePage: React.FC = () => {
       if (!id) return;
 
       try {
+        // Determine if this is a FQID (contains full URL path) or UUID
+        const authorId = id.includes("http") || location.pathname.includes("authors/") && location.pathname.split("/").length > 3
+          ? location.pathname.replace("/authors/", "") // Get full path after /authors/
+          : id;
+
         // Fetch author data first
-        const authorData = await api.getAuthor(id);
+        const authorData = await api.getAuthor(authorId);
         setAuthor(authorData);
         
         // Try to fetch entries separately - don't fail if this doesn't work
         try {
-          const postData = await api.getAuthorEntries(id);
+          const postData = await api.getAuthorEntries(authorId);
           setEntries(postData);
         } catch (entriesErr) {
           console.warn("Error loading author entries:", entriesErr);

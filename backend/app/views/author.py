@@ -621,31 +621,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """
         instance = self.get_object()
 
-        # If this is a remote author, try to fetch fresh data from the remote node
-        if instance.node is not None:
-            from app.utils.remote import RemoteObjectFetcher
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.info(
-                f"Fetching remote author data for {instance.username} from {instance.node.host}"
-            )
-
-            # Try to fetch fresh data from the remote node
-            remote_data = RemoteObjectFetcher.fetch_author_by_url(instance.url)
-
-            if remote_data:
-                logger.info(
-                    f"Successfully fetched remote author data for {instance.username}"
-                )
-                return Response(remote_data)
-            else:
-                logger.warning(
-                    f"Failed to fetch remote author data for {instance.username}, falling back to local cache"
-                )
-            # If remote fetch fails, fall through to return local cached data
-
-        # Return local data (either for local authors or as fallback for remote authors)
+        # Return author data (remote authors should use retrieve_by_fqid for fresh data)
         serializer = AuthorSerializer(instance, context={"request": request})
         return Response(serializer.data)
 
@@ -911,59 +887,15 @@ class AuthorViewSet(viewsets.ModelViewSet):
             try:
                 author = Author.objects.get(url=decoded_url)
 
-                # If this is a remote author, try to fetch fresh data from the remote node
-                if author.node is not None:
-                    from app.utils.remote import RemoteObjectFetcher
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.info(
-                        f"Fetching fresh remote author data for {author.username} from {author.node.host}"
-                    )
-
-                    # Try to fetch fresh data from the remote node
-                    remote_data = RemoteObjectFetcher.fetch_author_by_url(author.url)
-
-                    if remote_data:
-                        logger.info(
-                            f"Successfully fetched fresh remote author data for {author.username}"
-                        )
-                        return Response(remote_data)
-                    else:
-                        logger.warning(
-                            f"Failed to fetch fresh remote author data for {author.username}, falling back to local cache"
-                        )
-                        # Fall through to return local cached data
-
-                # Return local data (either for local authors or as fallback for remote authors)
+                # Return local cached data
                 serializer = AuthorSerializer(author, context={"request": request})
                 return Response(serializer.data)
 
             except Author.DoesNotExist:
-                # Author not found locally, try to fetch from remote node
-                from app.utils.remote import RemoteObjectFetcher
-                import logging
-
-                logger = logging.getLogger(__name__)
-                logger.info(
-                    f"Author not found locally, attempting to fetch from remote: {decoded_url}"
+                # Author not found locally - return 404
+                return Response(
+                    {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
                 )
-
-                # Try to fetch fresh data from the remote node
-                remote_data = RemoteObjectFetcher.fetch_author_by_url(decoded_url)
-
-                if remote_data:
-                    logger.info(
-                        f"Successfully fetched remote author data from URL: {decoded_url}"
-                    )
-                    return Response(remote_data)
-                else:
-                    logger.warning(
-                        f"Failed to fetch remote author data for URL: {decoded_url}"
-                    )
-                    return Response(
-                        {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
-                    )
 
         except Exception as e:
             import logging
@@ -974,3 +906,205 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 {"error": "Could not retrieve author"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def retrieve_by_fqid(self, request, author_fqid=None):
+        """
+        GET [remote]: retrieve AUTHOR_FQID's profile
+        
+        This endpoint retrieves an author by their FQID (Fully Qualified ID),
+        which is their complete URL. It supports fetching both local and remote authors.
+        
+        For remote authors, it attempts to fetch fresh data from the remote node
+        and falls back to local cached data if the remote fetch fails.
+        """
+        if not author_fqid:
+            return Response(
+                {"error": "Author FQID is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Decode the URL-encoded FQID
+            decoded_fqid = unquote(author_fqid)
+
+            # Try to find the author by URL first (handles both local and remote)
+            try:
+                author = Author.objects.get(url=decoded_fqid)
+                
+                # If this is a remote author, try to fetch fresh data
+                if author.node is not None:
+                    import requests
+                    from requests.auth import HTTPBasicAuth
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    
+                    try:
+                        # Make request to the remote author endpoint for fresh data
+                        response = requests.get(
+                            decoded_fqid,
+                            auth=HTTPBasicAuth(author.node.username, author.node.password),
+                            timeout=5,
+                            headers={'Accept': 'application/json'}
+                        )
+                        
+                        if response.status_code == 200:
+                            logger.info(f"Successfully fetched fresh remote author data from {decoded_fqid}")
+                            
+                            # Update local cached data with fresh remote data
+                            try:
+                                remote_data = response.json()
+                                
+                                # Update the local author record with fresh data
+                                author.displayName = remote_data.get("displayName", author.displayName)
+                                author.github_username = self._extract_github_username(remote_data.get("github", ""))
+                                author.profileImage = remote_data.get("profileImage", "") or ""
+                                author.host = remote_data.get("host", author.host)
+                                author.web = remote_data.get("web", author.web)
+                                author.save()
+                                
+                                logger.info(f"Updated local cache for remote author: {author.displayName}")
+                                
+                            except Exception as e:
+                                logger.error(f"Failed to update local cache for remote author: {str(e)}")
+                                # Continue with returning the remote data even if cache update fails
+                            
+                            return Response(response.json())
+                        else:
+                            logger.warning(f"Failed to fetch fresh remote author data from {decoded_fqid}: {response.status_code}")
+                            # Fall back to local cached data
+                            
+                    except requests.RequestException as e:
+                        logger.error(f"Network error fetching fresh remote author data from {decoded_fqid}: {str(e)}")
+                        # Fall back to local cached data
+                
+                # Return local cached data (for local authors or as fallback for remote authors)
+                serializer = AuthorSerializer(author, context={"request": request})
+                return Response(serializer.data)
+
+            except Author.DoesNotExist:
+                # Author not found locally, try to fetch from remote node
+                import requests
+                from requests.auth import HTTPBasicAuth
+                from urllib.parse import urlparse
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(
+                    f"Author not found locally, attempting to fetch from remote: {decoded_fqid}"
+                )
+
+                try:
+                    # Extract the base host from the FQID
+                    parsed_url = urlparse(decoded_fqid)
+                    base_host = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                    
+                    # Find the corresponding node in our database
+                    from app.models import Node
+                    try:
+                        node = Node.objects.get(host__icontains=parsed_url.netloc, is_active=True)
+                    except Node.DoesNotExist:
+                        logger.warning(f"No active node found for host {parsed_url.netloc}")
+                        return Response(
+                            {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                        )
+                    
+                    # Make request to the remote author endpoint
+                    response = requests.get(
+                        decoded_fqid,
+                        auth=HTTPBasicAuth(node.username, node.password),
+                        timeout=5,
+                        headers={'Accept': 'application/json'}
+                    )
+                    
+                    if response.status_code == 200:
+                        logger.info(f"Successfully fetched remote author data from {decoded_fqid}")
+                        
+                        # Save the newly fetched remote author to our local database for caching
+                        try:
+                            remote_data = response.json()
+                            
+                            # Extract author ID from the FQID
+                            author_id_str = decoded_fqid.split("/")[-2] if decoded_fqid.endswith("/") else decoded_fqid.split("/")[-1]
+                            
+                            # Create new remote author record
+                            from app.models import Author
+                            import uuid
+                            
+                            try:
+                                author_id = uuid.UUID(author_id_str)
+                            except ValueError:
+                                logger.warning(f"Could not extract valid UUID from FQID: {decoded_fqid}")
+                                # Return the data without caching if we can't parse the ID
+                                return Response(response.json())
+                            
+                            remote_author = Author(
+                                id=author_id,
+                                url=decoded_fqid,
+                                username=remote_data.get("displayName", f"remote_user_{str(author_id)[:8]}"),
+                                displayName=remote_data.get("displayName", ""),
+                                github_username=self._extract_github_username(remote_data.get("github", "")),
+                                profileImage=remote_data.get("profileImage") or "",
+                                host=remote_data.get("host", base_host),
+                                web=remote_data.get("web", ""),
+                                node=node,
+                                is_approved=True,  # Remote authors are auto-approved
+                                is_active=False,   # Remote authors can't log in
+                                password="!",      # Unusable password
+                            )
+                            remote_author.save()
+                            logger.info(f"Cached new remote author: {remote_author.displayName}")
+                            
+                        except Exception as e:
+                            logger.error(f"Failed to cache new remote author: {str(e)}")
+                            # Continue with returning the remote data even if caching fails
+                        
+                        return Response(response.json())
+                    else:
+                        logger.warning(f"Failed to fetch remote author from {decoded_fqid}: {response.status_code}")
+                        return Response(
+                            {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                        )
+                        
+                except requests.RequestException as e:
+                    logger.error(f"Network error fetching remote author from {decoded_fqid}: {str(e)}")
+                    return Response(
+                        {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                    )
+                except Exception as e:
+                    logger.error(f"Unexpected error fetching remote author from {decoded_fqid}: {str(e)}")
+                    return Response(
+                        {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                    )
+
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error retrieving author by FQID {author_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve author"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _extract_github_username(self, github_url):
+        """
+        Extract GitHub username from GitHub URL.
+        
+        Args:
+            github_url: GitHub URL or username
+            
+        Returns:
+            str: GitHub username or empty string
+        """
+        if not github_url:
+            return ""
+        
+        # If it's already just a username, return it
+        if "/" not in github_url:
+            return github_url
+        
+        # Extract username from GitHub URL
+        if "github.com/" in github_url:
+            return github_url.split("github.com/")[-1].rstrip("/")
+        
+        return ""

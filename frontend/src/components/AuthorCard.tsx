@@ -19,6 +19,7 @@ import {
   UserX,
   CheckCircle,
   XCircle,
+  Globe,
 } from "lucide-react";
 import type { Author } from "../types/models";
 import Avatar from "./Avatar/Avatar";
@@ -28,7 +29,7 @@ import { api } from "../services/api";
 import { socialService } from "../services/social";
 import { useAuth } from "./context/AuthContext";
 import { useToast } from "./context/ToastContext";
-import { extractUUID } from "../utils/extractId";
+import { extractUUID, getAuthorUrl, isRemoteAuthor } from "../utils/extractId";
 
 interface AuthorCardProps {
   author: Author & {
@@ -277,7 +278,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         whileHover={{ scale: 1.02 }}
         className={`flex items-center space-x-3 p-3 rounded-lg glass-card-subtle bg-[rgba(var(--glass-rgb),0.85)] backdrop-blur-md hover:bg-glass-low transition-all ${className}`}
       >
-        <Link to={`/authors/${extractUUID(author.id)}`}>
+        <Link to={getAuthorUrl(author)}>
           <Avatar
             imgSrc={author.profileImage || author.profile_image}
             alt={author.displayName || author.display_name || "Unknown"}
@@ -288,11 +289,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
 
         <div className="flex-1 min-w-0">
           <Link
-            to={`/authors/${extractUUID(author.id)}`}
+            to={getAuthorUrl(author)}
             className="hover:underline"
           >
-            <h4 className="font-medium text-text-1 truncate">
+            <h4 className="font-medium text-text-1 truncate flex items-center gap-1">
               {author.displayName || author.display_name || "Unknown"}
+              {isRemoteAuthor(author) && (
+                <Globe size={10} className="text-blue-500 shrink-0" title="Remote Author" />
+              )}
             </h4>
           </Link>
         </div>
@@ -338,7 +342,7 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <Link
-            to={`/authors/${extractUUID(author.id)}`}
+            to={getAuthorUrl(author)}
             className="flex items-center space-x-4"
           >
             <motion.div whileHover={{ scale: 1.05 }}>
@@ -351,8 +355,14 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
             </motion.div>
 
             <div>
-              <h3 className="text-lg font-semibold text-text-1 hover:underline">
+              <h3 className="text-lg font-semibold text-text-1 hover:underline flex items-center gap-2">
                 {author.displayName || author.display_name || "Unknown"}
+                {isRemoteAuthor(author) && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" title="Remote Author">
+                    <Globe size={12} className="mr-1" />
+                    Remote
+                  </span>
+                )}
               </h3>
 
               {author.is_followed_by && (

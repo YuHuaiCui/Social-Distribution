@@ -33,3 +33,35 @@ export function isValidUUID(str: string): boolean {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
 }
+
+/**
+ * Check if an author is remote by examining their ID
+ * Remote authors have full URLs as IDs, local authors have UUIDs
+ */
+export function isRemoteAuthor(author: { id: string; node?: any; is_remote?: boolean }): boolean {
+  // First check explicit flags if available
+  if (author.node || author.is_remote) {
+    return true;
+  }
+  
+  // Check if ID looks like a full URL (CMPUT 404 spec for remote authors)
+  const authorId = author.id;
+  return authorId && (authorId.includes('http') || (authorId.includes('/') && authorId.split('/').length > 2));
+}
+
+/**
+ * Generate the correct author URL for routing
+ * For remote authors: use FQID (full URL)
+ * For local authors: use UUID
+ */
+export function getAuthorUrl(author: { id: string; url?: string; node?: any; is_remote?: boolean }): string {
+  if (isRemoteAuthor(author)) {
+    // This is a remote author - use the full URL (FQID)
+    const fqid = author.url || author.id;
+    return `/authors/${encodeURIComponent(fqid)}`;
+  } else {
+    // This is a local author - use UUID
+    const uuid = extractUUID(author.id);
+    return `/authors/${uuid}`;
+  }
+}
