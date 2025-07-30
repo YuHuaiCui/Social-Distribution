@@ -35,18 +35,30 @@ export function isValidUUID(str: string): boolean {
 }
 
 /**
- * Check if an author is remote by examining backend flags
- * Remote authors have a node property (not null), local authors have node = null
+ * Check if an author is remote by comparing their host with the current node's backend URL
+ * Remote authors have a different host than the current node
  */
-export function isRemoteAuthor(author: { id: string; node?: any; is_remote?: boolean }): boolean {
-  // Check explicit remote flag first
+export function isRemoteAuthor(author: { id: string; host?: string; node?: any; is_remote?: boolean }): boolean {
+  // First check explicit flags if available
   if (author.is_remote === true) {
     return true;
   }
   
-  // Check if author has a node property - this is the authoritative backend field
-  // Local authors have node = null, remote authors have node = <node_object>
-  return author.node != null;
+  // Check if author has a node property (backend indicator for remote authors)
+  if (author.node != null) {
+    return true;
+  }
+  
+  // Compare author's host with current node's backend URL
+  if (author.host) {
+    const currentBackendUrl = `${window.location.origin}/api`;
+    const authorHost = author.host.replace(/\/$/, ''); // Remove trailing slash
+    const currentHost = currentBackendUrl.replace(/\/$/, ''); // Remove trailing slash
+    
+    return authorHost !== currentHost;
+  }
+  
+  return false;
 }
 
 /**
@@ -54,7 +66,7 @@ export function isRemoteAuthor(author: { id: string; node?: any; is_remote?: boo
  * For remote authors: use FQID (full URL)
  * For local authors: use UUID
  */
-export function getAuthorUrl(author: { id: string; url?: string; node?: any; is_remote?: boolean }): string {
+export function getAuthorUrl(author: { id: string; url?: string; host?: string; node?: any; is_remote?: boolean }): string {
   if (isRemoteAuthor(author)) {
     // This is a remote author - use the full URL (FQID)
     const fqid = author.url || author.id;
