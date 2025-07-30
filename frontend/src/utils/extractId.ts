@@ -35,10 +35,10 @@ export function isValidUUID(str: string): boolean {
 }
 
 /**
- * Check if an author is remote by comparing their host with the current node's host
- * Remote authors have a different host than the current node
+ * Check if an author is remote by examining if their ID/URL is a FQID (Fully Qualified ID)
+ * Remote authors have full URLs as IDs, local authors have UUIDs
  */
-export function isRemoteAuthor(author: { id: string; host?: string; node?: any; is_remote?: boolean }): boolean {
+export function isRemoteAuthor(author: { id: string; url?: string; node?: any; is_remote?: boolean }): boolean {
   // First check explicit flags if available
   if (author.is_remote === true) {
     return true;
@@ -49,20 +49,20 @@ export function isRemoteAuthor(author: { id: string; host?: string; node?: any; 
     return true;
   }
   
-  // Compare author's host with current node's host
-  if (author.host) {
-    // Get current node's host from window location
-    const currentNodeHost = window.location.origin;
+  // Check if the author's ID or URL is a FQID (fully qualified URL)
+  // Local authors have UUIDs, remote authors have full URLs
+  const authorId = author.url || author.id;
+  
+  if (authorId) {
+    // If it contains %, it's URL-encoded, which means it's a FQID (remote)
+    if (authorId.includes('%')) {
+      return true;
+    }
     
-    // Normalize both URLs for comparison
-    // Author host: "http://192.168.1.72:8000/api/" -> "http://192.168.1.72:8000"
-    // Node host: "http://192.168.1.72:8000" -> "http://192.168.1.72:8000"
-    const normalizeHost = (host: string) => host.replace(/\/api\/?$/, '').replace(/\/$/, '');
-    
-    const authorBaseHost = normalizeHost(author.host);
-    const currentBaseHost = normalizeHost(currentNodeHost);
-    
-    return authorBaseHost !== currentBaseHost;
+    // If it's just a UUID, it's local
+    if (isValidUUID(authorId)) {
+      return false;
+    }
   }
   
   return false;
@@ -73,7 +73,7 @@ export function isRemoteAuthor(author: { id: string; host?: string; node?: any; 
  * For remote authors: use FQID (full URL)
  * For local authors: use UUID
  */
-export function getAuthorUrl(author: { id: string; url?: string; host?: string; node?: any; is_remote?: boolean }): string {
+export function getAuthorUrl(author: { id: string; url?: string; node?: any; is_remote?: boolean }): string {
   if (isRemoteAuthor(author)) {
     // This is a remote author - use the full URL (FQID)
     const fqid = author.url || author.id;
