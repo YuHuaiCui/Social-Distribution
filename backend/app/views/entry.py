@@ -115,202 +115,21 @@ class EntryViewSet(viewsets.ModelViewSet):
                 return obj
             raise PermissionDenied("You do not have permission to view this post.")
 
-        # Remote fetch attempt
-        logger.info(f"Entry {lookup_value} not found locally. Attempting remote fetch.")
-        try:
-            remote_entry = self._fetch_remote_entry(lookup_value)
-            if remote_entry and remote_entry in Entry.objects.visible_to_author(
-                user_author
-            ):
-                return remote_entry
-            elif remote_entry:
-                raise PermissionDenied("You do not have permission to view this post.")
-        except Exception as e:
-            logger.warning(f"Remote fetch failed for {lookup_value}: {e}")
+        # Remote functionality removed
 
         raise NotFound("Entry not found.")
 
     def _fetch_remote_entry(self, entry_id):
         """
-        Attempt to fetch an entry from remote nodes when not found locally.
-
-        Args:
-            entry_id: The UUID of the entry to fetch
-
-        Returns:
-            Entry: The fetched entry if successful, None otherwise
+        Remote functionality removed.
         """
-        try:
-            from app.utils.remote import RemoteObjectFetcher, RemoteNodeClient
-            from app.utils.federation import FederationService
-            from app.models import Node
-            import requests
-            from requests.exceptions import Timeout, ConnectionError, RequestException
-
-            # Get all active nodes
-            active_nodes = Node.objects.filter(is_active=True)
-
-            if not active_nodes.exists():
-                logger.info(f"No active nodes configured for remote entry fetching")
-                return None
-
-            logger.info(
-                f"Attempting to fetch entry {entry_id} from {active_nodes.count()} active nodes"
-            )
-
-            for node in active_nodes:
-                try:
-                    # Skip if this is the same localhost instance (self-federation)
-                    if FederationService.is_same_localhost_instance(node.host):
-                        logger.debug(f"Skipping self-federation with node {node.name}")
-                        continue
-
-                    logger.info(
-                        f"Trying to fetch entry {entry_id} from node {node.name} ({node.host})"
-                    )
-
-                    # Try to fetch the entry from this node with shorter timeout
-                    client = RemoteNodeClient(node)
-
-                    # Try different endpoint patterns
-                    endpoints_to_try = [
-                        f"/api/entries/{entry_id}/",
-                        f"/entries/{entry_id}/",
-                    ]
-
-                    for endpoint in endpoints_to_try:
-                        try:
-                            logger.debug(f"Trying endpoint: {endpoint}")
-                            # Use a shorter timeout for remote fetching to prevent 503 errors
-                            response = client.get(endpoint, timeout=10)
-                            if response.status_code == 200:
-                                entry_data = response.json()
-                                logger.info(
-                                    f"Successfully fetched entry data from {node.name}"
-                                )
-
-                                # Create the entry locally
-                                entry = self._create_local_entry_from_remote(
-                                    entry_data, node
-                                )
-                                if entry:
-                                    logger.info(
-                                        f"Successfully created local entry from remote: {entry_id}"
-                                    )
-                                    return entry
-                                else:
-                                    logger.warning(
-                                        f"Failed to create local entry from remote data"
-                                    )
-
-                        except (Timeout, ConnectionError) as e:
-                            logger.debug(
-                                f"Timeout/Connection error fetching from {endpoint} on node {node.name}: {e}"
-                            )
-                            continue
-                        except RequestException as e:
-                            logger.debug(
-                                f"Request error fetching from {endpoint} on node {node.name}: {e}"
-                            )
-                            continue
-                        except Exception as e:
-                            logger.debug(
-                                f"Unexpected error fetching from {endpoint} on node {node.name}: {e}"
-                            )
-                            continue
-
-                except Exception as e:
-                    logger.warning(f"Error fetching from node {node.name}: {e}")
-                    continue
-
-            logger.info(f"Failed to fetch entry {entry_id} from any remote nodes")
-
-        except Exception as e:
-            logger.error(f"Error in _fetch_remote_entry: {e}")
-
         return None
 
     def _create_local_entry_from_remote(self, entry_data, node):
         """
-        Create or get a local entry from remote entry data using full URL as fqid.
+        Remote functionality removed.
         """
-        try:
-            from app.models import Author
-            from urllib.parse import urlparse
-
-            # Use full entry URL
-            entry_url = entry_data.get("id") or entry_data.get("url")
-            if not entry_url:
-                logger.warning("No entry URL found in remote data")
-                return None
-
-            # Parse UUID from URL path
-            parsed = urlparse(entry_url)
-            path_parts = parsed.path.strip("/").split("/")
-            entry_uuid = path_parts[-1] if path_parts else None
-            if not entry_uuid:
-                logger.warning("Unable to parse UUID from entry URL")
-                return None
-
-            # Get or create author
-            author_data = entry_data.get("author", {})
-            author_url = author_data.get("id") or author_data.get("url")
-            if not author_url:
-                logger.warning("No author URL found in entry")
-                return None
-
-            author_parsed = urlparse(author_url)
-            author_id = author_parsed.path.strip("/").split("/")[-1]
-
-            author, _ = Author.objects.get_or_create(
-                url=author_url,
-                defaults={
-                    "id": author_id,
-                    "username": author_data.get("username", f"{author_id}@{node.host}"),
-                    "display_name": author_data.get(
-                        "displayName", author_data.get("displayName", "")
-                    ),
-                    "github_username": author_data.get("github", ""),
-                    "profile_image": author_data.get("profileImage", ""),
-                    "host": author_data.get("host", node.host),
-                    "node": node,
-                    "is_approved": True,
-                    "is_active": True,
-                },
-            )
-
-            # Create or get Entry using fqid
-            try:
-                entry = Entry.objects.get(url=entry_url)
-                # Update fqid if missing
-                if not entry.fqid:
-                    entry.fqid = entry_url
-                    entry.save(update_fields=["fqid"])
-                created = False
-            except Entry.DoesNotExist:
-                entry = Entry.objects.create(
-                    id=entry_uuid,
-                    url=entry_url,
-                    fqid=entry_url,
-                    author=author,
-                    title=entry_data.get("title", ""),
-                    content=entry_data.get("content", ""),
-                    content_type=entry_data.get("contentType", "text/plain"),
-                    visibility=entry_data.get("visibility", "PUBLIC"),
-                    description=entry_data.get("description", ""),
-                    source=entry_data.get("source", entry_url),
-                    origin=entry_data.get("origin", entry_url),
-                )
-                created = True
-
-            logger.info(
-                f"{'Created' if created else 'Retrieved'} remote entry: {entry_url}"
-            )
-            return entry
-
-        except Exception as e:
-            logger.error(f"Error creating local entry from remote data: {e}")
-            return None
+        return None
 
     def get_queryset(self):
         """
@@ -427,192 +246,37 @@ class EntryViewSet(viewsets.ModelViewSet):
         # Save the entry with the user's author
         entry = serializer.save(author=user_author)
 
-        # Send to remote nodes based on visibility
-        if entry.visibility in [Entry.PUBLIC, Entry.FRIENDS]:
-            self._send_to_remote_nodes(entry)
+        # Remote functionality removed
 
     def _send_to_remote_nodes(self, entry):
         """
-        Send an entry to remote nodes based on visibility rules.
-        PUBLIC: Broadcast to all connected nodes for discovery
-        FRIENDS: Send only to remote friends
+        Remote functionality removed.
         """
-        try:
-            # Use the centralized federation service
-            from app.utils.federation import FederationService
-
-            results = FederationService.post_entry_to_remote_nodes(entry)
-
-            # Log the results
-            successful_nodes = [name for name, success in results.items() if success]
-            failed_nodes = [name for name, success in results.items() if not success]
-
-            if successful_nodes:
-                print(
-                    f"Successfully posted entry '{entry.title}' to {len(successful_nodes)} nodes: {', '.join(successful_nodes)}"
-                )
-
-            if failed_nodes:
-                print(
-                    f"Failed to post entry '{entry.title}' to {len(failed_nodes)} nodes: {', '.join(failed_nodes)}"
-                )
-
-        except Exception as e:
-            print(f"Error in _send_to_remote_nodes: {str(e)}")
+        pass
 
     def _broadcast_to_node(self, entry, node):
         """
-        Broadcast a PUBLIC post to a remote node.
-        Sends the post directly to the general inbox endpoint for PUBLIC content discovery.
+        Remote functionality removed.
         """
-        try:
-            import requests
-            from requests.auth import HTTPBasicAuth
-
-            print(
-                f"Broadcasting PUBLIC post '{entry.title}' to node: {node.name} ({node.host})"
-            )
-
-            # For PUBLIC posts, send directly to the general inbox
-            general_inbox_url = f"{node.host.rstrip('/')}/api/federation/inbox/"
-
-            # Use the helper method to prepare post data
-            post_data = self._prepare_post_data(entry)
-
-            print(f"Sending PUBLIC post to general inbox: {general_inbox_url}")
-            print(f"Authenticating as username: {node.username}")
-
-            response = requests.post(
-                general_inbox_url,
-                json=post_data,
-                auth=HTTPBasicAuth(node.username, node.password),
-                headers={"Content-Type": "application/json"},
-                timeout=10,
-            )
-
-            if response.status_code in [200, 201, 202]:
-                print(f"Successfully sent PUBLIC post to {node.name} general inbox")
-            else:
-                print(
-                    f"Failed to send to {node.name} general inbox: {response.status_code}"
-                )
-                print(f"Response: {response.text[:500]}")
-
-                # If general inbox fails, try to send to any known authors from this node
-                self._broadcast_to_known_authors(entry, node)
-
-        except Exception as e:
-            print(f"Error broadcasting to node {node.name}: {str(e)}")
-            # Fall back to sending to known authors from this node
-            self._broadcast_to_known_authors(entry, node)
+        pass
 
     def _broadcast_to_known_authors(self, entry, node):
         """
-        Fallback method to broadcast to known authors from a node.
-        Used when we can't fetch the full author list from the remote node.
+        Remote functionality removed.
         """
-        # Find any active author from this node to receive the broadcast
-        remote_authors = Author.objects.filter(node=node, is_active=True)
-
-        if remote_authors.exists():
-            for remote_author in remote_authors:
-                self._send_post_to_author(entry, remote_author, node)
-        else:
-            print(
-                f"Warning: No known authors from node {node.name} - post will be discovered when authors interact"
-            )
+        pass
 
     def _prepare_post_data(self, entry):
         """
-        Prepare post data in the format expected by remote nodes
+        Remote functionality removed.
         """
-        post_data = {
-            "content_type": "entry",
-            "type": "Post",
-            "id": entry.url,
-            "title": entry.title,
-            "content": entry.content,
-            "contentType": entry.content_type,
-            "visibility": entry.visibility,
-            "published": entry.created_at.isoformat(),
-            "author": {
-                "id": entry.author.url,
-                "url": entry.author.url,
-                "host": entry.author.host,
-                "displayName": entry.author.displayName,
-                "username": entry.author.username,
-                "github": (
-                    entry.author.github_username if entry.author.github_username else ""
-                ),
-                "profileImage": (
-                    entry.author.profile_image if entry.author.profile_image else ""
-                ),
-                "bio": entry.author.bio if entry.author.bio else "",
-                "location": entry.author.location if entry.author.location else "",
-                "website": entry.author.website if entry.author.website else "",
-                "page": entry.author.web if entry.author.web else "",
-            },
-            "description": entry.description if entry.description else "",
-            "source": entry.source if entry.source else entry.url,
-            "origin": entry.origin if entry.origin else entry.url,
-        }
-
-        # Include image if present
-        if entry.content_type in ["image/png", "image/jpeg"] and entry.image_data:
-            import base64
-
-            image_base64 = base64.b64encode(entry.image_data).decode("utf-8")
-            post_data["image"] = f"data:{entry.content_type};base64,{image_base64}"
-
-        return post_data
+        return {}
 
     def _send_post_to_author(self, entry, remote_author, remote_node):
         """
-        Send a post to a specific remote author's inbox
+        Remote functionality removed.
         """
-        from requests.auth import HTTPBasicAuth
-        import requests
-
-        # Use the helper method to prepare post data
-        post_data = self._prepare_post_data(entry)
-
-        # Send to remote node's inbox
-        try:
-            # Build the inbox URL from the author's URL
-            if remote_author.url:
-                # Extract author ID from URL like "http://nodeaaaa/authors/greg"
-                url_parts = remote_author.url.rstrip("/").split("/")
-                author_id = url_parts[-1]
-            else:
-                # Fallback to UUID
-                author_id = str(remote_author.id)
-
-            # Construct inbox URL using the node's host, not the author's host
-            # (author's host might be localhost from their local development)
-            host = remote_node.host.rstrip("/")
-            inbox_url = f"{host}/api/authors/{author_id}/inbox/"
-
-            response = requests.post(
-                inbox_url,
-                json=post_data,
-                auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                headers={"Content-Type": "application/json"},
-                timeout=5,
-            )
-
-            if response.status_code in [200, 201, 202]:
-                InboxDelivery.objects.get_or_create(
-                    entry=entry, recipient=remote_author, success=True
-                )
-            else:
-                print(
-                    f"Failed to send post to {inbox_url}: {response.status_code} - {response.text[:200]}"
-                )
-
-        except Exception as e:
-            print(
-                f"Error sending post to remote author {remote_author.username}: {str(e)}"
-            )
+        pass
 
     def get_permissions(self):
         """
@@ -674,8 +338,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         entry = self.get_object()
 
-        # Send delete notification to remote nodes before soft delete
-        self._send_delete_to_remote_nodes(entry)
+        # Remote functionality removed
 
         # Perform soft delete by changing visibility
         entry.visibility = Entry.DELETED
@@ -915,129 +578,15 @@ class EntryViewSet(viewsets.ModelViewSet):
 
     def _send_update_to_remote_nodes(self, entry):
         """
-        Send an updated entry to remote nodes that previously received it.
+        Remote functionality removed.
         """
-        try:
-            from app.models import InboxDelivery
-            from requests.auth import HTTPBasicAuth
-            import requests
-
-            # Get all successful deliveries for this entry
-            deliveries = InboxDelivery.objects.filter(
-                entry=entry, success=True, recipient__node__isnull=False
-            ).select_related("recipient", "recipient__node")
-
-            for delivery in deliveries:
-                remote_author = delivery.recipient
-                remote_node = remote_author.node
-
-                if not remote_node or not remote_node.is_active:
-                    continue
-
-                # Prepare the update data
-                update_data = {
-                    "@context": "https://www.w3.org/ns/activitystreams",
-                    "type": "Update",
-                    "actor": entry.author.url,
-                    "object": {
-                        "type": "Post",
-                        "id": entry.url,
-                        "title": entry.title,
-                        "content": entry.content,
-                        "contentType": entry.content_type,
-                        "visibility": entry.visibility,
-                        "published": entry.created_at.isoformat(),
-                        "updated": entry.updated_at.isoformat(),
-                        "author": entry.author.url,
-                    },
-                }
-
-                try:
-                    author_id = (
-                        remote_author.id.split("/")[-1]
-                        if remote_author.id.endswith("/")
-                        else remote_author.id.split("/")[-1]
-                    )
-                    inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
-
-                    response = requests.post(
-                        inbox_url,
-                        json=update_data,
-                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                        headers={"Content-Type": "application/json"},
-                        timeout=5,
-                    )
-
-                    if response.status_code not in [200, 201, 202]:
-                        print(
-                            f"Failed to send update to {inbox_url}: {response.status_code}"
-                        )
-
-                except Exception as e:
-                    print(
-                        f"Error sending update to remote node {remote_node.host}: {str(e)}"
-                    )
-
-        except Exception as e:
-            print(f"Error in _send_update_to_remote_nodes: {str(e)}")
+        pass
 
     def _send_delete_to_remote_nodes(self, entry):
         """
-        Send a delete notification to remote nodes that previously received the entry.
+        Remote functionality removed.
         """
-        try:
-            from app.models import InboxDelivery
-            from requests.auth import HTTPBasicAuth
-            import requests
-
-            # Get all successful deliveries for this entry
-            deliveries = InboxDelivery.objects.filter(
-                entry=entry, success=True, recipient__node__isnull=False
-            ).select_related("recipient", "recipient__node")
-
-            for delivery in deliveries:
-                remote_author = delivery.recipient
-                remote_node = remote_author.node
-
-                if not remote_node or not remote_node.is_active:
-                    continue
-
-                # Prepare the delete data
-                delete_data = {
-                    "@context": "https://www.w3.org/ns/activitystreams",
-                    "type": "Delete",
-                    "actor": entry.author.url,
-                    "object": {"type": "Post", "id": entry.url},
-                }
-
-                try:
-                    author_id = (
-                        remote_author.id.split("/")[-1]
-                        if remote_author.id.endswith("/")
-                        else remote_author.id.split("/")[-1]
-                    )
-                    inbox_url = f"{remote_author.host}authors/{author_id}/inbox/"
-
-                    response = requests.post(
-                        inbox_url,
-                        json=delete_data,
-                        auth=HTTPBasicAuth(remote_node.username, remote_node.password),
-                        headers={"Content-Type": "application/json"},
-                        timeout=5,
-                    )
-
-                    if response.status_code not in [200, 201, 202]:
-                        print(
-                            f"Failed to send delete to {inbox_url}: {response.status_code}"
-                        )
-
-                except Exception as e:
-                    print(
-                        f"Error sending delete to remote node {remote_node.host}: {str(e)}"
-                    )
-
-        except Exception as e:
-            print(f"Error in _send_delete_to_remote_nodes: {str(e)}")
+        pass
 
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for entry updates with logging"""
@@ -1053,14 +602,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         if response.status_code == 200:
             entry.refresh_from_db()
 
-            # Send to remote nodes if visibility allows
-            if entry.visibility in [Entry.PUBLIC, Entry.FRIENDS]:
-                if old_visibility == entry.visibility:
-                    # Visibility didn't change, send update
-                    self._send_update_to_remote_nodes(entry)
-                else:
-                    # Visibility changed, send as new post
-                    self._send_to_remote_nodes(entry)
+            # Remote functionality removed
 
         return response
 
@@ -1088,27 +630,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             except Entry.DoesNotExist:
                 pass
 
-            # If not found locally, try to fetch from remote nodes
-            logger.info(
-                f"Entry not found locally for URL {entry_url}, attempting remote fetch"
-            )
-
-            # Parse the URL to extract entry ID
-            from urllib.parse import urlparse
-
-            parsed = urlparse(entry_url)
-            path_parts = parsed.path.strip("/").split("/")
-
-            if "entries" in path_parts:
-                entry_index = path_parts.index("entries")
-                if entry_index + 1 < len(path_parts):
-                    entry_id = path_parts[entry_index + 1]
-
-                    # Try to fetch the entry using our remote fetching logic
-                    remote_entry = self._fetch_remote_entry(entry_id)
-                    if remote_entry:
-                        serializer = self.get_serializer(remote_entry)
-                        return Response(serializer.data)
+            # Remote functionality removed
 
             return Response(
                 {"error": "Entry not found"}, status=status.HTTP_404_NOT_FOUND
@@ -1326,9 +848,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(entry, data=request.data, partial=False)
             if serializer.is_valid():
                 updated_entry = serializer.save()
-                # Send update to remote nodes
-                if updated_entry.visibility in [Entry.PUBLIC, Entry.FRIENDS]:
-                    self._send_update_to_remote_nodes(updated_entry)
+                # Remote functionality removed
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

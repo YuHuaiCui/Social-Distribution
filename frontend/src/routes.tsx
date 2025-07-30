@@ -8,7 +8,6 @@ import HomePage from "./pages/HomePage";
 import Protected from "./components/protected/Protected";
 import PublicOnly from "./components/protected/PublicOnly";
 import AuthCallback from "./components/auth/AuthCallback";
-import InboxPage from "./pages/InboxPage";
 import ExplorePage from "./pages/ExplorePage";
 import PostDetailPage from "./pages/PostDetailPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -58,14 +57,6 @@ export const routes: RouteObject[] = [
         element: (
           <Protected>
             <HomePage />
-          </Protected>
-        ),
-      },
-      {
-        path: "/inbox",
-        element: (
-          <Protected>
-            <InboxPage />
           </Protected>
         ),
       },

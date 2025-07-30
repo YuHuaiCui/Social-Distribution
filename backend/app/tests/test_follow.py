@@ -50,13 +50,7 @@ class FollowTest(TestCase):
         follow = Follow.objects.get(follower=self.author_a, followed=self.author_b)
         self.assertEqual(follow.status, Follow.REQUESTING)
 
-        # Verify inbox notification was created
-        from app.models.inbox import Inbox
-
-        inbox_item = Inbox.objects.get(
-            recipient=self.author_b, item_type=Inbox.FOLLOW, follow=follow
-        )
-        self.assertEqual(inbox_item.recipient, self.author_b)
+        # Note: Inbox functionality has been removed from the system
         self.assertEqual(inbox_item.follow, follow)
         self.assertFalse(inbox_item.is_read)
 
@@ -440,13 +434,7 @@ class FollowTest(TestCase):
         follow = Follow.objects.get(follower=self.author_a, followed=self.author_b)
         self.assertEqual(follow.status, Follow.REQUESTING)
 
-        # Verify inbox notification was created
-        from app.models.inbox import Inbox
-
-        inbox_item = Inbox.objects.get(
-            recipient=self.author_b, item_type=Inbox.FOLLOW, follow=follow
-        )
-        self.assertEqual(inbox_item.recipient, self.author_b)
+        # Note: Inbox functionality has been removed from the system
         self.assertEqual(inbox_item.follow, follow)
         self.assertFalse(inbox_item.is_read)
 

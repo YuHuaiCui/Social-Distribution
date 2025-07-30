@@ -8,14 +8,12 @@ export { authService } from './auth';
 export { authorService } from './author';
 export { entryService } from './entry';
 export { socialService } from './social';
-export { inboxService } from './inbox';
 
 // Export service classes for custom instances
 export { default as AuthService } from './auth';
 export { default as AuthorService } from './author';
 export { default as EntryService } from './entry';
 export { default as SocialService } from './social';
-export { default as InboxService } from './inbox';
 export { default as BaseApiService } from './base';
 
 // Legacy api export for backwards compatibility
@@ -23,7 +21,6 @@ import { authService } from './auth';
 import { authorService } from './author';
 import { entryService } from './entry';
 import { socialService } from './social';
-import { inboxService } from './inbox';
 
 /**
  * Legacy API object for backwards compatibility
@@ -73,8 +70,4 @@ export const api = {
   getFollowers: socialService.getFollowers.bind(socialService),
   getFollowing: socialService.getFollowing.bind(socialService),
 
-  // Inbox methods
-  getInbox: inboxService.getInbox.bind(inboxService),
-  markInboxItemRead: inboxService.markItemAsRead.bind(inboxService),
-  clearInbox: inboxService.clearInbox.bind(inboxService),
 };

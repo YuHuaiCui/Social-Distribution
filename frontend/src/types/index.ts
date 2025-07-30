@@ -18,10 +18,3 @@ export * from './entry';
 // Social interaction types
 export * from './social';
 
-// Inbox types
-export * from './inbox';
-
-// Re-export for backwards compatibility
-export type {
-  InboxItem as Inbox,
-} from './inbox';

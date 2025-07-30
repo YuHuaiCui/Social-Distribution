@@ -12,7 +12,6 @@ from app.views.comment import (
     received_comments,
 )
 from app.views.github import GitHubValidationView, GitHubActivityView
-from app.views.inbox import InboxViewSet, InboxReceiveView
 from app.views.node import (
     GetNodesView,
     UpdateNodeView,
@@ -21,7 +20,6 @@ from app.views.node import (
     RemoteFolloweeView,
     RemoteAuthorsView,
 )
-from app.views import federation as federation_views
 from app.views.base import health_check
 
 # namespacing app
@@ -32,7 +30,6 @@ app_name = "social-distribution"
 router = DefaultRouter()
 router.register(r"authors", AuthorViewSet, basename="authors")
 router.register(r"follows", FollowViewSet, basename="follows")
-router.register(r"inbox", InboxViewSet, basename="inbox")
 
 # Legacy views for backward compatibility
 entry_list = EntryViewSet.as_view(
@@ -266,12 +263,6 @@ urlpatterns = [
         name="remote-followee",
     ),
     path("remote/authors/", RemoteAuthorsView.as_view(), name="remote-authors"),
-    # ActivityPub inbox endpoint for receiving objects from remote nodes
-    path(
-        "authors/<uuid:author_id>/inbox/",
-        InboxReceiveView.as_view(),
-        name="inbox-receive",
-    ),
     # API endpoints for likes (moved higher for priority)
     path(
         "api/entries/<uuid:entry_id>/likes/",
@@ -282,34 +273,6 @@ urlpatterns = [
         "api/entries/<path:entry_fqid>/likes/",
         EntryLikeView.as_view(),
         name="api-entry-likes-by-fqid",
-    ),
-    # General inbox endpoint for receiving PUBLIC broadcasts
-    path("federation/inbox/", InboxReceiveView.as_view(), name="general-inbox-receive"),
-    # Federation API endpoints
-    path(
-        "api/federation/sync-all/",
-        federation_views.sync_all_nodes,
-        name="federation-sync-all",
-    ),
-    path(
-        "api/federation/sync-node/",
-        federation_views.sync_node,
-        name="federation-sync-node",
-    ),
-    path(
-        "api/federation/post-local/",
-        federation_views.post_local_entries,
-        name="federation-post-local",
-    ),
-    path(
-        "api/federation/status/",
-        federation_views.federation_status,
-        name="federation-status",
-    ),
-    path(
-        "api/federation/test-connection/",
-        federation_views.test_node_connection,
-        name="federation-test-connection",
     ),
     # Health check endpoint
     path("health/", health_check, name="health-check"),
