@@ -312,7 +312,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                     # The entry.url should already be the full URL, but make sure it's set
                     entry_full_url = entry.url or f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}"
                     
-                    logger.info(f"Sending entry activity with ID: {entry_full_url} to {remote_author.username}")
+                    print(f"Sending entry activity with ID: {entry_full_url} to {remote_author.username}")
                     
                     # Prepare the activity object for the inbox
                     activity = {
@@ -339,14 +339,14 @@ class EntryViewSet(viewsets.ModelViewSet):
                         auth_info = f"Basic Auth (username: {node.username})"
                     
                     # Print out the entire request details
-                    logger.info("=" * 80)
-                    logger.info(f"INBOX REQUEST TO: {remote_author.username} ({remote_author.url})")
-                    logger.info(f"Target URL: {inbox_url}")
-                    logger.info(f"Authentication: {auth_info}")
-                    logger.info(f"Headers: {{'Content-Type': 'application/json'}}")
-                    logger.info("Request Body (JSON):")
-                    logger.info(json.dumps(activity, indent=2, default=str))
-                    logger.info("=" * 80)
+                    print("=" * 80)
+                    print(f"INBOX REQUEST TO: {remote_author.username} ({remote_author.url})")
+                    print(f"Target URL: {inbox_url}")
+                    print(f"Authentication: {auth_info}")
+                    print(f"Headers: {{'Content-Type': 'application/json'}}")
+                    print("Request Body (JSON):")
+                    print(json.dumps(activity, indent=2, default=str))
+                    print("=" * 80)
                     
                     # Send the POST request to the inbox
                     response = requests.post(
@@ -357,18 +357,18 @@ class EntryViewSet(viewsets.ModelViewSet):
                         timeout=10
                     )
                     
-                    # Log the response details
-                    logger.info("-" * 40)
-                    logger.info(f"RESPONSE FROM {remote_author.username}'s inbox:")
-                    logger.info(f"Status Code: {response.status_code}")
-                    logger.info(f"Response Headers: {dict(response.headers)}")
-                    logger.info(f"Response Body: {response.text}")
-                    logger.info("-" * 40)
+                    # Print the response details
+                    print("-" * 40)
+                    print(f"RESPONSE FROM {remote_author.username}'s inbox:")
+                    print(f"Status Code: {response.status_code}")
+                    print(f"Response Headers: {dict(response.headers)}")
+                    print(f"Response Body: {response.text}")
+                    print("-" * 40)
                     
                     if response.status_code in [200, 201, 202]:
-                        logger.info(f"✓ Successfully sent entry to {remote_author.username}'s inbox at {inbox_url}")
+                        print(f"✓ Successfully sent entry to {remote_author.username}'s inbox at {inbox_url}")
                     else:
-                        logger.warning(f"✗ Failed to send entry to {remote_author.username}'s inbox: {response.status_code} - {response.text}")
+                        print(f"✗ Failed to send entry to {remote_author.username}'s inbox: {response.status_code} - {response.text}")
                         
                 except Exception as e:
                     logger.error(f"Error sending entry to {remote_author.username}'s inbox: {str(e)}")
