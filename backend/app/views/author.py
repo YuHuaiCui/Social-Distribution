@@ -342,17 +342,28 @@ class AuthorViewSet(viewsets.ModelViewSet):
                                 if not follower_url:
                                     continue
                                     
-                                # Look for existing author by URL
+                                # Look for existing author by URL (try both normalized and original)
                                 try:
-                                    existing_follower = Author.objects.get(url=follower_url)
+                                    from app.utils.url_utils import normalize_author_url
+                                    normalized_follower_url = normalize_author_url(follower_url)
+                                    
+                                    # Try normalized URL first
+                                    try:
+                                        existing_follower = Author.objects.get(url=normalized_follower_url)
+                                    except Author.DoesNotExist:
+                                        # Fallback to original URL
+                                        existing_follower = Author.objects.get(url=follower_url)
+                                    
                                     if existing_follower not in local_followers:
                                         local_followers.append(existing_follower)
                                 except Author.DoesNotExist:
                                     # Create a new remote author record
+                                    from app.utils.url_utils import normalize_author_url
+                                    normalized_follower_url = normalize_author_url(follower_url)
                                     remote_follower = Author.objects.create(
                                         username=follower_data.get("username", "unknown"),
                                         displayName=follower_data.get("displayName") or follower_data.get("display_name", "Unknown User"),
-                                        url=follower_url,
+                                        url=normalized_follower_url,
                                         profile_image=follower_data.get("profileImage") or follower_data.get("profile_image", ""),
                                         github_username=follower_data.get("github_username", ""),
                                         node=author.node,
@@ -851,11 +862,16 @@ class AuthorViewSet(viewsets.ModelViewSet):
         This ensures the same remote author is reused across multiple activities.
         """
         author_url = author_data.get("id")
-        print(f"DEBUG: Author URL: {author_url}")
+        print(f"DEBUG: Original Author URL: {author_url}")
 
         if not author_url:
             logger.error("Activity missing author id")
             return None
+
+        # Normalize the URL to prevent integrity errors
+        from app.utils.url_utils import normalize_author_url
+        normalized_url = normalize_author_url(author_url)
+        print(f"DEBUG: Normalized Author URL: {normalized_url}")
 
         # Extract username from displayName or URL
         display_name = author_data.get("displayName", "")
@@ -863,19 +879,31 @@ class AuthorViewSet(viewsets.ModelViewSet):
             display_name.lower().replace(" ", "_") if display_name else "unknown"
         )
 
-        # Use update_or_create to ensure we update existing authors with new info
-        author, created = Author.objects.update_or_create(
-            url=author_url,  # Use URL as unique identifier
-            defaults={
-                "username": username,
-                "displayName": author_data.get("displayName", ""),
-                "profileImage": author_data.get("profileImage") or "",  # Handle None/null values
-                "host": author_data.get("host", ""),
-                "web": author_data.get("web", ""),
-            },
-        )
-        print(f"DEBUG: Author {'created' if created else 'updated'} for URL {author_url}")
-        return author
+        try:
+            # Use update_or_create to ensure we update existing authors with new info
+            author, created = Author.objects.update_or_create(
+                url=normalized_url,  # Use normalized URL as unique identifier
+                defaults={
+                    "username": username,
+                    "displayName": author_data.get("displayName", ""),
+                    "profileImage": author_data.get("profileImage") or "",  # Handle None/null values
+                    "host": author_data.get("host", ""),
+                    "web": author_data.get("web", ""),
+                },
+            )
+            print(f"DEBUG: Author {'created' if created else 'updated'} for normalized URL {normalized_url}")
+            return author
+        except Exception as e:
+            logger.error(f"Error creating/updating author with URL {normalized_url}: {str(e)}")
+            # Try to find existing author with either URL format as fallback
+            try:
+                return Author.objects.get(url=normalized_url)
+            except Author.DoesNotExist:
+                try:
+                    return Author.objects.get(url=author_url)
+                except Author.DoesNotExist:
+                    logger.error(f"Could not find or create author with URL {author_url}")
+                    return None
 
     @classmethod
     def _get_or_create_entry_from_activity(cls, activity_data):
@@ -894,7 +922,16 @@ class AuthorViewSet(viewsets.ModelViewSet):
         # Create or update the entry based on URL (which is unique)
         entry_url = activity_data.get("id")
         entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
-        print(f"DEBUG: Entry URL: {entry_url}, UUID: {entry_uuid}")
+        print(f"DEBUG: Original Entry URL: {entry_url}, UUID: {entry_uuid}")
+
+        if not entry_url:
+            logger.error("Entry activity missing id/URL")
+            return None
+
+        # Normalize the URL to prevent integrity errors
+        from app.utils.url_utils import normalize_author_url
+        normalized_entry_url = normalize_author_url(entry_url)
+        print(f"DEBUG: Normalized Entry URL: {normalized_entry_url}")
 
         # Parse published date if it's a string
         published_value = activity_data.get("published")
@@ -902,26 +939,38 @@ class AuthorViewSet(viewsets.ModelViewSet):
             from django.utils.dateparse import parse_datetime
             published_value = parse_datetime(published_value)
 
-        # Always use URL-based get_or_create since URL is unique and identifies the same post
-        entry, created = Entry.objects.update_or_create(
-            url=entry_url,  # Use URL as the unique identifier
-            defaults={
-                "author": author,
-                "title": activity_data.get("title", ""),
-                "description": activity_data.get("description", ""),
-                "content": activity_data.get("content", ""),
-                "content_type": activity_data.get(
-                    "contentType", Entry.TEXT_PLAIN
-                ),
-                "visibility": activity_data.get("visibility", Entry.PUBLIC),
-                "source": activity_data.get("source", ""),
-                "origin": activity_data.get("origin", ""),
-                "web": activity_data.get("web", ""),
-                "published": published_value,
-            },
-        )
-        print(f"DEBUG: Entry {'created' if created else 'updated'} for URL {entry_url}")
-        return entry
+        try:
+            # Always use URL-based get_or_create since URL is unique and identifies the same post
+            entry, created = Entry.objects.update_or_create(
+                url=normalized_entry_url,  # Use normalized URL as the unique identifier
+                defaults={
+                    "author": author,
+                    "title": activity_data.get("title", ""),
+                    "description": activity_data.get("description", ""),
+                    "content": activity_data.get("content", ""),
+                    "content_type": activity_data.get(
+                        "contentType", Entry.TEXT_PLAIN
+                    ),
+                    "visibility": activity_data.get("visibility", Entry.PUBLIC),
+                    "source": activity_data.get("source", ""),
+                    "origin": activity_data.get("origin", ""),
+                    "web": activity_data.get("web", ""),
+                    "published": published_value,
+                },
+            )
+            print(f"DEBUG: Entry {'created' if created else 'updated'} for normalized URL {normalized_entry_url}")
+            return entry
+        except Exception as e:
+            logger.error(f"Error creating/updating entry with URL {normalized_entry_url}: {str(e)}")
+            # Try to find existing entry with either URL format as fallback
+            try:
+                return Entry.objects.get(url=normalized_entry_url)
+            except Entry.DoesNotExist:
+                try:
+                    return Entry.objects.get(url=entry_url)
+                except Entry.DoesNotExist:
+                    logger.error(f"Could not find or create entry with URL {entry_url}")
+                    return None
 
     def _process_entry_activity(self, activity_data):
         """Process an entry activity and create/update the entry per spec, return serialized data."""
@@ -1074,7 +1123,11 @@ class AuthorViewSet(viewsets.ModelViewSet):
             like_url = activity_data.get("id")
             like_uuid = parse_uuid_from_url(like_url) if like_url else None
             
-            print(f"DEBUG: Like creation - like_url: {like_url}, like_uuid: {like_uuid}")
+            # Normalize the like URL to prevent integrity errors
+            from app.utils.url_utils import normalize_author_url
+            normalized_like_url = normalize_author_url(like_url) if like_url else None
+            
+            print(f"DEBUG: Like creation - original_url: {like_url}, normalized_url: {normalized_like_url}, like_uuid: {like_uuid}")
             print(f"DEBUG: Liker info - username: {liker.username}, url: {liker.url}")
             if entry:
                 print(f"DEBUG: Entry info - id: {entry.id}, url: {entry.url}")
@@ -1090,21 +1143,24 @@ class AuthorViewSet(viewsets.ModelViewSet):
                             "author": liker,
                             "entry": entry,
                             "comment": comment,
-                            "url": like_url,
+                            "url": normalized_like_url,
                         },
                     )
                     print(f"DEBUG: Like created with UUID - id: {like.id}, url: {like.url}")
-                else:
-                    # Fallback to URL-based creation
+                elif normalized_like_url:
+                    # Fallback to URL-based creation with normalized URL
                     like, _ = Like.objects.get_or_create(
-                        url=like_url,
+                        url=normalized_like_url,
                         defaults={
                             "author": liker,
                             "entry": entry,
                             "comment": comment,
                         },
                     )
-                    print(f"DEBUG: Like created with URL - id: {like.id}, url: {like.url}")
+                    print(f"DEBUG: Like created with normalized URL - id: {like.id}, url: {like.url}")
+                else:
+                    logger.error("Like activity missing both UUID and URL")
+                    return None
             except Exception as like_error:
                 logger.error(f"Error creating like: {str(like_error)}")
                 print(f"DEBUG: Like creation failed: {str(like_error)}")
@@ -1161,33 +1217,54 @@ class AuthorViewSet(viewsets.ModelViewSet):
             comment_url = activity_data.get("id")
             comment_uuid = parse_uuid_from_url(comment_url) if comment_url else None
 
-            if comment_uuid:
-                # If we have a UUID, use it for the comment ID
-                comment, _ = Comment.objects.update_or_create(
-                    id=comment_uuid,
-                    defaults={
-                        "author": commenter,
-                        "entry": entry,
-                        "content": activity_data.get("comment", ""),
-                        "content_type": activity_data.get(
-                            "contentType", Entry.TEXT_PLAIN
-                        ),
-                        "url": comment_url,
-                    },
-                )
-            else:
-                # Fallback to URL-based creation
-                comment, _ = Comment.objects.get_or_create(
-                    url=comment_url,
-                    defaults={
-                        "author": commenter,
-                        "entry": entry,
-                        "content": activity_data.get("comment", ""),
-                        "content_type": activity_data.get(
-                            "contentType", Entry.TEXT_PLAIN
-                        ),
-                    },
-                )
+            # Normalize the comment URL to prevent integrity errors
+            from app.utils.url_utils import normalize_author_url
+            normalized_comment_url = normalize_author_url(comment_url) if comment_url else None
+
+            print(f"DEBUG: Comment creation - original_url: {comment_url}, normalized_url: {normalized_comment_url}, comment_uuid: {comment_uuid}")
+
+            try:
+                if comment_uuid:
+                    # If we have a UUID, use it for the comment ID
+                    comment, _ = Comment.objects.update_or_create(
+                        id=comment_uuid,
+                        defaults={
+                            "author": commenter,
+                            "entry": entry,
+                            "content": activity_data.get("comment", ""),
+                            "content_type": activity_data.get(
+                                "contentType", Entry.TEXT_PLAIN
+                            ),
+                            "url": normalized_comment_url,
+                        },
+                    )
+                elif normalized_comment_url:
+                    # Fallback to URL-based creation with normalized URL
+                    comment, _ = Comment.objects.get_or_create(
+                        url=normalized_comment_url,
+                        defaults={
+                            "author": commenter,
+                            "entry": entry,
+                            "content": activity_data.get("comment", ""),
+                            "content_type": activity_data.get(
+                                "contentType", Entry.TEXT_PLAIN
+                            ),
+                        },
+                    )
+                else:
+                    logger.error("Comment activity missing both UUID and URL")
+                    return None
+            except Exception as comment_error:
+                logger.error(f"Error creating comment: {str(comment_error)}")
+                # Try to find existing comment with either URL format as fallback
+                try:
+                    return Comment.objects.get(url=normalized_comment_url)
+                except Comment.DoesNotExist:
+                    try:
+                        return Comment.objects.get(url=comment_url)
+                    except Comment.DoesNotExist:
+                        logger.error(f"Could not find or create comment with URL {comment_url}")
+                        return None
 
             # Return serialized comment data instead of the model object
             from app.serializers.comment import CommentSerializer
@@ -1319,17 +1396,28 @@ class AuthorViewSet(viewsets.ModelViewSet):
                                 if not follower_url:
                                     continue
                                     
-                                # Look for existing author by URL
+                                # Look for existing author by URL (try both normalized and original)
                                 try:
-                                    existing_follower = Author.objects.get(url=follower_url)
+                                    from app.utils.url_utils import normalize_author_url
+                                    normalized_follower_url = normalize_author_url(follower_url)
+                                    
+                                    # Try normalized URL first
+                                    try:
+                                        existing_follower = Author.objects.get(url=normalized_follower_url)
+                                    except Author.DoesNotExist:
+                                        # Fallback to original URL
+                                        existing_follower = Author.objects.get(url=follower_url)
+                                    
                                     if existing_follower not in local_followers:
                                         local_followers.append(existing_follower)
                                 except Author.DoesNotExist:
                                     # Create a new remote author record
+                                    from app.utils.url_utils import normalize_author_url
+                                    normalized_follower_url = normalize_author_url(follower_url)
                                     remote_follower = Author.objects.create(
                                         username=follower_data.get("username", "unknown"),
                                         displayName=follower_data.get("displayName") or follower_data.get("display_name", "Unknown User"),
-                                        url=follower_url,
+                                        url=normalized_follower_url,
                                         profile_image=follower_data.get("profileImage") or follower_data.get("profile_image", ""),
                                         github_username=follower_data.get("github_username", ""),
                                         node=author.node,  # Same node as the author being followed
@@ -1419,9 +1507,11 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 author_data = response.json()
 
                 # Create local author record
+                from app.utils.url_utils import normalize_author_url
+                normalized_author_url = normalize_author_url(author_url)
                 remote_author = Author.objects.create(
                     id=author_id,
-                    url=author_url,
+                    url=normalized_author_url,
                     username=author_data.get("username", ""),
                     displayName=author_data.get("displayName", ""),
                     github_username=author_data.get("github", ""),
@@ -1777,9 +1867,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
                                 # Return the data without caching if we can't parse the ID
                                 return Response(response.json())
 
+                            # Normalize the URL to prevent integrity errors
+                            from app.utils.url_utils import normalize_author_url
+                            normalized_fqid = normalize_author_url(decoded_fqid)
+                            
                             remote_author = Author(
                                 id=author_id,
-                                url=decoded_fqid,
+                                url=normalized_fqid,
                                 username=remote_data.get(
                                     "displayName", f"remote_user_{str(author_id)[:8]}"
                                 ),

@@ -102,6 +102,69 @@ def normalize_url(url):
     return url
 
 
+def normalize_author_url(url):
+    """
+    Normalize an author URL to prevent integrity errors.
+    
+    This function ensures consistent URL formatting across different remote nodes
+    by standardizing the format to prevent duplicate key violations.
+    
+    Args:
+        url (str): The author URL to normalize
+        
+    Returns:
+        str: The normalized URL
+    """
+    if not url:
+        return url
+    
+    # Parse the URL
+    parsed = urlparse(url)
+    
+    # Reconstruct with consistent formatting
+    # - Lowercase scheme and hostname
+    # - Remove default ports (80 for http, 443 for https)
+    # - Ensure trailing slash for directory-like paths
+    scheme = parsed.scheme.lower()
+    hostname = parsed.hostname.lower() if parsed.hostname else ''
+    
+    # Handle port normalization
+    port = parsed.port
+    if port and ((scheme == 'http' and port == 80) or (scheme == 'https' and port == 443)):
+        port = None
+    
+    # Reconstruct netloc
+    if port:
+        netloc = f"{hostname}:{port}"
+    else:
+        netloc = hostname
+    
+    # Add username:password if present
+    if parsed.username:
+        if parsed.password:
+            netloc = f"{parsed.username}:{parsed.password}@{netloc}"
+        else:
+            netloc = f"{parsed.username}@{netloc}"
+    
+    # Normalize path - ensure trailing slash for author URLs
+    path = parsed.path.rstrip('/')
+    if path and not path.endswith('.html'):  # Don't add slash to file extensions
+        path += '/'
+    elif not path:
+        path = '/'
+    
+    # Reconstruct the URL
+    normalized = f"{scheme}://{netloc}{path}"
+    
+    # Add query and fragment if they exist
+    if parsed.query:
+        normalized += f"?{parsed.query}"
+    if parsed.fragment:
+        normalized += f"#{parsed.fragment}"
+    
+    return normalized
+
+
 def join_urls(base_url, path):
     """
     Join a base URL with a path.
