@@ -89,7 +89,7 @@ def send_comment_to_remote_inbox(comment):
         }
         
         # Construct inbox URL
-        inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox"
+        inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
         
         response = requests.post(
             inbox_url,

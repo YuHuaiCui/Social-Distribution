@@ -89,8 +89,8 @@ def send_like_to_remote_inbox(like):
             "published": like.created_at.isoformat() if hasattr(like, 'created_at') else None,
         }
         
-        # Construct inbox URL
-        inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox"
+        # Construct inbox URL with trailing slash
+        inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
         
         print(f"DEBUG: Sending like to inbox URL: {inbox_url}")
         print(f"DEBUG: Like data: {like_data}")
