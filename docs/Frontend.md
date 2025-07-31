@@ -1,5 +1,3 @@
-# Frontend Documentation
-
 ## Table of Contents
 1. [Project Overview](#project-overview)
 2. [Tech Stack](#tech-stack)
@@ -31,7 +29,7 @@ The application follows a component-based architecture with:
 - **TypeScript** for type safety and better developer experience
 - **Vite** for fast development and optimized production builds
 - **Context API** for global state management
-- **React Router** for client-side routing
+- **React Router DOM** for client-side routing
 - **Service-based API layer** for backend communication
 - **Federation support** for cross-instance social networking
 
@@ -46,13 +44,13 @@ The application follows a component-based architecture with:
 ### UI and Styling
 - **Tailwind CSS 4.1.8** - Utility-first CSS framework with Vite integration
 - **Framer Motion 12.18.1** - Animation library
-- **Lucide React** - Icon library
+- **Lucide React 0.515.0** - Icon library
 
 ### Additional Libraries
 - **React Hot Toast 2.5.2** - Toast notifications
 - **Sonner 2.0.5** - Alternative toast system
-- **liquid-glass-react** - Apple-style liquid glass effects
-- **Playwright** - E2E testing framework
+- **liquid-glass-react 1.1.1** - Apple-style liquid glass effects
+- **Playwright 1.53.0** - E2E testing framework
 
 ### Development Tools
 - **ESLint 9.25.0** - Code linting
@@ -80,9 +78,16 @@ frontend/
 │   │   ├── entry/         # Post/entry services
 │   │   ├── follow/        # Follow relationship services
 │   │   ├── image/         # Image upload services
-│   │   ├── inbox/         # Inbox/notification services
+│   │   ├── notification/  # Notification/inbox services
+│   │   ├── node/          # Federation node services
 │   │   └── social/        # Social interaction services
 │   ├── types/              # TypeScript type definitions
+│   │   ├── auth/          # Authentication types
+│   │   ├── author/        # Author/user types
+│   │   ├── common/        # Shared types
+│   │   ├── entry/         # Post/entry types
+│   │   ├── follow/        # Follow relationship types
+│   │   └── social/        # Social interaction types
 │   ├── utils/              # Utility functions
 │   ├── App.tsx             # Root component
 │   ├── main.tsx            # Application entry point
@@ -96,21 +101,22 @@ frontend/
 ## Core Features
 
 ### 1. User Authentication
-- Login/Signup with email and password
-- Remember me functionality with 30-day persistence
-- Session management with 24-hour expiry
-- Password reset capability
+- Login/Signup with username and password
+- Remember me functionality with extended session persistence
+- Session management with automatic expiry
 - Protected routes for authenticated users
 - GitHub OAuth integration
+- Password reset capability
 
 ### 2. Content Creation
 - Rich text editor with Markdown support
 - Image upload with binary database storage
 - Privacy controls (Public, Friends-only, Unlisted)
-- Category tagging
+- Category tagging system
 - Real-time preview for Markdown content
 - Fullscreen editing mode
 - Caption support for image posts
+- Content type selection (text/plain, text/markdown, image/png, image/jpeg)
 
 ### 3. Social Interactions
 - Follow/Unfollow users with pending request management
@@ -119,6 +125,7 @@ frontend/
 - Comment on posts with Markdown support
 - Share posts via Web Share API or to user inbox
 - Bookmark/save posts for later viewing
+- Cross-instance interactions
 
 ### 4. Content Discovery
 - Home feed with multiple views:
@@ -126,7 +133,7 @@ frontend/
   - Friends Feed: All posts from friends (mutual follows)
   - Liked Posts: Posts you've liked
 - Explore page for discovering new content
-- Search functionality for users
+- Search functionality for users and content
 - Profile pages with user posts and activity
 - Saved posts collection with easy access
 - Trending posts based on engagement
@@ -137,14 +144,15 @@ frontend/
 - Shared post notifications
 - Mark as read functionality
 - ActivityPub-compatible inbox for federation
+- Real-time notification updates
 
 ### 6. User Profiles
-- Customizable display name and bio
+- Customizable display name
 - Profile image upload
 - GitHub integration with activity display
-- Location and website fields
 - Activity feed
 - Follower/Following management
+- Remote author profile viewing
 
 ### 7. Federation Support
 - Node management interface
@@ -152,6 +160,7 @@ frontend/
 - Cross-instance content sharing
 - ActivityPub-compatible communication
 - Remote post viewing and interaction
+- Federation status monitoring
 
 ## Component Library
 
@@ -189,12 +198,14 @@ interface ButtonProps {
 - Interactive elements (like, comment, share)
 - Privacy indicators
 - Federation status indicators
+- Real-time like count updates
 
 #### AuthorCard
 - User profile display
 - Follow/unfollow actions
 - Quick stats (posts, followers, following)
 - Remote author indicators
+- GitHub activity integration
 
 #### CreatePostModal
 - Modal-based post creation
@@ -202,12 +213,28 @@ interface ButtonProps {
 - Privacy selection
 - Category management
 - Image upload support
+- Markdown editor integration
 
 #### NodeManagement
 - Node CRUD operations
 - Authentication status monitoring
 - Remote author discovery
 - Federation configuration
+- Connection testing
+
+#### SearchModal
+- Global search functionality
+- User and content search
+- Real-time search results
+- Search history
+- Advanced filtering
+
+#### ShareModal
+- Post sharing interface
+- Web Share API integration
+- Clipboard fallback
+- Social media sharing
+- Direct user sharing
 
 ## State Management
 
@@ -230,16 +257,25 @@ interface AuthContextType {
 - Handles post CRUD operations
 - Provides optimistic updates
 - Supports federation content
+- Real-time updates
 
 ### CreatePostContext
 - Controls post creation modal state
 - Manages draft state
 - Handles form submission
 - Image upload management
+- Preview generation
 
 ### ToastContext
 - Centralized toast notification system
 - Success/error/info message display
+- Auto-dismiss functionality
+
+### NotificationContext
+- Manages notification state
+- Real-time notification updates
+- Inbox integration
+- Mark as read functionality
 
 ### ThemeProvider
 - Dark/light mode management
@@ -267,7 +303,7 @@ class BaseService {
 2. **AuthorService** - User management
 3. **EntryService** - Post CRUD operations
 4. **FollowService** - Follow relationships
-5. **InboxService** - Notifications
+5. **NotificationService** - Inbox and notifications
 6. **SocialService** - Likes and comments
 7. **ImageService** - Image upload and management
 8. **NodeService** - Federation and node management
@@ -278,6 +314,12 @@ class BaseService {
 - User-friendly error messages
 - Network status detection
 - Federation error handling
+- CSRF token management
+
+### Deprecated API Service
+- The main `api.ts` file is deprecated
+- Individual service classes are preferred
+- Backwards compatibility maintained
 
 ## Routing and Navigation
 
@@ -287,14 +329,12 @@ class BaseService {
 // Protected routes
 /home              - User home feed
 /explore           - Discover new content
-/inbox             - Notifications
 /friends           - Friend management
-/profile/:id       - User profiles
-/posts/:id         - Post detail view
+/search            - Search results
+/posts/:postId     - Post detail view
+/posts/remote/:entryUrl - Remote post view
 /settings          - User settings
-/create            - Create new post
 /node-management   - Federation node management
-/saved             - Saved posts
 /liked             - Liked posts
 /follow-requests   - Follow request management
 /docs              - Documentation
@@ -324,10 +364,10 @@ class BaseService {
 6. Redirect to home page
 
 ### Session Management
-- 24-hour default session
-- 30-day extended session with "Remember Me"
+- Extended session with "Remember Me"
 - Automatic session refresh
 - Logout clears all auth data
+- CSRF token management
 
 ### Security Features
 - CSRF token management
@@ -408,6 +448,9 @@ npm run preview
 
 # Run linting
 npm run lint
+
+# Type checking
+npm run build:check
 ```
 
 ### Development Server
@@ -496,12 +539,14 @@ dist/
 - Explicit return types
 - Interface over type for objects
 - Proper null checking
+- Comprehensive type definitions
 
 ### React Best Practices
 - Functional components only
 - Custom hooks for logic reuse
 - Memoization where appropriate
 - Proper dependency arrays
+- React 19 features utilization
 
 ### File Naming
 - PascalCase for components
@@ -543,29 +588,33 @@ dist/
 
 ## Recent Improvements
 
-### Bug Fixes and Enhancements (January 2025)
-- **Friends Feed**: Fixed to show all posts from friends (users who mutually follow each other)
-- **Image Storage**: Migrated from file-based storage to database blob storage for better reliability
-- **Federation Support**: Added comprehensive node management and remote content integration
+### Major Updates (January 2025)
+- **React 19 Migration**: Upgraded to React 19.1.0 with React Compiler optimization
+- **TypeScript Enhancement**: Improved type safety with comprehensive type definitions
+- **Service Architecture**: Migrated from monolithic API service to individual service classes
+- **Federation Support**: Comprehensive node management and remote content integration
 - **UI/UX Improvements**:
-  - Fixed tab flickering in navigation
-  - Improved empty state containers with proper flex layout
-  - Fixed input opacity issues in dark mode
-  - Added smooth hover animations without color changes
-  - Fixed button separators in PostCard component
-  - Added federation status indicators
-- **Share Functionality**: Implemented Web Share API with clipboard fallback
-- **Report System**: Limited report visibility to admin users only
-- **Performance**: Removed unnecessary console.log statements for production readiness
-- **TypeScript**: Fixed type safety issues with Visibility types
-- **Node Management**: Added comprehensive interface for managing federated nodes
+  - Liquid glass effects throughout the application
+  - Improved responsive design
+  - Enhanced accessibility
+  - Better loading states and animations
+- **Content Management**:
+  - Enhanced Markdown editor with real-time preview
+  - Improved image upload with binary storage
+  - Better privacy controls
+  - Category tagging system
+- **Social Features**:
+  - Real-time like and comment updates
+  - Enhanced follow management
+  - Improved inbox system
+  - Better search functionality
 
-### Code Quality
-- Cleaned up development console statements
-- Removed unhelpful comments
-- Improved error handling consistency
-- Enhanced TypeScript type definitions
-- Added federation-specific error handling
+### Technical Improvements
+- **Performance**: React Compiler optimization and code splitting
+- **Error Handling**: Centralized error management with user-friendly messages
+- **State Management**: Improved context providers with better separation of concerns
+- **API Integration**: Service-based architecture with better error handling
+- **Type Safety**: Comprehensive TypeScript types for all data structures
 
 ### New Features
 - **Node Management Page**: Complete CRUD interface for federated nodes
@@ -573,6 +622,8 @@ dist/
 - **Cross-Instance Content**: View and interact with posts from federated nodes
 - **Federation Status Monitoring**: Real-time status of remote node connections
 - **ActivityPub Integration**: Support for ActivityPub protocol communication
+- **Enhanced Search**: Global search with real-time results
+- **Share Functionality**: Web Share API with clipboard fallback
 
 ## Future Improvements
 
@@ -583,6 +634,7 @@ dist/
 - [ ] Implement image lazy loading
 - [ ] Add request caching layer
 - [ ] Optimize federation content loading
+- [ ] React Compiler optimizations
 
 ### Feature Additions
 - [ ] Real-time notifications with WebSockets
@@ -597,7 +649,7 @@ dist/
 - [ ] Federation analytics and monitoring
 
 ### Technical Debt
-- [ ] Migrate deprecated API service
+- [ ] Complete migration from deprecated API service
 - [ ] Add comprehensive test coverage
 - [ ] Implement error boundaries
 - [ ] Add performance monitoring
