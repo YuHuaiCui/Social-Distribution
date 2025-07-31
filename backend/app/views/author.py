@@ -774,6 +774,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
         entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
         print(f"DEBUG: Entry URL: {entry_url}, UUID: {entry_uuid}")
 
+        # Parse published date if it's a string
+        published_value = activity_data.get("published")
+        if published_value and isinstance(published_value, str):
+            from django.utils.dateparse import parse_datetime
+            published_value = parse_datetime(published_value)
+
         # Always use URL-based get_or_create since URL is unique and identifies the same post
         entry, created = Entry.objects.update_or_create(
             url=entry_url,  # Use URL as the unique identifier
@@ -789,7 +795,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 "source": activity_data.get("source", ""),
                 "origin": activity_data.get("origin", ""),
                 "web": activity_data.get("web", ""),
-                "published": activity_data.get("published"),
+                "published": published_value,
             },
         )
         print(f"DEBUG: Entry {'created' if created else 'updated'} for URL {entry_url}")
