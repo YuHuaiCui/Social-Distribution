@@ -727,7 +727,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
             author, _ = Author.objects.get_or_create(
                 url=author_url,
                 defaults={
-                    "id": activity_data.get("id"),
                     "username": username,
                     "displayName": author_data.get("displayName", ""),
                     "profileImage": author_data.get("profileImage", ""),
