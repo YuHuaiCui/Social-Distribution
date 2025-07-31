@@ -16,6 +16,7 @@ from app.models import Like, InboxDelivery
 from django.db.models import Count, F
 from django.utils import timezone
 from datetime import timedelta
+from django.conf import settings
 import requests
 
 
@@ -276,6 +277,9 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         # Save the entry with the user's author
         entry = serializer.save(author=user_author)
+        
+        # Ensure the entry is saved and has a proper URL before sending to remote inboxes
+        entry.refresh_from_db()
 
         # Send the entry to remote authors' inboxes
         self._send_to_remote_authors(entry)
@@ -303,10 +307,16 @@ class EntryViewSet(viewsets.ModelViewSet):
                     # The inbox URL should be author_url/inbox/
                     inbox_url = remote_author.url.rstrip('/') + '/inbox/'
                     
+                    # Ensure we have the full backend URL as the entry ID
+                    # The entry.url should already be the full URL, but make sure it's set
+                    entry_full_url = entry.url or f"{settings.SITE_URL}/api/authors/{entry.author.id}/entries/{entry.id}"
+                    
+                    logger.info(f"Sending entry activity with ID: {entry_full_url} to {remote_author.username}")
+                    
                     # Prepare the activity object for the inbox
                     activity = {
                         'type': 'entry',
-                        'id': entry.url,
+                        'id': entry_full_url,
                         'title': entry_data.get('title', ''),
                         'description': entry_data.get('description', ''),
                         'content': entry_data.get('content', ''),
