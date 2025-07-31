@@ -27,6 +27,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://project-black-ej-53285e19ae0a.herokuapp.com",
     "https://s25-black-yangwang-4d3e16ddc539.herokuapp.com",
     "http://s25-black-yangwang-4d3e16ddc539.herokuapp.com",
+    "https://cmput404-black-prod-70809c3143a8.herokuapp.com",
+    "http://cmput404-black-prod-70809c3143a8.herokuapp.com",
 ]
 
 # Allow the app's own domain
