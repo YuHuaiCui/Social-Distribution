@@ -676,6 +676,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
             elif activity_type == "comment":
                 print(f"DEBUG: Processing comment activity")
                 object_data = self._process_comment_activity(activity_data, author)
+            elif activity_type == "undo":
+                print(f"DEBUG: Processing undo activity")
+                object_data = self._process_undo_activity(activity_data, author)
 
             if object_data is None:
                 print(f"DEBUG: Failed to process {activity_type} activity - object_data is None")
@@ -1600,3 +1603,140 @@ class AuthorViewSet(viewsets.ModelViewSet):
             return github_url.split("github.com/")[-1].rstrip("/")
 
         return ""
+    
+    def _process_undo_activity(self, activity_data, recipient):
+        """Process an undo activity (like unlike) and perform the undo action, return serialized data."""
+        print(f"DEBUG: _process_undo_activity called for recipient {recipient.username}")
+        try:
+            # Get the actor (person doing the undo)
+            actor_data = activity_data.get("actor", {})
+            actor = self._get_or_create_author_from_activity(actor_data)
+            
+            if not actor:
+                logger.error("Failed to get or create actor from undo activity data")
+                return None
+
+            # Get the object being undone (the original activity)
+            object_data = activity_data.get("object", {})
+            object_type = object_data.get("type", "")
+            
+            print(f"DEBUG: Undo object type: {object_type}")
+            
+            if object_type == "like":
+                # Process unlike (undo like)
+                return self._process_unlike_activity(object_data, actor, recipient)
+            elif object_type == "follow":
+                # Process unfollow (undo follow) - could be implemented later
+                print(f"DEBUG: Unfollow not implemented yet")
+                return {"type": "undo", "object_type": "follow", "status": "not_implemented"}
+            else:
+                logger.error(f"Unsupported undo object type: {object_type}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error processing undo activity: {str(e)}")
+            return None
+
+    def _process_unlike_activity(self, like_data, actor, recipient):
+        """Process an unlike activity by removing the like."""
+        print(f"DEBUG: _process_unlike_activity called")
+        try:
+            # Get the object that was liked
+            object_url = like_data.get("object")
+            print(f"DEBUG: Unlike object URL: {object_url}")
+            
+            if not object_url:
+                logger.error("Unlike activity missing object URL")
+                return None
+
+            # Try to find the like to delete
+            like_url = like_data.get("id")
+            like_uuid = parse_uuid_from_url(like_url) if like_url else None
+            
+            print(f"DEBUG: Looking for like to delete - url: {like_url}, uuid: {like_uuid}")
+            
+            like = None
+            
+            # Try to find by like UUID first
+            if like_uuid:
+                try:
+                    like = Like.objects.get(id=like_uuid, author=actor)
+                    print(f"DEBUG: Found like by UUID: {like.id}")
+                except Like.DoesNotExist:
+                    pass
+            
+            # Fallback to finding by like URL
+            if not like and like_url:
+                try:
+                    like = Like.objects.get(url=like_url, author=actor)
+                    print(f"DEBUG: Found like by URL: {like.id}")
+                except Like.DoesNotExist:
+                    pass
+            
+            # If we still haven't found the like, try to find by actor and object
+            if not like:
+                try:
+                    # Try to find the entry or comment being unliked
+                    object_uuid = parse_uuid_from_url(object_url) if object_url else None
+                    
+                    if object_uuid:
+                        # Try entry first
+                        try:
+                            entry = Entry.objects.get(id=object_uuid)
+                            like = Like.objects.get(author=actor, entry=entry)
+                            print(f"DEBUG: Found like by actor and entry: {like.id}")
+                        except (Entry.DoesNotExist, Like.DoesNotExist):
+                            # Try comment
+                            try:
+                                comment = Comment.objects.get(id=object_uuid)
+                                like = Like.objects.get(author=actor, comment=comment)
+                                print(f"DEBUG: Found like by actor and comment: {like.id}")
+                            except (Comment.DoesNotExist, Like.DoesNotExist):
+                                pass
+                    
+                    # Fallback to URL-based lookup
+                    if not like:
+                        try:
+                            entry = Entry.objects.get(url=object_url)
+                            like = Like.objects.get(author=actor, entry=entry)
+                            print(f"DEBUG: Found like by actor and entry URL: {like.id}")
+                        except (Entry.DoesNotExist, Like.DoesNotExist):
+                            try:
+                                comment = Comment.objects.get(url=object_url)
+                                like = Like.objects.get(author=actor, comment=comment)
+                                print(f"DEBUG: Found like by actor and comment URL: {like.id}")
+                            except (Comment.DoesNotExist, Like.DoesNotExist):
+                                pass
+                
+                except Exception as lookup_error:
+                    logger.error(f"Error during like lookup: {str(lookup_error)}")
+            
+            if like:
+                # Delete the like
+                like.delete()
+                print(f"DEBUG: Successfully deleted like {like.id}")
+                logger.info(f"Processed unlike - deleted like {like.id} by {actor.username}")
+                
+                return {
+                    "type": "undo",
+                    "object_type": "like",
+                    "actor": actor.username,
+                    "object_url": object_url,
+                    "status": "success"
+                }
+            else:
+                print(f"DEBUG: Like not found for unlike activity")
+                logger.warning(f"Like not found for unlike activity - actor: {actor.username}, object: {object_url}")
+                
+                # Return success anyway for idempotent behavior
+                return {
+                    "type": "undo",
+                    "object_type": "like",
+                    "actor": actor.username,
+                    "object_url": object_url,
+                    "status": "not_found_but_success"
+                }
+
+        except Exception as e:
+            logger.error(f"Error processing unlike activity: {str(e)}")
+            return None
