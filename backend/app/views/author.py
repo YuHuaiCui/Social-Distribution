@@ -70,6 +70,42 @@ class AuthorViewSet(viewsets.ModelViewSet):
     queryset = Author.objects.all().order_by("-created_at")
     permission_classes = [IsAdminOrOwnerOrReadOnly]
 
+    def get_object(self):
+        """
+        Override get_object to handle both UUID and FQID (full URL) lookups.
+        This allows the same endpoints to work for both local and remote authors.
+        """
+        pk = self.kwargs.get('pk') or self.kwargs.get('author_fqid')
+        if not pk:
+            return super().get_object()
+        
+        # If it looks like a URL, try FQID lookup
+        if pk.startswith('http://') or pk.startswith('https://') or '/' in pk:
+            from urllib.parse import unquote
+            decoded_pk = unquote(pk)
+            
+            try:
+                # Try to find by URL first
+                return Author.objects.get(url=decoded_pk)
+            except Author.DoesNotExist:
+                # Try to find by ID if it contains a UUID
+                import re
+                uuid_pattern = r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
+                uuid_match = re.search(uuid_pattern, decoded_pk, re.IGNORECASE)
+                if uuid_match:
+                    uuid_str = uuid_match.group()
+                    try:
+                        return Author.objects.get(id=uuid_str)
+                    except Author.DoesNotExist:
+                        pass
+                
+                # If still not found, this is likely a remote author we don't have locally
+                from django.http import Http404
+                raise Http404(f"Author with identifier '{decoded_pk}' not found")
+        
+        # Otherwise, try UUID lookup (default behavior)
+        return super().get_object()
+
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
         if self.action == "list":

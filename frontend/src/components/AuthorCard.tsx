@@ -122,9 +122,11 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
 
       setStatsLoading(true);
       try {
+        // Use the full author identifier (URL for remote authors, UUID for local authors)
+        const authorIdentifier = author.url || author.id;
         const [followers, following] = await Promise.all([
-          api.getFollowers(extractUUID(author.id)),
-          api.getFollowing(extractUUID(author.id)),
+          api.getFollowers(authorIdentifier),
+          api.getFollowing(authorIdentifier),
         ]);
 
         setFollowerCount(followers.length);

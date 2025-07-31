@@ -440,10 +440,9 @@ class ApiService {
   }
 
   async getFollowers(authorId: string): Promise<Author[]> {
-    // Extract ID from URL if full URL is passed
-    const id = authorId.includes("/")
-      ? authorId.split("/").filter(Boolean).pop()
-      : authorId;
+    // For remote authors (full URLs), encode the URL for the API call
+    // For local authors (UUIDs), use as-is
+    const id = authorId.includes("/") ? encodeURIComponent(authorId) : authorId;
     const response = await this.request<{
       type: "followers";
       followers: Author[];
@@ -452,10 +451,9 @@ class ApiService {
   }
 
   async getFollowing(authorId: string): Promise<Author[]> {
-    // Extract ID from URL if full URL is passed
-    const id = authorId.includes("/")
-      ? authorId.split("/").filter(Boolean).pop()
-      : authorId;
+    // For remote authors (full URLs), encode the URL for the API call
+    // For local authors (UUIDs), use as-is
+    const id = authorId.includes("/") ? encodeURIComponent(authorId) : authorId;
     const response = await this.request<{
       type: "following";
       following: Author[];
