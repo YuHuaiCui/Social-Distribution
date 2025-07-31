@@ -666,7 +666,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
             if activity_type == "entry":
                 print(f"DEBUG: Processing entry activity")
-                object_data = self._process_entry_activity(activity_data, author)
+                object_data = self._process_entry_activity(activity_data)
             elif activity_type == "follow":
                 print(f"DEBUG: Processing follow activity")
                 object_data = self._process_follow_activity(activity_data, author)
@@ -722,83 +722,89 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _process_entry_activity(self, activity_data, recipient):
+    @classmethod
+    def _get_or_create_author_from_activity(cls, author_data):
+        """
+        Get or create an author from activity author data.
+        This ensures the same remote author is reused across multiple activities.
+        """
+        author_url = author_data.get("id")
+        print(f"DEBUG: Author URL: {author_url}")
+
+        if not author_url:
+            logger.error("Activity missing author id")
+            return None
+
+        # Extract username from displayName or URL
+        display_name = author_data.get("displayName", "")
+        username = (
+            display_name.lower().replace(" ", "_") if display_name else "unknown"
+        )
+
+        # Use update_or_create to ensure we update existing authors with new info
+        author, created = Author.objects.update_or_create(
+            url=author_url,  # Use URL as unique identifier
+            defaults={
+                "username": username,
+                "displayName": author_data.get("displayName", ""),
+                "profileImage": author_data.get("profileImage", ""),
+                "host": author_data.get("host", ""),
+                "web": author_data.get("web", ""),
+            },
+        )
+        print(f"DEBUG: Author {'created' if created else 'updated'} for URL {author_url}")
+        return author
+
+    @classmethod
+    def _get_or_create_entry_from_activity(cls, activity_data):
+        """
+        Get or create an entry from activity data. 
+        This is a class method to ensure the same entry is reused across multiple inbox calls.
+        """
+        # Get or create the entry author using centralized method
+        author_data = activity_data.get("author", {})
+        author = cls._get_or_create_author_from_activity(author_data)
+        
+        if not author:
+            logger.error("Failed to get or create author from activity data")
+            return None
+
+        # Create or update the entry based on URL (which is unique)
+        entry_url = activity_data.get("id")
+        entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
+        print(f"DEBUG: Entry URL: {entry_url}, UUID: {entry_uuid}")
+
+        # Always use URL-based get_or_create since URL is unique and identifies the same post
+        entry, created = Entry.objects.update_or_create(
+            url=entry_url,  # Use URL as the unique identifier
+            defaults={
+                "author": author,
+                "title": activity_data.get("title", ""),
+                "description": activity_data.get("description", ""),
+                "content": activity_data.get("content", ""),
+                "content_type": activity_data.get(
+                    "contentType", Entry.TEXT_PLAIN
+                ),
+                "visibility": activity_data.get("visibility", Entry.PUBLIC),
+                "source": activity_data.get("source", ""),
+                "origin": activity_data.get("origin", ""),
+                "web": activity_data.get("web", ""),
+                "published": activity_data.get("published"),
+            },
+        )
+        print(f"DEBUG: Entry {'created' if created else 'updated'} for URL {entry_url}")
+        return entry
+
+    def _process_entry_activity(self, activity_data):
         """Process an entry activity and create/update the entry per spec, return serialized data."""
-        print(f"DEBUG: _process_entry_activity called for recipient {recipient.username}")
+        print(f"DEBUG: _process_entry_activity called")
         try:
-            # Get or create the entry author
-            author_data = activity_data.get("author", {})
-            author_url = author_data.get("id")
-            print(f"DEBUG: Entry author URL: {author_url}")
-
-            if not author_url:
-                logger.error("Entry activity missing author id")
+            # Use the class method to get or create the entry (ensures single entry per URL)
+            entry = self._get_or_create_entry_from_activity(activity_data)
+            
+            if not entry:
+                logger.error("Failed to get or create entry from activity data")
                 return None
-
-            # Extract username from displayName or URL
-            display_name = author_data.get("displayName", "")
-            username = (
-                display_name.lower().replace(" ", "_") if display_name else "unknown"
-            )
-
-            author, _ = Author.objects.get_or_create(
-                url=author_url,
-                defaults={
-                    "username": username,
-                    "displayName": author_data.get("displayName", ""),
-                    "profileImage": author_data.get("profileImage", ""),
-                    "host": author_data.get("host", ""),
-                    "web": author_data.get("web", ""),
-                },
-            )
-
-            # Create or update the entry
-            entry_url = activity_data.get("id")
-            entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
-            print(f"DEBUG: Entry URL: {entry_url}, UUID: {entry_uuid}")
-
-            # Use UUID if we can parse it, otherwise use the URL
-            entry_id = entry_uuid if entry_uuid else None
-
-            if entry_id:
-                # If we have a UUID, try to find existing entry by ID first
-                entry, created = Entry.objects.update_or_create(
-                    id=entry_id,
-                    defaults={
-                        "author": author,
-                        "title": activity_data.get("title", ""),
-                        "description": activity_data.get("description", ""),
-                        "content": activity_data.get("content", ""),
-                        "content_type": activity_data.get(
-                            "contentType", Entry.TEXT_PLAIN
-                        ),
-                        "visibility": activity_data.get("visibility", Entry.PUBLIC),
-                        "source": activity_data.get("source", ""),
-                        "origin": activity_data.get("origin", ""),
-                        "url": entry_url,
-                        "web": activity_data.get("web", ""),
-                        "published": activity_data.get("published"),
-                    },
-                )
-            else:
-                # Fallback to URL-based creation
-                entry, created = Entry.objects.get_or_create(
-                    url=entry_url,
-                    defaults={
-                        "author": author,
-                        "title": activity_data.get("title", ""),
-                        "description": activity_data.get("description", ""),
-                        "content": activity_data.get("content", ""),
-                        "content_type": activity_data.get(
-                            "contentType", Entry.TEXT_PLAIN
-                        ),
-                        "visibility": activity_data.get("visibility", Entry.PUBLIC),
-                        "source": activity_data.get("source", ""),
-                        "origin": activity_data.get("origin", ""),
-                        "web": activity_data.get("web", ""),
-                        "published": activity_data.get("published"),
-                    },
-                )
 
             # Return serialized entry data instead of the model object
             from app.serializers.entry import EntrySerializer
@@ -813,31 +819,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Process a follow activity and create the follow request per spec, return serialized data."""
         print(f"DEBUG: _process_follow_activity called for recipient {recipient.username}")
         try:
-            # Get follower information from actor
+            # Get follower information from actor using centralized method
             actor_data = activity_data.get("actor", {})
-            actor_url = actor_data.get("id")
-            print(f"DEBUG: Follow actor URL: {actor_url}")
-
-            if not actor_url:
-                logger.error("Follow activity missing actor id")
+            follower = self._get_or_create_author_from_activity(actor_data)
+            
+            if not follower:
+                logger.error("Failed to get or create follower from activity data")
                 return None
-
-            # Extract username from displayName or URL
-            display_name = actor_data.get("displayName", "")
-            username = (
-                display_name.lower().replace(" ", "_") if display_name else "unknown"
-            )
-
-            follower, _ = Author.objects.get_or_create(
-                url=actor_url,
-                defaults={
-                    "username": username,
-                    "displayName": actor_data.get("displayName", ""),
-                    "profileImage": actor_data.get("profileImage", ""),
-                    "host": actor_data.get("host", ""),
-                    "web": actor_data.get("web", ""),
-                },
-            )
 
             # Verify the object matches the recipient
             object_data = activity_data.get("object", {})
@@ -868,31 +856,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Process a like activity and create the like per spec, return serialized data."""
         print(f"DEBUG: _process_like_activity called for recipient {recipient.username}")
         try:
-            # Get liker information
+            # Get liker information using centralized method
             author_data = activity_data.get("author", {})
-            author_url = author_data.get("id")
-            print(f"DEBUG: Like author URL: {author_url}")
-
-            if not author_url:
-                logger.error("Like activity missing author id")
+            liker = self._get_or_create_author_from_activity(author_data)
+            
+            if not liker:
+                logger.error("Failed to get or create liker from activity data")
                 return None
-
-            # Extract username from displayName or URL
-            display_name = author_data.get("displayName", "")
-            username = (
-                display_name.lower().replace(" ", "_") if display_name else "unknown"
-            )
-
-            liker, _ = Author.objects.get_or_create(
-                url=author_url,
-                defaults={
-                    "username": username,
-                    "displayName": author_data.get("displayName", ""),
-                    "profileImage": author_data.get("profileImage", ""),
-                    "host": author_data.get("host", ""),
-                    "web": author_data.get("web", ""),
-                },
-            )
 
             # Get the liked object URL
             object_url = activity_data.get("object")
@@ -968,31 +938,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Process a comment activity and create the comment per spec, return serialized data."""
         print(f"DEBUG: _process_comment_activity called for recipient {recipient.username}")
         try:
-            # Get commenter information
+            # Get commenter information using centralized method
             author_data = activity_data.get("author", {})
-            author_url = author_data.get("id")
-            print(f"DEBUG: Comment author URL: {author_url}")
-
-            if not author_url:
-                logger.error("Comment activity missing author id")
+            commenter = self._get_or_create_author_from_activity(author_data)
+            
+            if not commenter:
+                logger.error("Failed to get or create commenter from activity data")
                 return None
-
-            # Extract username from displayName or URL
-            display_name = author_data.get("displayName", "")
-            username = (
-                display_name.lower().replace(" ", "_") if display_name else "unknown"
-            )
-
-            commenter, _ = Author.objects.get_or_create(
-                url=author_url,
-                defaults={
-                    "username": username,
-                    "displayName": author_data.get("displayName", ""),
-                    "profileImage": author_data.get("profileImage", ""),
-                    "host": author_data.get("host", ""),
-                    "web": author_data.get("web", ""),
-                },
-            )
 
             # Get the entry being commented on (from 'entry' field per spec)
             entry_url = activity_data.get("entry")

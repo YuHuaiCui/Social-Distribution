@@ -120,8 +120,9 @@ def parse_uuid_from_url(url):
     """
     Extract a UUID from a URL.
     
-    This function searches for a valid UUID pattern in the URL and returns it.
-    Useful for extracting IDs from federated activity URLs.
+    This function searches for a valid UUID pattern in the URL and returns the last one found.
+    This is important for URLs like /authors/{author_uuid}/entries/{entry_uuid} where we 
+    want the entry UUID, not the author UUID.
     
     Args:
         url (str): The URL containing a UUID
@@ -132,7 +133,7 @@ def parse_uuid_from_url(url):
     Examples:
         >>> parse_uuid_from_url("http://example.com/api/authors/123e4567-e89b-12d3-a456-426614174000/")
         '123e4567-e89b-12d3-a456-426614174000'
-        >>> parse_uuid_from_url("http://example.com/entries/550e8400-e29b-41d4-a716-446655440000")
+        >>> parse_uuid_from_url("http://example.com/authors/123e4567-e89b-12d3-a456-426614174000/entries/550e8400-e29b-41d4-a716-446655440000")
         '550e8400-e29b-41d4-a716-446655440000'
     """
     if not url:
@@ -141,14 +142,14 @@ def parse_uuid_from_url(url):
     # UUID regex pattern
     uuid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
     
-    # Search for UUID in the URL
-    match = re.search(uuid_pattern, url)
+    # Find all UUIDs in the URL and return the last one
+    matches = re.findall(uuid_pattern, url)
     
-    if match:
-        # Validate it's a proper UUID
+    if matches:
+        # Validate the last UUID found is a proper UUID
         try:
-            uuid.UUID(match.group(0))
-            return match.group(0)
+            uuid.UUID(matches[-1])
+            return matches[-1]
         except ValueError:
             return None
     
