@@ -1,4 +1,4 @@
-# Backend API Documentation
+# Backend API Documentation (Updated)
 
 ## Table of Contents
 1. [API Overview](#api-overview)
@@ -17,7 +17,7 @@
    - [Follow Endpoints](#follow-endpoints)
    - [Inbox Endpoints](#inbox-endpoints)
    - [Image Upload Endpoints](#image-upload-endpoints)
-   - [GitHub Integration Endpoints](#github-integration-endpoints)
+   - [GitHub Integration Endpoints](#github-integration-endpoints]
    - [Node Management Endpoints](#node-management-endpoints)
 9. [CORS Configuration](#cors-configuration)
 10. [Database Schema](#database-schema)
@@ -42,6 +42,8 @@ The Social Distribution Backend API is a RESTful API built with Django and Djang
 - GitHub integration for profile validation and activity tracking
 - Federation support for cross-instance communication
 - Node management for remote instance connections
+- FQID (Fully Qualified ID) support for federation
+- Remote entry fetching and caching
 
 ## Tech Stack
 
@@ -99,7 +101,7 @@ drf-spectacular==0.27.0
 
 4. **Logout**
    ```
-   POST /accounts/logout/
+   POST /api/auth/logout/
    ```
    Destroys the current session
 
@@ -182,21 +184,16 @@ Creates a new user account and automatically logs them in.
 ```json
 {
   "username": "johndoe",
-  "email": "john@example.com",
   "password": "securepassword123",
-  "display_name": "John Doe",
-  "github_username": "johndoe",
-  "bio": "Software developer",
-  "location": "San Francisco, CA",
-  "website": "https://johndoe.com"
+  "displayName": "John Doe",
+  "github_username": "johndoe"
 }
 ```
 
 **Required Fields:**
 - `username`: Unique username
-- `email`: Valid email address
 - `password`: Password (must meet validation requirements)
-- `display_name`: Display name for the user
+- `displayName`: Display name for the user
 
 **Response (201 Created):**
 ```json
@@ -206,13 +203,9 @@ Creates a new user account and automatically logs them in.
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "url": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000",
     "username": "johndoe",
-    "email": "john@example.com",
-    "display_name": "John Doe",
+    "displayName": "John Doe",
     "github_username": "johndoe",
-    "profile_image": null,
-    "bio": "Software developer",
-    "location": "San Francisco, CA",
-    "website": "https://johndoe.com",
+    "profileImage": null,
     "is_approved": true,
     "is_active": true,
     "created_at": "2025-01-15T12:00:00Z"
@@ -222,7 +215,7 @@ Creates a new user account and automatically logs them in.
 ```
 
 **Error Responses:**
-- `400 Bad Request`: Username/email already exists, password validation failed
+- `400 Bad Request`: Username already exists, password validation failed
 
 #### 2. User Login
 **POST** `/api/auth/login/`
@@ -245,9 +238,8 @@ Authenticates a user and creates a session.
   "user": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "johndoe",
-    "email": "john@example.com",
-    "display_name": "John Doe",
-    "profile_image": null,
+    "displayName": "John Doe",
+    "profileImage": null,
     "is_approved": true,
     "is_active": true
   },
@@ -271,14 +263,13 @@ Checks if the user is authenticated and returns user info.
   "user": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "johndoe",
-    "email": "john@example.com",
-    "display_name": "John Doe"
+    "displayName": "John Doe"
   }
 }
 ```
 
 #### 4. Logout
-**POST** `/accounts/logout/`
+**POST** `/api/auth/logout/`
 
 Logs out the current user.
 
@@ -290,16 +281,16 @@ Logs out the current user.
 ```
 
 #### 5. Get/Update Current User
-**GET/PATCH** `/api/author/me/`
+**GET/PATCH** `/api/authors/me/`
 
 Gets or updates the current authenticated user's profile.
 
 **PATCH Request Body:**
 ```json
 {
-  "display_name": "John Updated",
-  "bio": "Updated bio",
-  "profile_image": "http://example.com/image.jpg"
+  "displayName": "John Updated",
+  "github_username": "johndoe_updated",
+  "profileImage": "http://example.com/image.jpg"
 }
 ```
 
@@ -325,7 +316,7 @@ Handles GitHub OAuth callback after successful authentication.
   "user": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "johndoe",
-    "display_name": "John Doe"
+    "displayName": "John Doe"
   }
 }
 ```
@@ -341,7 +332,7 @@ Lists all authors with pagination and filtering.
 - `is_approved`: Filter by approval status (true/false)
 - `is_active`: Filter by active status (true/false)
 - `type`: Filter by author type (local/remote)
-- `search`: Search by username, display_name, github_username, or email
+- `search`: Search by username, displayName, github_username
 - `page`: Page number for pagination
 
 **Response (200 OK):**
@@ -355,10 +346,9 @@ Lists all authors with pagination and filtering.
       "id": "550e8400-e29b-41d4-a716-446655440000",
       "url": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000",
       "username": "johndoe",
-      "email": "john@example.com",
-      "display_name": "John Doe",
+      "displayName": "John Doe",
       "github_username": "johndoe",
-      "profile_image": "",
+      "profileImage": "",
       "is_approved": true,
       "is_active": true,
       "created_at": "2025-01-10T06:42:00Z"
@@ -375,7 +365,12 @@ Gets details of a specific author.
 **Response (200 OK):**
 Returns the author object.
 
-#### 3. Update Author (Admin Only)
+#### 3. Get Author by FQID
+**GET** `/api/authors/{author_fqid}/`
+
+Gets an author by their fully qualified ID (FQID).
+
+#### 4. Update Author (Admin Only)
 **PUT/PATCH** `/api/authors/{id}/`
 
 Updates an author's profile (admin only).
@@ -383,18 +378,18 @@ Updates an author's profile (admin only).
 **Request Body:**
 ```json
 {
-  "display_name": "Updated Name",
+  "displayName": "Updated Name",
   "is_approved": true,
-  "bio": "Updated bio"
+  "github_username": "updated_github"
 }
 ```
 
-#### 4. Create Author (Admin Only)
+#### 5. Create Author (Admin Only)
 **POST** `/api/authors/`
 
 Creates a new author (admin only).
 
-#### 5. Author Management Actions (Admin Only)
+#### 6. Author Management Actions (Admin Only)
 
 ##### Approve Author
 **POST** `/api/authors/{id}/approve/`
@@ -412,7 +407,7 @@ Activates or deactivates an author (admin only).
 
 Promotes an author to admin status (admin only).
 
-#### 6. Author Statistics
+#### 7. Author Statistics
 **GET** `/api/authors/stats/`
 
 Gets author statistics.
@@ -428,12 +423,12 @@ Gets author statistics.
 }
 ```
 
-#### 7. Pending Authors (Admin Only)
+#### 8. Pending Authors (Admin Only)
 **GET** `/api/authors/pending/`
 
 Gets authors awaiting approval (admin only).
 
-#### 8. Get Author's Followers
+#### 9. Get Author's Followers
 **GET** `/api/authors/{id}/followers/`
 
 Gets all followers of an author.
@@ -446,14 +441,14 @@ Gets all followers of an author.
     {
       "id": "follower-uuid",
       "username": "follower1",
-      "display_name": "Follower One",
-      "profile_image": null
+      "displayName": "Follower One",
+      "profileImage": null
     }
   ]
 }
 ```
 
-#### 9. Get Author's Following
+#### 10. Get Author's Following
 **GET** `/api/authors/{id}/following/`
 
 Gets all authors that this author is following.
@@ -466,7 +461,7 @@ Gets all authors that this author is following.
 }
 ```
 
-#### 10. Get Author's Friends
+#### 11. Get Author's Friends
 **GET** `/api/authors/{id}/friends/`
 
 Gets all friends (mutual follows) of an author.
@@ -479,7 +474,7 @@ Gets all friends (mutual follows) of an author.
 }
 ```
 
-#### 11. Follow/Unfollow Author
+#### 12. Follow/Unfollow Author
 **POST/DELETE** `/api/authors/{id}/follow/`
 
 Follow or unfollow an author.
@@ -497,7 +492,7 @@ Follow or unfollow an author.
 }
 ```
 
-#### 12. Get Author's Entries
+#### 13. Get Author's Entries
 **GET** `/api/authors/{id}/entries/`
 
 Gets entries by a specific author.
@@ -513,17 +508,17 @@ Gets entries by a specific author.
 }
 ```
 
-#### 13. Create Entry for Author
+#### 14. Create Entry for Author
 **POST** `/api/authors/{id}/entries/`
 
 Creates a new entry for the author (author must be current user).
 
-#### 14. Post to Author's Inbox
+#### 15. Post to Author's Inbox
 **POST** `/api/authors/{id}/inbox/`
 
 Posts an item to an author's inbox (ActivityPub compliance).
 
-#### 15. Follow Remote Author
+#### 16. Follow Remote Author
 **POST** `/api/authors/follow-remote/`
 
 Follow a remote author by creating/fetching their local record first.
@@ -546,7 +541,7 @@ Lists entries visible to the authenticated user.
 
 **Query Parameters:**
 - `author`: Filter by author UUID
-- `visibility`: Filter by visibility (PUBLIC, UNLISTED, FRIENDS)
+- `visibility`: Filter by visibility (PUBLIC, UNLISTED, FRIENDS_ONLY)
 - `search`: Search in title and content
 - `page`: Page number
 
@@ -563,7 +558,7 @@ Lists entries visible to the authenticated user.
       "author": {
         "id": "author-uuid",
         "username": "johndoe",
-        "display_name": "John Doe"
+        "displayName": "John Doe"
       },
       "title": "My First Post",
       "content": "This is the content of my post",
@@ -573,8 +568,7 @@ Lists entries visible to the authenticated user.
       "updated_at": "2025-01-15T12:00:00Z",
       "likes_count": 5,
       "comments_count": 3,
-      "is_liked": false,
-      "is_saved": false
+      "is_liked": false
     }
   ]
 }
@@ -600,7 +594,7 @@ Creates a new entry/post. For image posts, use multipart/form-data to upload ima
 - `title`: Post title
 - `content`: Caption for the image (optional)
 - `content_type`: "image/png" or "image/jpeg"
-- `visibility`: One of: PUBLIC, UNLISTED, FRIENDS
+- `visibility`: One of: PUBLIC, UNLISTED, FRIENDS_ONLY
 - `categories`: JSON stringified array of category tags
 - `image`: The image file to upload
 
@@ -608,7 +602,7 @@ Creates a new entry/post. For image posts, use multipart/form-data to upload ima
 - `title`: Post title
 - `content`: Post content (or caption for images)
 - `content_type`: One of: text/plain, text/markdown, image/png, image/jpeg
-- `visibility`: One of: PUBLIC, UNLISTED, FRIENDS
+- `visibility`: One of: PUBLIC, UNLISTED, FRIENDS_ONLY
 
 **Note:** Images are stored as binary data (blobs) in the database. The API returns base64-encoded data URLs for images in the `image` field.
 
@@ -620,7 +614,12 @@ Returns the created entry object with the `image` field containing a data URL fo
 
 Gets a specific entry if visible to the user.
 
-#### 4. Update Entry
+#### 4. Get Entry by FQID
+**GET** `/api/entries/{entry_fqid}/`
+
+Gets an entry by its fully qualified ID (FQID).
+
+#### 5. Update Entry
 **PUT/PATCH** `/api/entries/{id}/`
 
 Updates an entry (author only).
@@ -630,16 +629,16 @@ Updates an entry (author only).
 {
   "title": "Updated Title",
   "content": "Updated content",
-  "visibility": "FRIENDS"
+  "visibility": "FRIENDS_ONLY"
 }
 ```
 
-#### 5. Delete Entry
+#### 6. Delete Entry
 **DELETE** `/api/entries/{id}/`
 
 Soft deletes an entry (sets visibility to "DELETED").
 
-#### 6. Get Liked Entries
+#### 7. Get Liked Entries
 **GET** `/api/entries/liked/`
 
 Gets entries that the current user has liked.
@@ -647,7 +646,7 @@ Gets entries that the current user has liked.
 **Response (200 OK):**
 Returns paginated list of liked entries.
 
-#### 7. Get Friends Feed
+#### 8. Get Friends Feed
 **GET** `/api/entries/feed/`
 
 Gets entries from users who are friends (mutual follows) with the current user. This endpoint returns all posts from friends regardless of visibility settings.
@@ -655,31 +654,7 @@ Gets entries from users who are friends (mutual follows) with the current user. 
 **Response (200 OK):**
 Returns paginated list of entries from friends.
 
-#### 8. Get Saved Entries
-**GET** `/api/entries/saved/`
-
-Gets the current user's saved/bookmarked entries.
-
-#### 9. Save/Unsave Entry
-**POST/DELETE** `/api/entries/{id}/save/`
-
-Save or unsave an entry.
-
-**POST Response (201 Created):**
-```json
-{
-  "detail": "Entry saved successfully"
-}
-```
-
-**DELETE Response (204 No Content):**
-```json
-{
-  "detail": "Entry unsaved successfully"
-}
-```
-
-#### 10. Get Trending Entries
+#### 9. Get Trending Entries
 **GET** `/api/entries/trending/`
 
 Gets trending entries based on like count and recent activity.
@@ -687,7 +662,7 @@ Gets trending entries based on like count and recent activity.
 **Response (200 OK):**
 Returns paginated list of trending entries.
 
-#### 11. Get Categories
+#### 10. Get Categories
 **GET** `/api/entries/categories/`
 
 Gets all categories used in entries.
@@ -706,7 +681,29 @@ Gets all categories used in entries.
 ]
 ```
 
-#### 12. CMPUT 404 Compliant Endpoints
+#### 11. Fetch Remote Entry
+**GET** `/api/entries/fetch-remote/`
+
+Fetches a remote entry from another node.
+
+**Query Parameters:**
+- `url`: The URL of the remote entry to fetch
+
+**Response (200 OK):**
+Returns the fetched entry object.
+
+#### 12. Get Local Comments for Remote Entry
+**GET** `/api/entries/local-comments-for-remote/`
+
+Gets local comments for a remote entry.
+
+**Query Parameters:**
+- `entry_url`: The URL of the remote entry
+
+**Response (200 OK):**
+Returns comments for the remote entry.
+
+#### 13. CMPUT 404 Compliant Endpoints
 
 ##### Get Entry by Author and Entry ID
 **GET** `/api/authors/{author_id}/entries/{entry_id}/`
@@ -723,11 +720,6 @@ Updates an entry by author and entry ID.
 
 Deletes an entry by author and entry ID.
 
-##### Get Entry by FQID
-**GET** `/api/entries/{entry_fqid}/`
-
-Gets an entry by its fully qualified ID (FQID).
-
 ### Comment Endpoints
 
 #### 1. List Comments
@@ -743,7 +735,7 @@ Lists all comments for an entry.
     "author": {
       "id": "author-uuid",
       "username": "commenter",
-      "display_name": "Commenter Name"
+      "displayName": "Commenter Name"
     },
     "content": "Great post!",
     "content_type": "text/plain",
@@ -804,6 +796,11 @@ Gets comments for an entry by FQID.
 **GET** `/api/authors/{author_id}/commented/`
 
 Gets all comments by a specific author.
+
+##### Get Author's Comments by FQID
+**GET** `/api/authors/{author_fqid}/commented/`
+
+Gets all comments by a specific author using FQID.
 
 ### Like Endpoints
 
@@ -943,12 +940,12 @@ Lists incoming follow requests for the authenticated user.
     "actor": {
       "id": "follower-uuid",
       "username": "john",
-      "display_name": "John Doe"
+      "displayName": "John Doe"
     },
     "object": {
       "id": "followed-uuid",
       "username": "jane",
-      "display_name": "Jane Smith"
+      "displayName": "Jane Smith"
     },
     "status": "pending",
     "created_at": "2025-01-15T15:00:00Z"
@@ -1030,15 +1027,16 @@ Checks follow status between two authors.
 
 ### Inbox Endpoints
 
+The inbox system has been refactored to store activities directly as JSON data instead of foreign key references. This improves federation compatibility and simplifies the data model.
+
 #### 1. List Inbox Items
 **GET** `/api/inbox/`
 
 Lists inbox items for the authenticated user.
 
 **Query Parameters:**
-- `content_type`: Filter by type (follow, like, comment, entry)
-- `read`: Filter by read status (true/false)
-- `processed`: Filter by processed status (true/false)
+- `activity_type`: Filter by type (entry, follow, like, comment)
+- `is_read`: Filter by read status (true/false)
 - `page`: Page number
 - `page_size`: Items per page (max 100)
 
@@ -1048,15 +1046,15 @@ Lists inbox items for the authenticated user.
   "results": [
     {
       "id": "inbox-item-uuid",
-      "item_type": "follow",
+      "activity_type": "follow",
       "is_read": false,
-      "created_at": "2025-01-15T16:00:00Z",
-      "follow": {
+      "delivered_at": "2025-01-15T16:00:00Z",
+      "object_data": {
         "id": "follow-uuid",
         "follower": {
           "id": "follower-uuid",
           "username": "newfollower",
-          "display_name": "New Follower"
+          "displayName": "New Follower"
         },
         "status": "pending"
       }
@@ -1100,12 +1098,7 @@ Marks multiple inbox items as read.
 
 Marks a single inbox item as read.
 
-#### 5. Mark Items as Processed
-**POST** `/api/inbox/mark-processed/`
-
-Marks multiple inbox items as processed (ActivityPub compatibility).
-
-#### 6. Get Inbox Stats
+#### 5. Get Inbox Stats
 **GET** `/api/inbox/stats/`
 
 Gets inbox statistics.
@@ -1119,7 +1112,7 @@ Gets inbox statistics.
 }
 ```
 
-#### 7. Get Unread Count
+#### 6. Get Unread Count
 **GET** `/api/inbox/unread-count/`
 
 Gets count of unread notifications.
@@ -1131,7 +1124,7 @@ Gets count of unread notifications.
 }
 ```
 
-#### 8. Accept Follow from Inbox
+#### 7. Accept Follow from Inbox
 **POST** `/api/inbox/{id}/accept-follow/`
 
 Accepts a follow request directly from inbox.
@@ -1143,7 +1136,7 @@ Accepts a follow request directly from inbox.
 }
 ```
 
-#### 9. Reject Follow from Inbox
+#### 8. Reject Follow from Inbox
 **POST** `/api/inbox/{id}/reject-follow/`
 
 Rejects a follow request directly from inbox.
@@ -1155,7 +1148,7 @@ Rejects a follow request directly from inbox.
 }
 ```
 
-#### 10. Clear Inbox
+#### 9. Clear Inbox
 **POST** `/api/inbox/clear/`
 
 Clears all inbox items for the user.
@@ -1369,7 +1362,7 @@ Gets recommended remote authors from connected nodes.
     {
       "id": "remote-author-uuid",
       "username": "remote_user",
-      "display_name": "Remote User",
+      "displayName": "Remote User",
       "host": "http://remotenode.com/api/"
     }
   ]
@@ -1407,15 +1400,15 @@ CORS_ALLOWED_HEADERS = [
 
 #### Author (User)
 - Extends Django's AbstractUser
-- Fields: id (UUID), url, username, email, display_name, profile_image, bio, github_username, location, website, is_approved, is_active, type, host, web, node (ForeignKey to Node)
+- Fields: id (UUID), url, username, displayName, profileImage, github_username, is_approved, is_active, type, host, web, node (ForeignKey to Node)
 - Relationships: entries, comments, likes, followers, following
 - Supports both local and remote authors for federation
 
 #### Entry (Post)
-- Fields: id (UUID), url, title, description, content, content_type, categories (JSONField), visibility, source, origin, type, web, published, image_data (BinaryField), created_at, updated_at
+- Fields: id (UUID), url, fqid, title, description, content, content_type, categories (JSONField), visibility, source, origin, type, web, published, image_data (BinaryField), created_at, updated_at
 - Relationships: author, comments, likes
 - Supports multiple content types: text/plain, text/markdown, image/png, image/jpeg
-- Visibility levels: PUBLIC, UNLISTED, FRIENDS, DELETED
+- Visibility levels: PUBLIC, UNLISTED, FRIENDS_ONLY, DELETED
 
 #### Comment
 - Fields: id (UUID), url, content, content_type, created_at, updated_at
@@ -1432,10 +1425,11 @@ CORS_ALLOWED_HEADERS = [
 - Relationships: follower (Author), followed (Author)
 - Supports follow request workflow
 
-#### Inbox
-- Fields: id (UUID), item_type, is_read, created_at, raw_data (JSONField)
-- Relationships: recipient (Author), follow, like, comment, entry
-- Stores notifications and federation messages
+#### Inbox (Refactored)
+- Fields: id (UUID), activity_type, object_data (JSONField), is_read, delivered_at, raw_data (JSONField)
+- Relationships: recipient (Author)
+- Stores activities directly as JSON instead of foreign key references
+- Activity types: entry, follow, like, comment
 
 #### Friendship
 - Represents mutual follow relationships
@@ -1448,10 +1442,10 @@ CORS_ALLOWED_HEADERS = [
 - Fields: id (UUID), name, host, username, password, is_active
 - Used for federation and remote author management
 
-#### SavedEntry
-- Tracks user bookmarks
-- Fields: id (UUID), created_at
-- Relationships: author, entry
+#### InboxDelivery
+- Tracks delivery of entries to author inboxes for federation
+- Fields: entry, recipient, delivered_at, success
+- Helps prevent duplicate deliveries and provides audit trail
 
 ## API Versioning
 
@@ -1571,4 +1565,4 @@ Set these in production:
 - Configure node management for remote instances
 - Set up proper authentication for cross-instance communication
 - Implement ActivityPub compliance for interoperability
-- Monitor federation performance and reliability
+- Monitor federation performance and reliability 
