@@ -25,27 +25,6 @@ class ActivitySerializer(serializers.Serializer):
     """
     
     type = serializers.CharField()
-    id = serializers.CharField(required=False)  # Accept URLs as ID for activities
-    
-    # Entry activity fields
-    title = serializers.CharField(required=False)
-    description = serializers.CharField(required=False, allow_blank=True)
-    content = serializers.CharField(required=False)
-    contentType = serializers.CharField(required=False)
-    visibility = serializers.CharField(required=False)
-    source = serializers.CharField(required=False, allow_blank=True)
-    origin = serializers.CharField(required=False, allow_blank=True)
-    web = serializers.CharField(required=False, allow_blank=True)
-    published = serializers.CharField(required=False)
-    author = serializers.JSONField(required=False)
-    
-    # Follow activity fields
-    actor = serializers.JSONField(required=False)
-    object = serializers.JSONField(required=False)
-    
-    # Comment activity fields
-    comment = serializers.CharField(required=False)
-    entry = serializers.CharField(required=False)
     
     def validate_type(self, value):
         """Validate that the activity type is supported."""
@@ -103,10 +82,8 @@ class ActivitySerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid activity type")
             
         # Check that required fields are present
-        # Use self.initial_data to check for fields that might not be in validated data yet
-        check_data = {**self.initial_data, **data}
         for field in required_fields:
-            if field not in check_data or check_data[field] is None:
+            if field not in data:
                 raise serializers.ValidationError(
                     f"Missing required field '{field}' for {activity_type} activity"
                 )
