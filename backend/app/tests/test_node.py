@@ -138,6 +138,42 @@ class FederationTestServer:
                     self.send_header('Content-Type', 'application/json')
                     self.end_headers()
                     self.wfile.write(json.dumps({"error": "Internal server error"}).encode('utf-8'))
+            
+            def do_POST(self):
+                """Handle POST requests to inbox endpoints for federation testing"""
+                try:
+                    # Parse the path to check if it's an inbox request
+                    path_parts = self.path.strip('/').split('/')
+                    
+                    if 'authors' in path_parts and 'inbox' in path_parts:
+                        # This is an inbox request - accept it for testing
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        
+                        # Return a success response
+                        response_data = {
+                            "status": "success",
+                            "message": "Inbox item received successfully",
+                            "received_at": "2025-07-31T17:30:00.000000+00:00"
+                        }
+                        self.wfile.write(json.dumps(response_data).encode('utf-8'))
+                        return
+                    
+                    # For other POST requests, return method not allowed
+                    self.send_response(405)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "Method not allowed"}).encode('utf-8'))
+                    
+                except Exception as e:
+                    # Handle any errors gracefully
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "Internal server error"}).encode('utf-8'))
                 
         return TestFederationHandler
 
@@ -305,8 +341,14 @@ class NodeAPITest(BaseAPITestCase):
         self.assertIn('is_active', node_data)
         self.assertIn('created_at', node_data)
 
-    def test_add_node(self):
+    @patch('app.views.node.requests.get')
+    def test_add_node(self, mock_get):
         """Test adding a new node"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"authors": []}  # Empty authors list
+        mock_get.return_value = mock_response
+        
         url = reverse("social-distribution:add-node")
         data = {
             "name": "New Test Node",
@@ -376,8 +418,15 @@ class NodeAPITest(BaseAPITestCase):
         response = self.admin_client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_update_node(self):
+    @patch('app.views.node.requests.get')
+    def test_update_node(self, mock_get):
         """Test updating an existing node"""
+        # Mock the requests.get call to prevent actual network requests
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"authors": []}  # Empty authors list
+        mock_get.return_value = mock_response
+        
         url = reverse("social-distribution:update-node")
         data = {
             "oldHost": "http://testnode1.com",
