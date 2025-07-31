@@ -42,6 +42,7 @@ def send_like_to_remote_inbox(like):
     Send like to remote author's inbox using the spec format.
     Handles both entry and comment likes.
     """
+    print(f"DEBUG: send_like_to_remote_inbox called for like {like.id}")
     try:
         # Determine if it's an entry or comment like
         if like.entry:
@@ -49,21 +50,28 @@ def send_like_to_remote_inbox(like):
             target = like.entry
             target_author = like.entry.author
             target_url = like.entry.url
+            print(f"DEBUG: Entry like - target: {target.title}, author: {target_author.displayName}")
         elif like.comment:
             # Comment like
             target = like.comment
             target_author = like.comment.author
             target_url = like.comment.url
+            print(f"DEBUG: Comment like - target: {target.content[:50]}..., author: {target_author.displayName}")
         else:
             logger.error("Like has neither entry nor comment")
             return
             
+        print(f"DEBUG: Target author is_remote: {target_author.is_remote}, has node: {target_author.node is not None}")
+        
         # Only send if the target author is remote
         if not target_author.is_remote or not target_author.node:
+            print(f"DEBUG: Skipping federation - target author is local or has no node")
             return
             
         remote_author = target_author
         remote_node = remote_author.node
+        
+        print(f"DEBUG: Sending like to remote node: {remote_node.name} ({remote_node.host})")
         
         # Create like data in the spec format
         like_data = {
@@ -84,6 +92,9 @@ def send_like_to_remote_inbox(like):
         # Construct inbox URL
         inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox"
         
+        print(f"DEBUG: Sending like to inbox URL: {inbox_url}")
+        print(f"DEBUG: Like data: {like_data}")
+        
         response = requests.post(
             inbox_url,
             json=like_data,
@@ -92,6 +103,8 @@ def send_like_to_remote_inbox(like):
             timeout=10,
         )
         
+        print(f"DEBUG: Like federation response: {response.status_code} - {response.text}")
+        
         if response.status_code in [200, 201]:
             logger.info(f"Successfully sent like to {remote_author.displayName}")
         else:
@@ -99,6 +112,7 @@ def send_like_to_remote_inbox(like):
             
     except Exception as e:
         logger.error(f"Error sending like to remote inbox: {str(e)}")
+        print(f"DEBUG: Exception in send_like_to_remote_inbox: {str(e)}")
 
 
 class EntryLikeView(APIView):
