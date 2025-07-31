@@ -16,6 +16,7 @@ from app.models import Like, InboxDelivery
 from django.db.models import Count, F
 from django.utils import timezone
 from datetime import timedelta
+import requests
 
 
 logger = logging.getLogger(__name__)
@@ -276,7 +277,76 @@ class EntryViewSet(viewsets.ModelViewSet):
         # Save the entry with the user's author
         entry = serializer.save(author=user_author)
 
-        # Remote functionality removed
+        # Send the entry to remote authors' inboxes
+        self._send_to_remote_authors(entry)
+
+    def _send_to_remote_authors(self, entry):
+        """
+        Send the entry to all remote authors' inboxes.
+        """
+        import requests
+        from requests.auth import HTTPBasicAuth
+        from app.serializers.entry import EntrySerializer
+        
+        try:
+            # Get all remote authors (authors with node set)
+            remote_authors = Author.objects.filter(node__isnull=False)
+            
+            logger.info(f"Sending entry {entry.id} to {remote_authors.count()} remote authors")
+            
+            # Serialize the entry
+            entry_data = EntrySerializer(entry).data
+            
+            for remote_author in remote_authors:
+                try:
+                    # Construct the inbox URL for the remote author
+                    # The inbox URL should be author_url/inbox/
+                    inbox_url = remote_author.url.rstrip('/') + '/inbox/'
+                    
+                    # Prepare the activity object for the inbox
+                    activity = {
+                        'type': 'entry',
+                        'id': entry.url,
+                        'title': entry_data.get('title', ''),
+                        'description': entry_data.get('description', ''),
+                        'content': entry_data.get('content', ''),
+                        'contentType': entry_data.get('contentType', 'text/plain'),
+                        'visibility': entry_data.get('visibility', 'PUBLIC'),
+                        'source': entry_data.get('source', ''),
+                        'origin': entry_data.get('origin', ''),
+                        'web': entry_data.get('web', ''),
+                        'published': entry_data.get('published'),
+                        'author': entry_data.get('author'),
+                    }
+                    
+                    # Get the node credentials if available
+                    node = remote_author.node
+                    auth = None
+                    if node and node.username and node.password:
+                        auth = HTTPBasicAuth(node.username, node.password)
+                    
+                    # Send the POST request to the inbox
+                    response = requests.post(
+                        inbox_url,
+                        json=activity,
+                        auth=auth,
+                        headers={'Content-Type': 'application/json'},
+                        timeout=10
+                    )
+                    
+                    if response.status_code in [200, 201, 202]:
+                        logger.info(f"Successfully sent entry to {remote_author.username}'s inbox at {inbox_url}")
+                    else:
+                        logger.warning(f"Failed to send entry to {remote_author.username}'s inbox: {response.status_code} - {response.text}")
+                        
+                except Exception as e:
+                    logger.error(f"Error sending entry to {remote_author.username}'s inbox: {str(e)}")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error in _send_to_remote_authors: {str(e)}")
+            # Don't fail the entry creation if inbox distribution fails
+            pass
 
     def _send_to_remote_nodes(self, entry):
         """
@@ -629,7 +699,8 @@ class EntryViewSet(viewsets.ModelViewSet):
         if response.status_code == 200:
             entry.refresh_from_db()
 
-            # Remote functionality removed
+            # Send updated entry to remote authors' inboxes
+            self._send_to_remote_authors(entry)
 
         return response
 
