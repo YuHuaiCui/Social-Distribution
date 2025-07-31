@@ -908,28 +908,42 @@ class AuthorViewSet(viewsets.ModelViewSet):
             # Create the like
             like_url = activity_data.get("id")
             like_uuid = parse_uuid_from_url(like_url) if like_url else None
+            
+            print(f"DEBUG: Like creation - like_url: {like_url}, like_uuid: {like_uuid}")
+            print(f"DEBUG: Liker info - username: {liker.username}, url: {liker.url}")
+            if entry:
+                print(f"DEBUG: Entry info - id: {entry.id}, url: {entry.url}")
+            if comment:
+                print(f"DEBUG: Comment info - id: {comment.id}, url: {comment.url}")
 
-            if like_uuid:
-                # If we have a UUID, use it for the like ID
-                like, _ = Like.objects.update_or_create(
-                    id=like_uuid,
-                    defaults={
-                        "author": liker,
-                        "entry": entry,
-                        "comment": comment,
-                        "url": like_url,
-                    },
-                )
-            else:
-                # Fallback to URL-based creation
-                like, _ = Like.objects.get_or_create(
-                    url=like_url,
-                    defaults={
-                        "author": liker,
-                        "entry": entry,
-                        "comment": comment,
-                    },
-                )
+            try:
+                if like_uuid:
+                    # If we have a UUID, use it for the like ID
+                    like, _ = Like.objects.update_or_create(
+                        id=like_uuid,
+                        defaults={
+                            "author": liker,
+                            "entry": entry,
+                            "comment": comment,
+                            "url": like_url,
+                        },
+                    )
+                    print(f"DEBUG: Like created with UUID - id: {like.id}, url: {like.url}")
+                else:
+                    # Fallback to URL-based creation
+                    like, _ = Like.objects.get_or_create(
+                        url=like_url,
+                        defaults={
+                            "author": liker,
+                            "entry": entry,
+                            "comment": comment,
+                        },
+                    )
+                    print(f"DEBUG: Like created with URL - id: {like.id}, url: {like.url}")
+            except Exception as like_error:
+                logger.error(f"Error creating like: {str(like_error)}")
+                print(f"DEBUG: Like creation failed: {str(like_error)}")
+                return None
 
             # Return serialized like data instead of the model object
             from app.serializers.like import LikeSerializer
