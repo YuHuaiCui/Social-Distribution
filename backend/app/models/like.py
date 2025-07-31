@@ -70,16 +70,14 @@ class Like(models.Model):
         """
         Save the like and auto-generate URL if not provided.
 
-        For likes by local authors, automatically generates the API URL.
-        Remote likes must already include a valid URL.
+        For likes created on this node (by local authors), automatically generates the API URL.
+        Only remote likes (likes that originated from other nodes) must already include a valid URL.
         """
         if not self.url:
-            if self.author.is_local:
-                # Temporarily assign a UUID if the object hasn't been saved yet
-                temp_id = self.id or uuid.uuid4()
-                self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{temp_id}"
-            else:
-                raise ValueError("Remote Like must have a URL.")
+            # Always generate URL for likes created on this node
+            # This includes local authors liking any content (local or remote)
+            temp_id = self.id or uuid.uuid4()
+            self.url = f"{settings.SITE_URL}/api/authors/{self.author.id}/liked/{temp_id}"
 
         super().save(*args, **kwargs)
 
