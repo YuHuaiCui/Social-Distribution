@@ -18,6 +18,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
 import requests
+import json
 
 
 logger = logging.getLogger(__name__)
@@ -332,8 +333,20 @@ class EntryViewSet(viewsets.ModelViewSet):
                     # Get the node credentials if available
                     node = remote_author.node
                     auth = None
+                    auth_info = "No authentication"
                     if node and node.username and node.password:
                         auth = HTTPBasicAuth(node.username, node.password)
+                        auth_info = f"Basic Auth (username: {node.username})"
+                    
+                    # Print out the entire request details
+                    logger.info("=" * 80)
+                    logger.info(f"INBOX REQUEST TO: {remote_author.username} ({remote_author.url})")
+                    logger.info(f"Target URL: {inbox_url}")
+                    logger.info(f"Authentication: {auth_info}")
+                    logger.info(f"Headers: {{'Content-Type': 'application/json'}}")
+                    logger.info("Request Body (JSON):")
+                    logger.info(json.dumps(activity, indent=2, default=str))
+                    logger.info("=" * 80)
                     
                     # Send the POST request to the inbox
                     response = requests.post(
@@ -344,10 +357,18 @@ class EntryViewSet(viewsets.ModelViewSet):
                         timeout=10
                     )
                     
+                    # Log the response details
+                    logger.info("-" * 40)
+                    logger.info(f"RESPONSE FROM {remote_author.username}'s inbox:")
+                    logger.info(f"Status Code: {response.status_code}")
+                    logger.info(f"Response Headers: {dict(response.headers)}")
+                    logger.info(f"Response Body: {response.text}")
+                    logger.info("-" * 40)
+                    
                     if response.status_code in [200, 201, 202]:
-                        logger.info(f"Successfully sent entry to {remote_author.username}'s inbox at {inbox_url}")
+                        logger.info(f"✓ Successfully sent entry to {remote_author.username}'s inbox at {inbox_url}")
                     else:
-                        logger.warning(f"Failed to send entry to {remote_author.username}'s inbox: {response.status_code} - {response.text}")
+                        logger.warning(f"✗ Failed to send entry to {remote_author.username}'s inbox: {response.status_code} - {response.text}")
                         
                 except Exception as e:
                     logger.error(f"Error sending entry to {remote_author.username}'s inbox: {str(e)}")
