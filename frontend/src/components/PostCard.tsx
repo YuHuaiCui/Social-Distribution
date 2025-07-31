@@ -28,7 +28,7 @@ import Card from "./ui/Card";
 import { renderMarkdown } from "../utils/markdown";
 
 import AnimatedGradient from "./ui/AnimatedGradient";
-import { extractUUID, getEntryUrl } from "../utils/extractId";
+import { extractUUID, getEntryUrl, isRemoteEntry } from "../utils/extractId";
 import { ShareModal } from "./ShareModal";
 
 
@@ -271,29 +271,66 @@ const PostCardComponent: React.FC<PostCardProps> = ({
         contentType === 'image/jpeg;base64' ||
         contentType === 'application/base64') {
       
-      // Use the new image API endpoint
-      const authorId = extractUUID(post.author.id);
-      const entryId = extractUUID(post.id);
-      const imageUrl = `/api/authors/${authorId}/entries/${entryId}/image`;
-      
-      return (
-        <div className="mb-4 rounded-lg overflow-hidden">
-          <LoadingImage
-            src={imageUrl}
-            alt={post.title || "Post image"}
-            className="w-full h-auto max-h-96 object-contain rounded-lg"
-            fallback={
-              <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
-                <FileText size={48} />
-              </div>
-            }
-          />
-          {/* Show description as caption if it exists */}
-          {post.description && (
-            <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
-          )}
-        </div>
-      );
+      // Check if this is a remote entry
+      if (isRemoteEntry(post)) {
+        // For remote entries, display the base64 content directly
+        let imageSrc = post.content;
+        
+        // Add data URL prefix if not present
+        if (!imageSrc.startsWith('data:')) {
+          if (contentType === 'image/png;base64' || contentType === 'image/png') {
+            imageSrc = `data:image/png;base64,${imageSrc}`;
+          } else if (contentType === 'image/jpeg;base64' || contentType === 'image/jpeg') {
+            imageSrc = `data:image/jpeg;base64,${imageSrc}`;
+          } else {
+            // Default to PNG for generic base64
+            imageSrc = `data:image/png;base64,${imageSrc}`;
+          }
+        }
+        
+        return (
+          <div className="mb-4 rounded-lg overflow-hidden">
+            <LoadingImage
+              src={imageSrc}
+              alt={post.title || "Post image"}
+              className="w-full h-auto max-h-96 object-contain rounded-lg"
+              fallback={
+                <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
+                  <FileText size={48} />
+                </div>
+              }
+            />
+            {/* Show description as caption if it exists */}
+            {post.description && (
+              <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
+            )}
+          </div>
+        );
+      } else {
+        // For local entries, use the image API endpoint
+        const authorId = extractUUID(post.author.id);
+        const entryId = extractUUID(post.id);
+        const imageUrl = `/api/authors/${authorId}/entries/${entryId}/image`;
+        
+        return (
+          <div className="mb-4 rounded-lg overflow-hidden">
+            <LoadingImage
+              src={imageUrl}
+              alt={post.title || "Post image"}
+              className="w-full h-auto max-h-96 object-contain rounded-lg"
+              fallback={
+                <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
+                  <FileText size={48} />
+                </div>
+              }
+            />
+            {/* Show description as caption if it exists */}
+            {post.description && (
+              <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
+            )}
+          </div>
+        );
+      }
     }
 
     if (contentType === "text/markdown") {
