@@ -15,7 +15,7 @@ class FollowTest(TestCase):
         self.author_a = Author.objects.create_user(
             username="userA",
             password="pass123",
-            display_name="User A",
+            displayName="User A",
             url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
             is_approved=True,
         )
@@ -23,7 +23,7 @@ class FollowTest(TestCase):
         self.author_b = Author.objects.create_user(
             username="userB",
             password="pass123",
-            display_name="User B",
+            displayName="User B",
             url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
             is_approved=True,
         )
@@ -31,7 +31,7 @@ class FollowTest(TestCase):
         self.author_c = Author.objects.create_user(
             username="userC",
             password="pass123",
-            display_name="User C",
+            displayName="User C",
             url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
             is_approved=True,
         )
@@ -50,9 +50,7 @@ class FollowTest(TestCase):
         follow = Follow.objects.get(follower=self.author_a, followed=self.author_b)
         self.assertEqual(follow.status, Follow.REQUESTING)
 
-        # Note: Inbox functionality has been removed from the system
-        self.assertEqual(inbox_item.follow, follow)
-        self.assertFalse(inbox_item.is_read)
+        # Note: Inbox functionality has been removed from the follow request creation process
 
     def test_send_follow_request_unauthorized(self):
         """Test sending a follow request without authentication"""
@@ -190,7 +188,7 @@ class FollowTest(TestCase):
             follower = Author.objects.create_user(
                 username=f"follower{i}",
                 password="pass123",
-                display_name=f"Follower {i}",
+                displayName=f"Follower {i}",
                 url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
                 is_approved=True,
             )
@@ -397,7 +395,7 @@ class FollowTest(TestCase):
         self.assertEqual(len(response.data["followers"]), 2)
 
         # Check that the correct followers are returned
-        follower_urls = [follower["url"] for follower in response.data["followers"]]
+        follower_urls = [follower["id"] for follower in response.data["followers"]]
         self.assertIn(self.author_a.url, follower_urls)
         self.assertIn(self.author_c.url, follower_urls)
 
@@ -418,7 +416,7 @@ class FollowTest(TestCase):
         self.assertEqual(len(response.data["following"]), 2)
 
         # Check that the correct users being followed are returned
-        following_urls = [followed["url"] for followed in response.data["following"]]
+        following_urls = [followed["id"] for followed in response.data["following"]]
         self.assertIn(self.author_b.url, following_urls)
         self.assertIn(self.author_c.url, following_urls)
 
@@ -435,8 +433,6 @@ class FollowTest(TestCase):
         self.assertEqual(follow.status, Follow.REQUESTING)
 
         # Note: Inbox functionality has been removed from the system
-        self.assertEqual(inbox_item.follow, follow)
-        self.assertFalse(inbox_item.is_read)
 
     def test_author_follow_endpoint_delete(self):
         """Test unfollowing an author via author endpoint"""

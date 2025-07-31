@@ -26,7 +26,7 @@ class APIEndpointComplianceTest(APITestCase):
             username='author1',
             email='author1@example.com',
             password='testpass123',
-            display_name='Author One',
+            displayName='Author One',
             is_approved=True
         )
         
@@ -34,7 +34,7 @@ class APIEndpointComplianceTest(APITestCase):
             username='author2',
             email='author2@example.com',
             password='testpass123',
-            display_name='Author Two',
+            displayName='Author Two',
             is_approved=True
         )
         
@@ -106,7 +106,7 @@ class APIEndpointComplianceTest(APITestCase):
         ], f"Single author GET endpoint should exist: {url}")
         
         # Test PUT /api/authors/{AUTHOR_SERIAL}/
-        response = self.client1.put(url, {'display_name': 'Updated Name'})
+        response = self.client1.put(url, {'displayName': 'Updated Name'})
         self.assertIn(response.status_code, [
             status.HTTP_200_OK, 
             status.HTTP_400_BAD_REQUEST,
