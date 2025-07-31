@@ -89,6 +89,10 @@ export const routes: RouteObject[] = [
         element: <PostDetailPage />,
       },
       {
+        path: "/posts/remote/:entryUrl",
+        element: <PostDetailPage />,
+      },
+      {
         path: "/settings",
         element: (
           <Protected>

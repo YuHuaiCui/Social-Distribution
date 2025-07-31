@@ -1455,6 +1455,8 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 from requests.auth import HTTPBasicAuth
                 from urllib.parse import urlparse
                 import logging
+                from app.models import Node  # Move import here to avoid scope issues
+                import uuid
 
                 logger = logging.getLogger(__name__)
                 logger.info(
@@ -1467,8 +1469,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     base_host = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
                     # Find the corresponding node in our database
-                    from app.models import Node
-
                     try:
                         node = Node.objects.get(
                             host__icontains=parsed_url.netloc, is_active=True
@@ -1507,9 +1507,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
                             )
 
                             # Create new remote author record
-                            from app.models import Author
-                            import uuid
-
                             try:
                                 author_id = uuid.UUID(author_id_str)
                             except ValueError:

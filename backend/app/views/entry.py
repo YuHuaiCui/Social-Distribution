@@ -83,9 +83,12 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         obj = None
 
+        print(f"DEBUG: get_object called with lookup_value: {lookup_value}")
+        
         # Try to find locally by UUID
         try:
             obj = Entry.objects.get(id=lookup_value)
+            print(f"DEBUG: Found entry by UUID: {obj.title}")
         except Entry.DoesNotExist:
             pass
 
@@ -93,6 +96,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         if not obj:
             try:
                 obj = Entry.objects.get(fqid=lookup_value)
+                print(f"DEBUG: Found entry by FQID: {obj.title}")
             except Entry.DoesNotExist:
                 pass
 
@@ -100,7 +104,29 @@ class EntryViewSet(viewsets.ModelViewSet):
         if not obj:
             try:
                 obj = Entry.objects.get(url=lookup_value)
+                print(f"DEBUG: Found entry by URL: {obj.title}")
             except Entry.DoesNotExist:
+                pass
+                
+        # If still not found and lookup_value looks like a UUID, 
+        # check if there's a remote entry we know about with this UUID in its URL
+        if not obj and len(str(lookup_value)) == 36:  # UUID length
+            try:
+                import uuid
+                uuid.UUID(str(lookup_value))  # Validate it's a proper UUID
+                print(f"DEBUG: Looking for remote entries containing UUID: {lookup_value}")
+                
+                # Look for entries where the URL contains this UUID
+                possible_entries = Entry.objects.filter(
+                    url__icontains=str(lookup_value),
+                    author__node__isnull=False  # Only remote entries
+                )
+                
+                if possible_entries.exists():
+                    obj = possible_entries.first()
+                    print(f"DEBUG: Found remote entry by UUID in URL: {obj.title}")
+                    
+            except (ValueError, TypeError):
                 pass
 
         # Permissions + visibility
@@ -825,28 +851,50 @@ class EntryViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            # For now, treat FQID as a simple UUID extraction
-            # In a full implementation, this would parse the full URL
-            if "/" in entry_fqid:
-                # Extract UUID from the end of the path
-                entry_id = entry_fqid.rstrip("/").split("/")[-1]
-            else:
-                entry_id = entry_fqid
+            print(f"DEBUG: retrieve_by_fqid called with entry_fqid: {entry_fqid}")
+            
+            entry = None
+            
+            # First try to look up by full URL (for remote entries)
+            if entry_fqid.startswith("http"):
+                try:
+                    entry = Entry.objects.get(url=entry_fqid)
+                    print(f"DEBUG: Found entry by full URL: {entry.title}")
+                except Entry.DoesNotExist:
+                    print(f"DEBUG: Entry not found by full URL")
+                    pass
+            
+            # If not found by URL, try UUID extraction (for local entries or FQID format)
+            if not entry:
+                if "/" in entry_fqid:
+                    # Extract UUID from the end of the path
+                    entry_id = entry_fqid.rstrip("/").split("/")[-1]
+                else:
+                    entry_id = entry_fqid
 
-            # Try to parse as UUID
-            import uuid
+                # Try to parse as UUID
+                import uuid
 
-            try:
-                uuid.UUID(entry_id)
-            except ValueError:
+                try:
+                    uuid.UUID(entry_id)
+                    print(f"DEBUG: Extracted UUID {entry_id} from FQID")
+                    # Get the entry using the existing get_object logic
+                    self.kwargs["id"] = entry_id
+                    entry = self.get_object()
+                    print(f"DEBUG: Found entry by UUID: {entry.title}")
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid entry ID format"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                except Entry.DoesNotExist:
+                    print(f"DEBUG: Entry not found by UUID")
+                    pass
+
+            if not entry:
                 return Response(
-                    {"error": "Invalid entry ID format"},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"error": "Entry not found"}, status=status.HTTP_404_NOT_FOUND
                 )
-
-            # Get the entry using the existing get_object logic
-            self.kwargs["id"] = entry_id
-            entry = self.get_object()
 
             serializer = self.get_serializer(entry)
             return Response(serializer.data)
@@ -859,6 +907,214 @@ class EntryViewSet(viewsets.ModelViewSet):
             logger.error(f"Error retrieving entry by FQID {entry_fqid}: {str(e)}")
             return Response(
                 {"error": "Could not retrieve entry"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    
+    @action(detail=False, methods=["get"], url_path="by-fqid-with-comments")
+    def get_entry_with_comments_by_fqid(self, request):
+        """
+        Get entry details along with its comments by FQID.
+        Supports both local and remote entries.
+        
+        Query parameters:
+        - fqid: The full qualified ID (URL) of the entry
+        """
+        entry_fqid = request.query_params.get("fqid")
+        if not entry_fqid:
+            return Response(
+                {"error": "FQID parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        try:
+            print(f"DEBUG: get_entry_with_comments_by_fqid called with fqid: {entry_fqid}")
+            
+            # Find the entry by URL first, then by UUID
+            entry = None
+            
+            # Try full URL lookup first (for remote entries)
+            if entry_fqid.startswith("http"):
+                try:
+                    entry = Entry.objects.get(url=entry_fqid)
+                    print(f"DEBUG: Found entry by URL: {entry.title}")
+                except Entry.DoesNotExist:
+                    pass
+            
+            # If not found by URL, try UUID extraction
+            if not entry:
+                try:
+                    if "/" in entry_fqid:
+                        entry_id = entry_fqid.rstrip("/").split("/")[-1]
+                    else:
+                        entry_id = entry_fqid
+                    
+                    import uuid
+                    uuid.UUID(entry_id)  # Validate UUID format
+                    entry = Entry.objects.get(id=entry_id)
+                    print(f"DEBUG: Found entry by UUID: {entry.title}")
+                except (ValueError, Entry.DoesNotExist):
+                    pass
+            
+            if not entry:
+                return Response(
+                    {"error": "Entry not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get entry data
+            entry_serializer = self.get_serializer(entry)
+            entry_data = entry_serializer.data
+            
+            # Get comments for this entry
+            from app.models import Comment
+            from app.serializers.comment import CommentSerializer
+            
+            comments = Comment.objects.filter(entry=entry).order_by("-created_at")
+            comment_serializer = CommentSerializer(comments, many=True, context={"request": request})
+            
+            # Combine entry and comments data
+            response_data = {
+                **entry_data,
+                "comments": {
+                    "type": "comments",
+                    "count": comments.count(),
+                    "items": comment_serializer.data
+                }
+            }
+            
+            print(f"DEBUG: Returning entry with {comments.count()} comments")
+            return Response(response_data)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving entry with comments by FQID {entry_fqid}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve entry with comments"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"], url_path="local-comments-for-remote")
+    def get_local_comments_for_remote_entry(self, request):
+        """
+        Get only the locally stored comments for a remote entry URL.
+        This is used when the frontend fetches entry details from the remote node
+        but wants to show local comments.
+        
+        Query parameters:
+        - entry_url: The full URL of the remote entry
+        """
+        entry_url = request.query_params.get("entry_url")
+        if not entry_url:
+            return Response(
+                {"error": "entry_url parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        try:
+            print(f"DEBUG: get_local_comments_for_remote_entry called with entry_url: {entry_url}")
+            
+            # Get comments for this entry URL (whether the entry exists locally or not)
+            from app.models import Comment
+            from app.serializers.comment import CommentSerializer
+            
+            comments = Comment.objects.filter(entry__url=entry_url).order_by("-created_at")
+            comment_serializer = CommentSerializer(comments, many=True, context={"request": request})
+            
+            print(f"DEBUG: Found {comments.count()} local comments for remote entry")
+            
+            # Return comments in the standard format
+            response_data = {
+                "type": "comments",
+                "entry_url": entry_url,
+                "count": comments.count(),
+                "items": comment_serializer.data
+            }
+            
+            return Response(response_data)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving local comments for remote entry {entry_url}: {str(e)}")
+            return Response(
+                {"error": "Could not retrieve local comments"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"], url_path="fetch-remote")
+    def fetch_remote_entry(self, request):
+        """
+        Fetch entry details from a remote node and return them.
+        This is a proxy endpoint to help the frontend fetch remote entry details.
+        
+        Query parameters:
+        - entry_url: The full URL of the remote entry
+        """
+        entry_url = request.query_params.get("entry_url")
+        if not entry_url:
+            return Response(
+                {"error": "entry_url parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        try:
+            print(f"DEBUG: fetch_remote_entry called with entry_url: {entry_url}")
+            
+            # First check if we have this entry locally (from previous federation)
+            try:
+                local_entry = Entry.objects.get(url=entry_url)
+                print(f"DEBUG: Found entry locally: {local_entry.title}")
+                serializer = self.get_serializer(local_entry)
+                return Response(serializer.data)
+            except Entry.DoesNotExist:
+                print(f"DEBUG: Entry not found locally, will fetch from remote")
+                pass
+            
+            # Parse the URL to get the remote node details
+            from urllib.parse import urlparse
+            import requests
+            from requests.auth import HTTPBasicAuth
+            from app.models import Node
+            
+            parsed_url = urlparse(entry_url)
+            remote_host = f"{parsed_url.scheme}://{parsed_url.netloc}"
+            
+            print(f"DEBUG: Remote host: {remote_host}")
+            
+            # Try to find the node for authentication
+            try:
+                node = Node.objects.filter(host__icontains=parsed_url.netloc).first()
+                if node:
+                    print(f"DEBUG: Found node for authentication: {node.name}")
+                    auth = HTTPBasicAuth(node.username, node.password)
+                else:
+                    print(f"DEBUG: No node found for {parsed_url.netloc}, trying without auth")
+                    auth = None
+            except Exception as e:
+                print(f"DEBUG: Error finding node: {e}")
+                auth = None
+            
+            # Fetch the entry from the remote node
+            response = requests.get(
+                entry_url,
+                auth=auth,
+                headers={"Accept": "application/json"},
+                timeout=10,
+            )
+            
+            print(f"DEBUG: Remote fetch response: {response.status_code}")
+            
+            if response.status_code == 200:
+                entry_data = response.json()
+                print(f"DEBUG: Successfully fetched remote entry: {entry_data.get('title', 'Unknown')}")
+                return Response(entry_data)
+            else:
+                return Response(
+                    {"error": f"Failed to fetch remote entry: {response.status_code}"},
+                    status=response.status_code,
+                )
+                
+        except Exception as e:
+            logger.error(f"Error fetching remote entry {entry_url}: {str(e)}")
+            return Response(
+                {"error": "Could not fetch remote entry"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

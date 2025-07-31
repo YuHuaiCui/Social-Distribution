@@ -101,3 +101,59 @@ export function getAuthorUrl(author: { id: string; url?: string; node?: any; is_
     return `/authors/${uuid}`;
   }
 }
+
+/**
+ * Check if an entry is remote by examining its URL or author
+ */
+export function isRemoteEntry(entry: { id: string; url?: string; author?: any }): boolean {
+  // If entry has a URL that starts with http and doesn't match our backend
+  if (entry.url && (entry.url.startsWith('http://') || entry.url.startsWith('https://'))) {
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const backendIP = extractIPFromUrl(backendUrl);
+    const entryIP = extractIPFromUrl(entry.url);
+    
+    // If the entry URL's IP doesn't match our backend, it's remote
+    if (entryIP !== backendIP) {
+      return true;
+    }
+  }
+  
+  // If the entry's author is remote, the entry is likely remote too
+  if (entry.author && isRemoteAuthor(entry.author)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Get the appropriate entry identifier for API calls
+ * For remote entries: return the full URL
+ * For local entries: return the UUID
+ */
+export function getEntryIdentifier(entry: { id: string; url?: string; author?: any }): string {
+  if (isRemoteEntry(entry)) {
+    // For remote entries, use the full URL
+    return entry.url || entry.id;
+  } else {
+    // For local entries, use the UUID
+    return extractUUID(entry.id);
+  }
+}
+
+/**
+ * Generate the correct entry URL for routing
+ * For remote entries: use a special route that indicates remote handling
+ * For local entries: use UUID
+ */
+export function getEntryUrl(entry: { id: string; url?: string; author?: any }): string {
+  if (isRemoteEntry(entry)) {
+    // For remote entries, we'll use a special route format
+    const entryUrl = entry.url || entry.id;
+    return `/posts/remote/${encodeURIComponent(entryUrl)}`;
+  } else {
+    // For local entries, use UUID
+    const uuid = extractUUID(entry.id);
+    return `/posts/${uuid}`;
+  }
+}

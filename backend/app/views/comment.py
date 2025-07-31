@@ -62,13 +62,21 @@ def received_comments(request):
 
 def send_comment_to_remote_inbox(comment):
     """Send comment to remote author's inbox using the spec format."""
+    print(f"DEBUG: send_comment_to_remote_inbox called for comment {comment.id}")
     try:
         # Only send if the entry author is remote
         if not comment.entry or not comment.entry.author.is_remote or not comment.entry.author.node:
+            print(f"DEBUG: Skipping comment federation - entry author is local or has no node")
+            print(f"DEBUG: Entry exists: {comment.entry is not None}")
+            if comment.entry:
+                print(f"DEBUG: Entry author is_remote: {comment.entry.author.is_remote}")
+                print(f"DEBUG: Entry author has node: {comment.entry.author.node is not None}")
             return
             
         remote_author = comment.entry.author
         remote_node = remote_author.node
+        
+        print(f"DEBUG: Remote author: {remote_author.displayName} from node: {remote_node.name}")
         
         # Create comment data in the spec format
         comment_data = {
@@ -91,6 +99,9 @@ def send_comment_to_remote_inbox(comment):
         # Construct inbox URL
         inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
         
+        print(f"DEBUG: Sending comment to inbox URL: {inbox_url}")
+        print(f"DEBUG: Comment data: {comment_data}")
+        
         response = requests.post(
             inbox_url,
             json=comment_data,
@@ -99,10 +110,14 @@ def send_comment_to_remote_inbox(comment):
             timeout=10,
         )
         
+        print(f"DEBUG: Comment federation response: {response.status_code} - {response.text}")
+        
         if response.status_code in [200, 201]:
             logger.info(f"Successfully sent comment to {remote_author.displayName}")
+            print(f"DEBUG: Successfully sent comment to {remote_author.displayName}")
         else:
             logger.warning(f"Failed to send comment to {inbox_url}: {response.status_code}")
+            print(f"DEBUG: Failed to send comment - status: {response.status_code}, response: {response.text}")
             
     except Exception as e:
         logger.error(f"Error sending comment to remote inbox: {str(e)}")
@@ -120,31 +135,30 @@ class CommentListCreateView(generics.ListCreateAPIView):
     def dispatch(self, request, *args, **kwargs):
         """Route requests based on available parameters - support both entry_id and entry_fqid."""
         if "entry_fqid" in kwargs:
-            # Extract entry ID from FQID for FQID-based endpoints
             entry_fqid = kwargs["entry_fqid"]
-            try:
-                # Try to extract UUID from the FQID
-                if entry_fqid.startswith("http"):
-                    # Full URL - extract last part
-                    entry_id = (
-                        entry_fqid.split("/")[-1]
-                        if entry_fqid.split("/")[-1]
-                        else entry_fqid.split("/")[-2]
+            print(f"DEBUG: CommentListCreateView dispatch with entry_fqid: {entry_fqid}")
+            
+            # For full URLs (remote entries), keep as entry_fqid for special handling
+            if entry_fqid.startswith("http"):
+                print(f"DEBUG: Keeping full URL as entry_fqid for remote entry")
+                # Keep entry_fqid as is - we'll handle it in get_queryset
+                pass
+            else:
+                # For local entries or UUID-like FQIDs, try to extract UUID
+                try:
+                    entry_id = entry_fqid if "/" not in entry_fqid else entry_fqid.rstrip("/").split("/")[-1]
+                    
+                    # Validate UUID format
+                    UUID(entry_id)
+                    kwargs["entry_id"] = entry_id
+                    # Remove the entry_fqid parameter since view methods expect entry_id
+                    del kwargs["entry_fqid"]
+                    print(f"DEBUG: Converted local FQID to entry_id: {entry_id}")
+                except (ValueError, IndexError):
+                    return Response(
+                        {"detail": "Invalid entry FQID format"},
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
-                else:
-                    # Assume it's already a UUID
-                    entry_id = entry_fqid
-
-                # Validate UUID format
-                UUID(entry_id)
-                kwargs["entry_id"] = entry_id
-                # Remove the entry_fqid parameter since view methods expect entry_id
-                del kwargs["entry_fqid"]
-            except (ValueError, IndexError):
-                return Response(
-                    {"detail": "Invalid entry FQID format"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
         return super().dispatch(request, *args, **kwargs)
 
@@ -152,7 +166,13 @@ class CommentListCreateView(generics.ListCreateAPIView):
         # Handle different URL patterns
         if "entry_id" in self.kwargs:
             entry_id = self.kwargs["entry_id"]
+            print(f"DEBUG: Getting comments for entry_id: {entry_id}")
             return Comment.objects.filter(entry__id=entry_id).order_by("-created_at")
+        elif "entry_fqid" in self.kwargs:
+            # Handle remote entries by full URL
+            entry_fqid = self.kwargs["entry_fqid"]
+            print(f"DEBUG: Getting comments for entry_fqid: {entry_fqid}")
+            return Comment.objects.filter(entry__url=entry_fqid).order_by("-created_at")
         elif "author_id" in self.kwargs:
             # For /api/authors/{author_id}/commented/ endpoint
             author_id = self.kwargs["author_id"]
@@ -177,28 +197,46 @@ class CommentListCreateView(generics.ListCreateAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         
         # Apply visibility rules
+        entry = None
         if "entry_id" in self.kwargs:
             entry_id = self.kwargs["entry_id"]
             try:
                 entry = Entry.objects.get(id=entry_id)
-                # Check if user can see comments based on entry visibility
-                viewing_author = request.user if request.user.is_authenticated else None
-                if not self._should_include_comment_details(entry, viewing_author):
-                    # Return empty comments object if not visible
-                    return Response({
-                        "type": "comments",
-                        "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}/entries/{entry.id}",
-                        "id": f"{entry.url}/comments",
-                        "page_number": 1,
-                        "size": 5,
-                        "count": 0,
-                        "src": [],
-                    })
             except Entry.DoesNotExist:
                 return Response(
                     {"detail": "Entry not found"},
                     status=status.HTTP_404_NOT_FOUND,
                 )
+        elif "entry_fqid" in self.kwargs:
+            entry_fqid = self.kwargs["entry_fqid"]
+            try:
+                entry = Entry.objects.get(url=entry_fqid)
+                print(f"DEBUG: Found entry by FQID for comments: {entry.title}")
+            except Entry.DoesNotExist:
+                return Response(
+                    {"detail": "Entry not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        
+        if entry:
+            # Check if user can see comments based on entry visibility
+            viewing_author = request.user if request.user.is_authenticated else None
+            if not self._should_include_comment_details(entry, viewing_author):
+                # Return empty comments object if not visible
+                return Response({
+                    "type": "comments",
+                    "web": f"{getattr(settings, 'FRONTEND_URL', settings.SITE_URL)}/authors/{entry.author.id}/entries/{entry.id}",
+                    "id": f"{entry.url}/comments",
+                    "page_number": 1,
+                    "size": 5,
+                    "count": 0,
+                    "src": [],
+                })
+        else:
+            return Response(
+                {"detail": "Entry not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         
         # Serialize comments
         serializer = self.get_serializer(queryset[:5], many=True)
@@ -242,20 +280,30 @@ class CommentListCreateView(generics.ListCreateAPIView):
         return False
 
     def perform_create(self, serializer):
+        print(f"DEBUG: perform_create called for comment creation")
+        print(f"DEBUG: kwargs: {self.kwargs}")
+        print(f"DEBUG: serializer validated_data: {serializer.validated_data}")
+        
         # Handle different URL patterns
         if "entry_id" in self.kwargs:
             entry_id = self.kwargs["entry_id"]
+            print(f"DEBUG: Looking up entry by ID: {entry_id}")
             try:
                 entry = Entry.objects.get(id=entry_id)
+                print(f"DEBUG: Found entry by ID: {entry.title} by {entry.author.displayName}")
             except Entry.DoesNotExist:
+                print(f"DEBUG: Entry with ID {entry_id} not found")
                 raise NotFound(f"Entry with ID {entry_id} not found")
         else:
             entry_url = serializer.validated_data.get("entry")
+            print(f"DEBUG: Looking up entry by URL: {entry_url}")
             if not entry_url:
                 raise ValidationError({"entry": "Entry field is required"})
             try:
                 entry = Entry.objects.get(url=entry_url)
+                print(f"DEBUG: Found entry by URL: {entry.title} by {entry.author.displayName}")
             except Entry.DoesNotExist:
+                print(f"DEBUG: Entry with URL {entry_url} not found")
                 raise NotFound(f"Entry not found")
 
         # Ensure required fields are present
@@ -274,7 +322,11 @@ class CommentListCreateView(generics.ListCreateAPIView):
         # Pass the author's URL (not the User object) since the FK uses to_field="url"
         # request.user IS the Author instance (Author extends AbstractUser)
         author_url = self.request.user.url
+        print(f"DEBUG: Creating comment with author_url: {author_url}, entry_url: {entry.url}")
         comment = serializer.save(author_id=author_url, entry_id=entry.url)
+        print(f"DEBUG: Comment created successfully: {comment.id}")
+        print(f"DEBUG: Comment author: {comment.author.displayName}, Entry author: {comment.entry.author.displayName}")
+        print(f"DEBUG: Entry author is_remote: {comment.entry.author.is_remote}")
 
         send_comment_to_remote_inbox(comment)
 

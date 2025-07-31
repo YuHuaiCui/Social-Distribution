@@ -28,7 +28,7 @@ import Card from "./ui/Card";
 import { renderMarkdown } from "../utils/markdown";
 
 import AnimatedGradient from "./ui/AnimatedGradient";
-import { extractUUID } from "../utils/extractId";
+import { extractUUID, getEntryUrl } from "../utils/extractId";
 import { ShareModal } from "./ShareModal";
 
 
@@ -483,7 +483,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           </div>
 
           {/* Post title */}
-          <Link to={`/posts/${extractUUID(post.id)}`}>
+          <Link to={getEntryUrl(post)}>
             <h2 className="text-xl font-semibold mb-3 text-text-1 hover:text-brand-500 transition-colors">
               {post.title}
             </h2>
@@ -595,7 +595,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({
 
             {/* Comment Button */}
             <button
-              onClick={() => navigate(`/posts/${extractUUID(post.id)}`)}
+              onClick={() => navigate(getEntryUrl(post))}
               className="flex-1 flex items-center justify-center py-3 relative overflow-hidden group transition-all"
               aria-label="View comments"
             >

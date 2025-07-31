@@ -27,7 +27,7 @@ import LoadingImage from "../components/ui/LoadingImage";
 import { entryService } from "../services/entry";
 import { socialService } from "../services/social";
 import { renderMarkdown } from "../utils/markdown";
-import { extractUUID } from "../utils/extractId";
+import { extractUUID, isRemoteEntry, getEntryIdentifier } from "../utils/extractId";
 
 interface CommentWithReplies extends Comment {
   replies?: Comment[];
@@ -36,7 +36,7 @@ interface CommentWithReplies extends Comment {
 }
 
 export const PostDetailPage: React.FC = () => {
-  const { postId } = useParams<{ postId: string }>();
+  const { postId, entryUrl } = useParams<{ postId?: string; entryUrl?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
@@ -52,6 +52,7 @@ export const PostDetailPage: React.FC = () => {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [isRemotePost, setIsRemotePost] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
   // Type guard to check if author is an Author object
   const isAuthorObject = (author: unknown): author is Author => {
@@ -62,147 +63,190 @@ export const PostDetailPage: React.FC = () => {
     );
   };
   const fetchPostDetails = useCallback(async () => {
-    if (!postId) return;
+    const currentPostId = postId || entryUrl;
+    if (!currentPostId) return;
 
     setIsLoading(true);
 
-    // Extract UUID if postId is a full URL
-    let extractedId = postId;
-    if (postId.includes("/")) {
-      // Extract the UUID from the URL (last segment)
-      const segments = postId.split("/");
-      extractedId =
-        segments[segments.length - 1] || segments[segments.length - 2];
+    // Determine if this is a remote entry
+    let actualEntryUrl: string;
+    let isRemote = false;
+    
+    if (entryUrl) {
+      // This came from the remote route - decode the URL
+      actualEntryUrl = decodeURIComponent(entryUrl);
+      isRemote = true;
+      setIsRemotePost(true);
+    } else if (postId && postId.startsWith('remote/')) {
+      // Legacy support for remote/ prefix in postId
+      actualEntryUrl = decodeURIComponent(postId.replace('remote/', ''));
+      isRemote = true;
+      setIsRemotePost(true);
+    } else {
+      // This is a local entry
+      actualEntryUrl = currentPostId;
+      setIsRemotePost(false);
     }
 
-    // Validate UUID format
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(extractedId)) {
+    let fetchedPost: Entry;
+    
+    try {
+      if (isRemote) {
+        // For remote entries, fetch from the remote node
+        fetchedPost = await entryService.fetchRemoteEntry(actualEntryUrl);
+      } else {
+        // For local entries, use existing logic
+        let extractedId = actualEntryUrl;
+        if (actualEntryUrl.includes("/")) {
+          const segments = actualEntryUrl.split("/");
+          extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+        }
+
+        // Validate UUID format for local entries
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(extractedId)) {
+          setPost(null);
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          fetchedPost = await entryService.getEntry(extractedId);
+        } catch (error) {
+          console.error("Error fetching post:", error);
+          
+          // Fallback: try fetching through author's endpoint
+          if (user?.id) {
+            try {
+              const response = await entryService.getEntriesByAuthor(user.id);
+              const authorPost = response.src.find((entry) => entry.id === extractedId);
+              
+              if (authorPost) {
+                fetchedPost = authorPost;
+              } else {
+                setPost(null);
+                setIsLoading(false);
+                return;
+              }
+            } catch (authorError) {
+              console.error("Error fetching from author entries:", authorError);
+              setPost(null);
+              setIsLoading(false);
+              return;
+            }
+          } else {
+            setPost(null);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+      
+      setPost(fetchedPost);
+    } catch (error) {
+      console.error("Error fetching post details:", error);
       setPost(null);
       setIsLoading(false);
       return;
     }
 
-    // Use the extracted UUID for all API calls
-    const validPostId = extractedId;
-
-    // Fetch the post details
-    let fetchedPost;
+    // Fetch comments - different logic for remote vs local entries
     try {
-      fetchedPost = await entryService.getEntry(validPostId);
-      setPost(fetchedPost);
-    } catch (error) {
-      // Check if it's a 404 error - could be the post doesn't exist or is not viewable due to permissions
-      console.error("Error fetching post:", error);
+      if (isRemote) {
+        // For remote entries, get only local comments
+        const commentsResponse = await entryService.getLocalCommentsForRemoteEntry(actualEntryUrl);
+        
+        // Convert to the expected format
+        const parentComments: CommentWithReplies[] = [];
+        const commentReplies: Record<string, Comment[]> = {};
 
-      // Update the API endpoint in PostDetailPage to use the author's specific entries endpoint
-      // if the direct entry endpoint returns a 404
-      if (user?.id) {
-        try {
-          // Try fetching through author's endpoint which might have different permissions
-          const response = await entryService.getEntriesByAuthor(user.id);
-          const authorPost = response.src.find(
-            (entry) => entry.id === validPostId
-          );
-
-          if (authorPost) {
-            setPost(authorPost);
-            setIsLoading(false);
-            return;
+        commentsResponse.items.forEach((comment) => {
+          if (comment.parent) {
+            const parentId = typeof comment.parent === "string" ? comment.parent : comment.parent.id;
+            if (!commentReplies[parentId]) {
+              commentReplies[parentId] = [];
+            }
+            commentReplies[parentId].push(comment);
+          } else {
+            parentComments.push({ ...comment, replies: [] });
           }
-        } catch (authorError) {
-          console.error("Error fetching from author entries:", authorError);
-        }
+        });
+
+        parentComments.forEach((comment) => {
+          if (commentReplies[comment.id]) {
+            comment.replies = commentReplies[comment.id];
+          }
+        });
+
+        setComments(parentComments);
+      } else {
+        // For local entries, use existing logic
+        const extractedId = extractUUID(actualEntryUrl);
+        const commentsResponse = await entryService.getComments(extractedId);
+
+        const parentComments: CommentWithReplies[] = [];
+        const commentReplies: Record<string, Comment[]> = {};
+
+        commentsResponse.results.forEach((comment) => {
+          if (comment.parent) {
+            const parentId = typeof comment.parent === "string" ? comment.parent : comment.parent.id;
+            if (!commentReplies[parentId]) {
+              commentReplies[parentId] = [];
+            }
+            commentReplies[parentId].push(comment);
+          } else {
+            parentComments.push({ ...comment, replies: [] });
+          }
+        });
+
+        parentComments.forEach((comment) => {
+          if (commentReplies[comment.id]) {
+            comment.replies = commentReplies[comment.id];
+          }
+        });
+
+        // Fetch like status for each comment (only for local entries)
+        const commentsWithLikes = await Promise.all(
+          parentComments.map(async (comment) => {
+            try {
+              const likeStatus = await socialService.getCommentLikeStatus(comment.id);
+              return {
+                ...comment,
+                likes_count: likeStatus.like_count,
+                is_liked: likeStatus.liked_by_current_user,
+              };
+            } catch (error) {
+              console.error(`Error fetching like status for comment ${comment.id}:`, error);
+              return comment;
+            }
+          })
+        );
+
+        setComments(commentsWithLikes);
       }
-
-      // Set post to null and exit early
-      setPost(null);
-      setIsLoading(false);
-      return; // Exit early if we can't get the post
-    }
-
-    // Fetch comments for the post
-    try {
-      const commentsResponse = await entryService.getComments(validPostId);
-
-      // Convert flat comments to threaded structure
-      const parentComments: CommentWithReplies[] = [];
-      const commentReplies: Record<string, Comment[]> = {};
-
-      // First pass: separate parent comments and replies
-      commentsResponse.results.forEach((comment) => {
-        if (comment.parent) {
-          // This is a reply
-          const parentId =
-            typeof comment.parent === "string"
-              ? comment.parent
-              : comment.parent.id;
-
-          if (!commentReplies[parentId]) {
-            commentReplies[parentId] = [];
-          }
-          commentReplies[parentId].push(comment);
-        } else {
-          // This is a parent comment
-          parentComments.push({ ...comment, replies: [] });
-        }
-      });
-
-      // Second pass: add replies to their parent comments
-      parentComments.forEach((comment) => {
-        if (commentReplies[comment.id]) {
-          comment.replies = commentReplies[comment.id];
-        }
-      });
-
-      // Fetch like status for each comment
-      const commentsWithLikes = await Promise.all(
-        parentComments.map(async (comment) => {
-          try {
-            const likeStatus = await socialService.getCommentLikeStatus(
-              comment.id
-            );
-            return {
-              ...comment,
-              likes_count: likeStatus.like_count,
-              is_liked: likeStatus.liked_by_current_user,
-            };
-          } catch (error) {
-            console.error(
-              `Error fetching like status for comment ${comment.id}:`,
-              error
-            );
-            return comment;
-          }
-        })
-      );
-
-      setComments(commentsWithLikes);
     } catch (error) {
       console.error("Error fetching comments:", error);
-      // Continue with other operations even if comments fail
+      setComments([]);
     }
 
-    // Get like status using the SocialService
-    if (user?.id) {
+    // Get like status (only for local entries)
+    if (!isRemote && user?.id) {
       try {
-        const likeData = await socialService.getEntryLikes(validPostId);
-        // Check if current user liked this entry by looking through the likes
-        const liked_by_current_user = likeData.src.some(
-          (like) => like.author.id === user.id
-        );
+        const extractedId = extractUUID(actualEntryUrl);
+        const likeData = await socialService.getEntryLikes(extractedId);
+        const liked_by_current_user = likeData.src.some((like) => like.author.id === user.id);
         setIsLiked(liked_by_current_user);
       } catch (error) {
         console.error("Error fetching like status:", error);
-        // Fallback to post data
         setIsLiked(fetchedPost.is_liked || false);
       }
+    } else {
+      // For remote entries, disable liking for now
+      setIsLiked(false);
     }
 
-    // Always set loading to false at the end
     setIsLoading(false);
-  }, [postId, user?.id]);
+  }, [postId, entryUrl, user?.id]);
 
   useEffect(() => {
     fetchPostDetails();
@@ -228,10 +272,11 @@ export const PostDetailPage: React.FC = () => {
   }, [showActions]);
 
   const handleLike = async () => {
-    if (!postId || !post) return;
+    const currentPostId = postId || entryUrl;
+    if (!currentPostId || !post || isRemotePost) return; // Disable liking for remote posts
 
     // Extract UUID from postId if it's a URL
-    const extractedId = extractUUID(postId);
+    const extractedId = extractUUID(currentPostId);
 
     const newLikedState = !isLiked;
     setIsLiked(newLikedState);
@@ -296,52 +341,54 @@ export const PostDetailPage: React.FC = () => {
   };
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim() || !postId) return;
-
-    // Extract UUID from postId if it's a URL
-    let extractedId = postId;
-    if (postId.includes("/")) {
-      const segments = postId.split("/");
-      extractedId =
-        segments[segments.length - 1] || segments[segments.length - 2];
-    }
+    const currentPostId = postId || entryUrl;
+    if (!commentText.trim() || !currentPostId || !post) return;
 
     setIsSubmitting(true);
     try {
-      // Create the comment data with the correct API specification format
       const commentData = {
         content: commentText,
         contentType: commentContentType,
       };
 
-      // If replying to another comment, add it as parent
-      if (replyingTo) {
-        // In a real implementation this would include parent reference
-        // For now we'll submit it as a regular comment
-        const newComment = await entryService.createComment(
-          extractedId,
-          commentData
-        );
+      let newComment: Comment;
 
-        // Update the comments array with the new reply
-        setComments((prev) =>
-          prev.map((comment) =>
-            comment.id === replyingTo
-              ? {
-                  ...comment,
-                  replies: [...(comment.replies || []), newComment],
-                }
-              : comment
-          )
-        );
+      if (isRemotePost) {
+        // For remote entries, get the entry URL and use remote comment endpoint
+        const actualEntryUrl = entryUrl ? decodeURIComponent(entryUrl) : decodeURIComponent(currentPostId.replace('remote/', ''));
+        newComment = await entryService.createCommentOnRemoteEntry(actualEntryUrl, commentData);
       } else {
-        // Create a new top-level comment
-        const newComment = await entryService.createComment(
-          extractedId,
-          commentData
-        );
+        // For local entries, use existing logic
+        let extractedId = currentPostId;
+        if (currentPostId.includes("/")) {
+          const segments = currentPostId.split("/");
+          extractedId = segments[segments.length - 1] || segments[segments.length - 2];
+        }
 
-        // Add to the comments list
+        if (replyingTo) {
+          // For now we'll submit it as a regular comment
+          newComment = await entryService.createComment(extractedId, commentData);
+          
+          // Update the comments array with the new reply
+          setComments((prev) =>
+            prev.map((comment) =>
+              comment.id === replyingTo
+                ? {
+                    ...comment,
+                    replies: [...(comment.replies || []), newComment],
+                  }
+                : comment
+            )
+          );
+        } else {
+          newComment = await entryService.createComment(extractedId, commentData);
+          // Add to the comments list
+          setComments((prev) => [newComment as CommentWithReplies, ...prev]);
+        }
+      }
+
+      if (!replyingTo || isRemotePost) {
+        // Add to the comments list (only if not a reply to local comment)
         setComments((prev) => [newComment as CommentWithReplies, ...prev]);
       }
 
@@ -350,24 +397,21 @@ export const PostDetailPage: React.FC = () => {
       setReplyingTo(null);
 
       // Update the comment count
-      if (post) {
-        const newCommentCount = (post.comments_count || 0) + 1;
-        setPost({ ...post, comments_count: newCommentCount });
+      const newCommentCount = (post.comments_count || 0) + 1;
+      setPost({ ...post, comments_count: newCommentCount });
 
-        // Dispatch custom event to update comment count in other components
-        window.dispatchEvent(
-          new CustomEvent("post-update", {
-            detail: {
-              postId: post.id,
-              updates: { comments_count: newCommentCount },
-            },
-          })
-        );
+      // Dispatch custom event to update comment count in other components
+      window.dispatchEvent(
+        new CustomEvent("post-update", {
+          detail: {
+            postId: post.id,
+            updates: { comments_count: newCommentCount },
+          },
+        })
+      );
 
-      }
     } catch (err) {
       console.error("Error submitting comment:", err);
-      // Show user-friendly error message
       showError("Failed to submit comment. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -383,7 +427,8 @@ export const PostDetailPage: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!post || !postId) return;
+    const currentPostId = postId || entryUrl;
+    if (!post || !currentPostId) return;
 
     setShowActions(false);
     if (
@@ -392,7 +437,7 @@ export const PostDetailPage: React.FC = () => {
       )
     ) {
       try {
-        const extractedId = extractUUID(postId);
+        const extractedId = extractUUID(currentPostId);
         await entryService.deleteEntry(extractedId);
         showSuccess("Post deleted successfully");
         navigate("/"); // Navigate back to home page
@@ -588,7 +633,7 @@ export const PostDetailPage: React.FC = () => {
           <span>Back</span>
         </button>
 
-        {isAuthorObject(post.author) && post.author.id === user?.id && (
+        {!isRemotePost && isAuthorObject(post.author) && post.author.id === user?.id && (
           <div className="relative" ref={actionsRef}>
             <motion.button
               whileHover={{ scale: 1.1 }}
@@ -663,15 +708,9 @@ export const PostDetailPage: React.FC = () => {
               </h3>
               <div className="flex items-center space-x-3 text-sm text-text-2">
                 <span>
-                  @
                   {isAuthorObject(post.author)
                     ? post.author.username
                     : "unknown"}
-                </span>
-                <span>•</span>
-                <span className="flex items-center">
-                  <Clock size={14} className="mr-1" />
-                  {formatDate(post.published)}
                 </span>
               </div>
             </div>
@@ -709,7 +748,7 @@ export const PostDetailPage: React.FC = () => {
           {/* Actions */}
           <div className="flex items-center justify-between pt-6 border-t border-border-1">
             <div className="flex items-center space-x-4">
-              {user?.id ? (
+              {user?.id && !isRemotePost ? (
                 <motion.button
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
@@ -767,7 +806,7 @@ export const PostDetailPage: React.FC = () => {
             Comments ({comments.length})
           </h2>
 
-          {/* Comment Form */}
+          {/* Comment Form - Available for both local and remote posts */}
           {user?.id && (
             <form onSubmit={handleSubmitComment} className="mb-6">
               {replyingTo && (

@@ -111,6 +111,17 @@ urlpatterns = [
         EntryViewSet.as_view({"get": "get_entry_by_url"}),
         name="entry-by-url",
     ),
+    # Remote entry endpoints - MUST BE BEFORE FQID patterns
+    path(
+        "entries/fetch-remote/",
+        EntryViewSet.as_view({"get": "fetch_remote_entry"}),
+        name="entry-fetch-remote",
+    ),
+    path(
+        "entries/local-comments-for-remote/",
+        EntryViewSet.as_view({"get": "get_local_comments_for_remote_entry"}),
+        name="entry-local-comments-remote",
+    ),
     path(
         "entries/<uuid:id>/",
         EntryViewSet.as_view(

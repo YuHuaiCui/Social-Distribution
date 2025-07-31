@@ -440,6 +440,46 @@ export class EntryService extends BaseApiService {
   async getCategories(): Promise<Array<{ name: string; count: number }>> {
     return this.request("/api/entries/categories/");
   }
+
+  /**
+   * Fetch remote entry details from the remote node
+   */
+  async fetchRemoteEntry(entryUrl: string): Promise<Entry> {
+    const encodedUrl = encodeURIComponent(entryUrl);
+    return this.request<Entry>(`/api/entries/fetch-remote/?entry_url=${encodedUrl}`);
+  }
+
+  /**
+   * Get local comments for a remote entry
+   */
+  async getLocalCommentsForRemoteEntry(entryUrl: string): Promise<{
+    type: "comments";
+    entry_url: string;
+    count: number;
+    items: Comment[];
+  }> {
+    const encodedUrl = encodeURIComponent(entryUrl);
+    return this.request(`/api/entries/local-comments-for-remote/?entry_url=${encodedUrl}`);
+  }
+
+  /**
+   * Create a comment on a remote entry using the FQID endpoint
+   */
+  async createCommentOnRemoteEntry(
+    entryUrl: string,
+    data: CreateCommentData
+  ): Promise<Comment> {
+    const encodedUrl = encodeURIComponent(entryUrl);
+    const commentData = {
+      comment: data.content,
+      contentType: data.contentType || "text/plain",
+    };
+
+    return this.request<Comment>(`/api/entries/${encodedUrl}/comments/`, {
+      method: "POST",
+      body: JSON.stringify(commentData),
+    });
+  }
 }
 
 // Export singleton instance
