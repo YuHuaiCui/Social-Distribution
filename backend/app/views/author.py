@@ -603,10 +603,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     def _get_inbox(self, request, pk=None):
         """Handle GET requests to retrieve inbox contents."""
+        print(f"DEBUG: _get_inbox called for author pk={pk}")
         try:
             author = self.get_object()
+            print(f"DEBUG: Retrieved author {author.username} (id={author.id})")
 
             # Only allow authors to access their own inbox
+            print(f"DEBUG: Checking permissions - request.user={request.user.username if hasattr(request.user, 'username') else request.user}, author={author.username}")
             if request.user != author:
                 return Response(
                     {"error": "You can only access your own inbox"},
@@ -619,6 +622,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
             inbox_items = Inbox.objects.filter(recipient=author).order_by(
                 "-delivered_at"
             )
+            print(f"DEBUG: Found {inbox_items.count()} inbox items for {author.username}")
 
             # Apply pagination
             page = self.paginate_queryset(inbox_items)
@@ -638,33 +642,43 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     def _post_to_inbox(self, request, pk=None):
         """Handle POST requests to add activities to inbox."""
+        print(f"DEBUG: _post_to_inbox called for author pk={pk}")
+        print(f"DEBUG: Request data: {request.data}")
         try:
             # Get the recipient author
             author = self.get_object()
+            print(f"DEBUG: Retrieved recipient author {author.username} (id={author.id})")
 
             # Validate the incoming activity
             serializer = ActivitySerializer(data=request.data)
             if not serializer.is_valid():
+                print(f"DEBUG: Activity serializer validation failed: {serializer.errors}")
                 return Response(
                     {"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
                 )
 
             activity_data = serializer.validated_data
             activity_type = activity_data.get("type", "")
+            print(f"DEBUG: Processing activity type: {activity_type}")
 
             # Process the activity based on its type to get serialized object data
             object_data = None
 
             if activity_type == "entry":
+                print(f"DEBUG: Processing entry activity")
                 object_data = self._process_entry_activity(activity_data, author)
             elif activity_type == "follow":
+                print(f"DEBUG: Processing follow activity")
                 object_data = self._process_follow_activity(activity_data, author)
             elif activity_type == "like":
+                print(f"DEBUG: Processing like activity")
                 object_data = self._process_like_activity(activity_data, author)
             elif activity_type == "comment":
+                print(f"DEBUG: Processing comment activity")
                 object_data = self._process_comment_activity(activity_data, author)
 
             if object_data is None:
+                print(f"DEBUG: Failed to process {activity_type} activity - object_data is None")
                 return Response(
                     {"error": f"Failed to process {activity_type} activity"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -685,6 +699,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 object_data=object_data,
                 defaults={"raw_data": request.data},
             )
+            print(f"DEBUG: Inbox item created={created} for {activity_type} activity")
 
             if created:
                 logger.info(f"Added {activity_type} to {author.username}'s inbox")
@@ -709,10 +724,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     def _process_entry_activity(self, activity_data, recipient):
         """Process an entry activity and create/update the entry per spec, return serialized data."""
+        print(f"DEBUG: _process_entry_activity called for recipient {recipient.username}")
         try:
             # Get or create the entry author
             author_data = activity_data.get("author", {})
             author_url = author_data.get("id")
+            print(f"DEBUG: Entry author URL: {author_url}")
 
             if not author_url:
                 logger.error("Entry activity missing author id")
@@ -738,6 +755,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
             # Create or update the entry
             entry_url = activity_data.get("id")
             entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
+            print(f"DEBUG: Entry URL: {entry_url}, UUID: {entry_uuid}")
 
             # Use UUID if we can parse it, otherwise use the URL
             entry_id = entry_uuid if entry_uuid else None
@@ -793,10 +811,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     def _process_follow_activity(self, activity_data, recipient):
         """Process a follow activity and create the follow request per spec, return serialized data."""
+        print(f"DEBUG: _process_follow_activity called for recipient {recipient.username}")
         try:
             # Get follower information from actor
             actor_data = activity_data.get("actor", {})
             actor_url = actor_data.get("id")
+            print(f"DEBUG: Follow actor URL: {actor_url}")
 
             if not actor_url:
                 logger.error("Follow activity missing actor id")
@@ -846,10 +866,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     def _process_like_activity(self, activity_data, recipient):
         """Process a like activity and create the like per spec, return serialized data."""
+        print(f"DEBUG: _process_like_activity called for recipient {recipient.username}")
         try:
             # Get liker information
             author_data = activity_data.get("author", {})
             author_url = author_data.get("id")
+            print(f"DEBUG: Like author URL: {author_url}")
 
             if not author_url:
                 logger.error("Like activity missing author id")
@@ -874,6 +896,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
             # Get the liked object URL
             object_url = activity_data.get("object")
+            print(f"DEBUG: Like object URL: {object_url}")
             if not object_url:
                 logger.error("Like activity missing object URL")
                 return None
@@ -943,10 +966,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
     def _process_comment_activity(self, activity_data, recipient):
         """Process a comment activity and create the comment per spec, return serialized data."""
+        print(f"DEBUG: _process_comment_activity called for recipient {recipient.username}")
         try:
             # Get commenter information
             author_data = activity_data.get("author", {})
             author_url = author_data.get("id")
+            print(f"DEBUG: Comment author URL: {author_url}")
 
             if not author_url:
                 logger.error("Comment activity missing author id")
@@ -971,6 +996,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
             # Get the entry being commented on (from 'entry' field per spec)
             entry_url = activity_data.get("entry")
+            print(f"DEBUG: Comment entry URL: {entry_url}")
             if not entry_url:
                 logger.error("Comment activity missing entry URL")
                 return None

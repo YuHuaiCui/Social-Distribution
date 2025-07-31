@@ -42,7 +42,7 @@ class ActivitySerializer(serializers.Serializer):
 
         # Basic validation - each activity type should have required fields per spec
         if activity_type == "entry":
-            required_fields = ["author", "title", "content", "contentType"]
+            required_fields = ["id", "author", "title", "content", "contentType"]
             # Validate author structure
             if "author" in data and not isinstance(data["author"], dict):
                 raise serializers.ValidationError("Entry author must be an object")
