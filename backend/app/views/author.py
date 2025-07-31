@@ -947,6 +947,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Process a follow activity and create the follow request per spec, return serialized data."""
         print(f"DEBUG: _process_follow_activity called for recipient {recipient.username}")
         try:
+            # Check if this is a follow response (accept/reject)
+            response_type = activity_data.get("response_type")
+            if response_type:
+                # This is a follow response from a remote node
+                return self._process_follow_response(activity_data, recipient, response_type)
+            
             # Get follower information from actor using centralized method
             actor_data = activity_data.get("actor", {})
             follower = self._get_or_create_author_from_activity(actor_data)
@@ -978,6 +984,43 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             logger.error(f"Error processing follow activity: {str(e)}")
+            return None
+    
+    def _process_follow_response(self, activity_data, recipient, response_type):
+        """Process a follow response (accept/reject) from a remote node."""
+        print(f"DEBUG: _process_follow_response called for recipient {recipient.username}, response_type: {response_type}")
+        try:
+            # Get the follower (who sent the original request) - that's the recipient
+            # Get the followed (who is responding) - that's in the activity data
+            follower_data = activity_data.get("follower", {})
+            followed_data = activity_data.get("followed", {})
+            
+            # Find the follow relationship
+            follow = Follow.objects.filter(
+                follower__url=follower_data.get("url", follower_data.get("id")),
+                followed__url=followed_data.get("url", followed_data.get("id"))
+            ).first()
+            
+            if not follow:
+                logger.error(f"Follow relationship not found for response")
+                return None
+            
+            # Update the follow status based on the response
+            if response_type == "Accept":
+                follow.status = Follow.ACCEPTED
+                follow.save()
+                logger.info(f"Follow request from {follow.follower.displayName} to {follow.followed.displayName} accepted")
+            elif response_type == "Reject":
+                follow.status = Follow.REJECTED
+                follow.save()
+                logger.info(f"Follow request from {follow.follower.displayName} to {follow.followed.displayName} rejected")
+            
+            # Return serialized follow data
+            from app.serializers.follow import FollowSerializer
+            return FollowSerializer(follow).data
+            
+        except Exception as e:
+            logger.error(f"Error processing follow response: {str(e)}")
             return None
 
     def _process_like_activity(self, activity_data, recipient):

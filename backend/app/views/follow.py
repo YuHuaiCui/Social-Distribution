@@ -129,8 +129,9 @@ class FollowViewSet(viewsets.ModelViewSet):
                     "id": follow.follower.url,
                     "host": follow.follower.host,
                     "displayName": follow.follower.displayName,
-                    "web": follow.follower.web,
+                    "github": f"http://github.com/{follow.follower.github_username}" if follow.follower.github_username else "",
                     "profileImage": follow.follower.profileImage,
+                    "web": follow.follower.web,
                 },
                 "object": {
                     "type": "author", 
@@ -138,12 +139,20 @@ class FollowViewSet(viewsets.ModelViewSet):
                     "host": follow.followed.host,
                     "displayName": follow.followed.displayName,
                     "web": follow.followed.web,
+                    "github": f"http://github.com/{follow.followed.github_username}" if follow.followed.github_username else "",
                     "profileImage": follow.followed.profileImage,
                 }
             }
 
             # Construct proper inbox URL
-            inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
+            # Extract UUID from the author's URL
+            from app.utils.url_utils import parse_uuid_from_url
+            author_uuid = parse_uuid_from_url(remote_author.url)
+            if not author_uuid:
+                # Fallback: try to extract from the URL path
+                author_uuid = remote_author.url.rstrip('/').split('/')[-1]
+            
+            inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{author_uuid}/inbox/"
 
             response = requests.post(
                 inbox_url,
