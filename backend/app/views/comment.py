@@ -294,6 +294,16 @@ class CommentListCreateView(generics.ListCreateAPIView):
             except Entry.DoesNotExist:
                 print(f"DEBUG: Entry with ID {entry_id} not found")
                 raise NotFound(f"Entry with ID {entry_id} not found")
+        elif "entry_fqid" in self.kwargs:
+            entry_fqid = self.kwargs["entry_fqid"]
+            print(f"DEBUG: Looking up entry by FQID: {entry_fqid}")
+            try:
+                # Try to find entry by URL first (for remote entries)
+                entry = Entry.objects.get(url=entry_fqid)
+                print(f"DEBUG: Found entry by FQID: {entry.title} by {entry.author.displayName}")
+            except Entry.DoesNotExist:
+                print(f"DEBUG: Entry with FQID {entry_fqid} not found")
+                raise NotFound(f"Entry not found")
         else:
             entry_url = serializer.validated_data.get("entry")
             print(f"DEBUG: Looking up entry by URL: {entry_url}")
