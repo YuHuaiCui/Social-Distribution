@@ -285,58 +285,83 @@ class AuthorViewSet(viewsets.ModelViewSet):
         local_followers = [follow.follower for follow in follows]
         
         # For remote authors, also fetch followers from their remote host
+        # IMPORTANT: Only fetch if the author is truly from a different host
         if author.is_remote and author.node:
             try:
                 import requests
                 from requests.auth import HTTPBasicAuth
+                from django.conf import settings
+                import urllib.parse
                 
-                # Extract author ID from the author's URL/ID
-                if author.url:
-                    author_id = author.url.rstrip('/').split('/')[-1]
-                else:
-                    author_id = str(author.id)
+                # Get the current host info from the request to compare against
+                request_host = request.get_host()
+                current_host_url = f"{request.scheme}://{request_host}"
                 
-                # Construct the remote followers endpoint
-                remote_url = f"{author.node.host.rstrip('/')}/api/authors/{author_id}/followers/"
+                # Parse the remote node's host
+                remote_host_url = author.node.host.rstrip('/')
                 
-                # Make the request to the remote node
-                response = requests.get(
-                    remote_url,
-                    auth=HTTPBasicAuth(author.node.username, author.node.password),
-                    timeout=10,
+                # Check if this is actually a different host
+                is_same_host = (
+                    remote_host_url == current_host_url or
+                    remote_host_url.startswith('http://127.0.0.1') or
+                    remote_host_url.startswith('http://localhost') or
+                    urllib.parse.urlparse(remote_host_url).netloc == request.get_host()
                 )
                 
-                if response.status_code == 200:
-                    remote_data = response.json()
-                    remote_followers_data = remote_data.get("followers", [])
+                if is_same_host:
+                    print(f"DEBUG: Skipping remote fetch - author {author.displayName} is from same host ({remote_host_url} == {current_host_url})")
+                    # This is actually a local author, skip remote fetching
+                    pass
+                else:
+                    print(f"DEBUG: Author {author.displayName} is truly remote from {remote_host}, fetching followers...")
                     
-                    # Create or update remote followers locally and add them to the list
-                    for follower_data in remote_followers_data:
-                        try:
-                            follower_url = follower_data.get("url") or follower_data.get("id")
-                            if not follower_url:
-                                continue
-                                
-                            # Look for existing author by URL
+                    # Extract author ID from the author's URL/ID
+                    if author.url:
+                        author_id = author.url.rstrip('/').split('/')[-1]
+                    else:
+                        author_id = str(author.id)
+                    
+                    # Construct the remote followers endpoint
+                    remote_url = f"{author.node.host.rstrip('/')}/api/authors/{author_id}/followers/"
+                    
+                    # Make the request to the remote node
+                    response = requests.get(
+                        remote_url,
+                        auth=HTTPBasicAuth(author.node.username, author.node.password),
+                        timeout=10,
+                    )
+                    
+                    if response.status_code == 200:
+                        remote_data = response.json()
+                        remote_followers_data = remote_data.get("followers", [])
+                        
+                        # Create or update remote followers locally and add them to the list
+                        for follower_data in remote_followers_data:
                             try:
-                                existing_follower = Author.objects.get(url=follower_url)
-                                if existing_follower not in local_followers:
-                                    local_followers.append(existing_follower)
-                            except Author.DoesNotExist:
-                                # Create a new remote author record
-                                remote_follower = Author.objects.create(
-                                    username=follower_data.get("username", "unknown"),
-                                    displayName=follower_data.get("displayName") or follower_data.get("display_name", "Unknown User"),
-                                    url=follower_url,
-                                    profile_image=follower_data.get("profileImage") or follower_data.get("profile_image", ""),
-                                    github_username=follower_data.get("github_username", ""),
-                                    node=author.node,
-                                    is_active=True,
-                                    is_approved=True,
-                                )
-                                local_followers.append(remote_follower)
-                        except Exception as e:
-                            continue
+                                follower_url = follower_data.get("url") or follower_data.get("id")
+                                if not follower_url:
+                                    continue
+                                    
+                                # Look for existing author by URL
+                                try:
+                                    existing_follower = Author.objects.get(url=follower_url)
+                                    if existing_follower not in local_followers:
+                                        local_followers.append(existing_follower)
+                                except Author.DoesNotExist:
+                                    # Create a new remote author record
+                                    remote_follower = Author.objects.create(
+                                        username=follower_data.get("username", "unknown"),
+                                        displayName=follower_data.get("displayName") or follower_data.get("display_name", "Unknown User"),
+                                        url=follower_url,
+                                        profile_image=follower_data.get("profileImage") or follower_data.get("profile_image", ""),
+                                        github_username=follower_data.get("github_username", ""),
+                                        node=author.node,
+                                        is_active=True,
+                                        is_approved=True,
+                                    )
+                                    local_followers.append(remote_follower)
+                            except Exception as e:
+                                continue
                             
             except Exception as e:
                 # Continue with local followers only
@@ -1186,70 +1211,95 @@ class AuthorViewSet(viewsets.ModelViewSet):
         local_followers = list(author.get_followers())
         
         # If this is a remote author, also fetch followers from their remote host
+        # IMPORTANT: Only fetch if the author is truly from a different host
         if author.is_remote and author.node:
             try:
                 import requests
                 from requests.auth import HTTPBasicAuth
+                from django.conf import settings
+                import urllib.parse
                 
-                # Extract author ID from the author's URL/ID
-                if author.url:
-                    # Parse the author ID from the URL
-                    # e.g., "http://remote-host/api/authors/uuid/" -> "uuid"
-                    author_id = author.url.rstrip('/').split('/')[-1]
-                else:
-                    # Fallback to author.id if no URL
-                    author_id = str(author.id)
+                # Get the current host info from the request to compare against
+                request_host = request.get_host()
+                current_host_url = f"{request.scheme}://{request_host}"
                 
-                # Construct the remote followers endpoint
-                remote_url = f"{author.node.host.rstrip('/')}/api/authors/{author_id}/followers/"
+                # Parse the remote node's host
+                remote_host_url = author.node.host.rstrip('/')
                 
-                print(f"DEBUG: Fetching remote followers from: {remote_url}")
-                
-                # Make the request to the remote node
-                response = requests.get(
-                    remote_url,
-                    auth=HTTPBasicAuth(author.node.username, author.node.password),
-                    timeout=10,
+                # Check if this is actually a different host
+                is_same_host = (
+                    remote_host_url == current_host_url or
+                    remote_host_url.startswith('http://127.0.0.1') or
+                    remote_host_url.startswith('http://localhost') or
+                    urllib.parse.urlparse(remote_host_url).netloc == request.get_host()
                 )
                 
-                if response.status_code == 200:
-                    remote_data = response.json()
-                    remote_followers_data = remote_data.get("followers", [])
-                    
-                    print(f"DEBUG: Retrieved {len(remote_followers_data)} remote followers")
-                    
-                    # Create or update remote followers locally and add them to the list
-                    for follower_data in remote_followers_data:
-                        try:
-                            # Try to find existing remote follower
-                            follower_url = follower_data.get("url") or follower_data.get("id")
-                            if not follower_url:
-                                continue
-                                
-                            # Look for existing author by URL
-                            try:
-                                existing_follower = Author.objects.get(url=follower_url)
-                                if existing_follower not in local_followers:
-                                    local_followers.append(existing_follower)
-                            except Author.DoesNotExist:
-                                # Create a new remote author record
-                                remote_follower = Author.objects.create(
-                                    username=follower_data.get("username", "unknown"),
-                                    displayName=follower_data.get("displayName") or follower_data.get("display_name", "Unknown User"),
-                                    url=follower_url,
-                                    profile_image=follower_data.get("profileImage") or follower_data.get("profile_image", ""),
-                                    github_username=follower_data.get("github_username", ""),
-                                    node=author.node,  # Same node as the author being followed
-                                    is_active=True,
-                                    is_approved=True,
-                                )
-                                local_followers.append(remote_follower)
-                                print(f"DEBUG: Created new remote follower: {remote_follower.displayName}")
-                        except Exception as e:
-                            print(f"DEBUG: Error processing remote follower {follower_data.get('displayName', 'unknown')}: {str(e)}")
-                            continue
+                if is_same_host:
+                    print(f"DEBUG: Skipping remote fetch - author {author.displayName} is from same host ({remote_host_url} == {current_host_url})")
+                    # This is actually a local author, skip remote fetching
+                    pass
                 else:
-                    print(f"DEBUG: Failed to fetch remote followers: {response.status_code}")
+                    print(f"DEBUG: Author {author.displayName} is truly remote from {remote_host}, fetching followers...")
+                    
+                    # Extract author ID from the author's URL/ID
+                    if author.url:
+                        # Parse the author ID from the URL
+                        # e.g., "http://remote-host/api/authors/uuid/" -> "uuid"
+                        author_id = author.url.rstrip('/').split('/')[-1]
+                    else:
+                        # Fallback to author.id if no URL
+                        author_id = str(author.id)
+                    
+                    # Construct the remote followers endpoint
+                    remote_url = f"{author.node.host.rstrip('/')}/api/authors/{author_id}/followers/"
+                    
+                    print(f"DEBUG: Fetching remote followers from: {remote_url}")
+                    
+                    # Make the request to the remote node
+                    response = requests.get(
+                        remote_url,
+                        auth=HTTPBasicAuth(author.node.username, author.node.password),
+                        timeout=10,
+                    )
+                    
+                    if response.status_code == 200:
+                        remote_data = response.json()
+                        remote_followers_data = remote_data.get("followers", [])
+                        
+                        print(f"DEBUG: Retrieved {len(remote_followers_data)} remote followers")
+                        
+                        # Create or update remote followers locally and add them to the list
+                        for follower_data in remote_followers_data:
+                            try:
+                                # Try to find existing remote follower
+                                follower_url = follower_data.get("url") or follower_data.get("id")
+                                if not follower_url:
+                                    continue
+                                    
+                                # Look for existing author by URL
+                                try:
+                                    existing_follower = Author.objects.get(url=follower_url)
+                                    if existing_follower not in local_followers:
+                                        local_followers.append(existing_follower)
+                                except Author.DoesNotExist:
+                                    # Create a new remote author record
+                                    remote_follower = Author.objects.create(
+                                        username=follower_data.get("username", "unknown"),
+                                        displayName=follower_data.get("displayName") or follower_data.get("display_name", "Unknown User"),
+                                        url=follower_url,
+                                        profile_image=follower_data.get("profileImage") or follower_data.get("profile_image", ""),
+                                        github_username=follower_data.get("github_username", ""),
+                                        node=author.node,  # Same node as the author being followed
+                                        is_active=True,
+                                        is_approved=True,
+                                    )
+                                    local_followers.append(remote_follower)
+                                    print(f"DEBUG: Created new remote follower: {remote_follower.displayName}")
+                            except Exception as e:
+                                print(f"DEBUG: Error processing remote follower {follower_data.get('displayName', 'unknown')}: {str(e)}")
+                                continue
+                    else:
+                        print(f"DEBUG: Failed to fetch remote followers: {response.status_code}")
                     
             except Exception as e:
                 print(f"DEBUG: Error fetching remote followers for {author.displayName}: {str(e)}")
