@@ -293,11 +293,18 @@ class EntryViewSet(viewsets.ModelViewSet):
         from requests.auth import HTTPBasicAuth
         from app.serializers.entry import EntrySerializer
         
+        print(f"DEBUG: _send_to_remote_authors called for entry {entry.id} (visibility: {entry.visibility})")
+        
         try:
             # Get all remote authors (authors with node set)
             remote_authors = Author.objects.filter(node__isnull=False)
             
+            print(f"DEBUG: Found {remote_authors.count()} remote authors")
             logger.info(f"Sending entry {entry.id} to {remote_authors.count()} remote authors")
+            
+            if remote_authors.count() == 0:
+                print("DEBUG: No remote authors found - skipping federation")
+                return
             
             # Serialize the entry
             entry_data = EntrySerializer(entry).data
@@ -721,6 +728,7 @@ class EntryViewSet(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         """Handle PATCH requests for entry updates with logging"""
         logger.debug(f"Updating entry - User: {request.user}, Data: {request.data}")
+        print(f"DEBUG: partial_update called for entry update")
 
         # Get the entry before update
         entry = self.get_object()
@@ -728,9 +736,35 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         response = super().partial_update(request, *args, **kwargs)
 
+        print(f"DEBUG: Update response status: {response.status_code}")
+        
         # If update was successful, check if we need to send to remote nodes
         if response.status_code == 200:
             entry.refresh_from_db()
+            print(f"DEBUG: Calling _send_to_remote_authors for updated entry {entry.id}")
+
+            # Send updated entry to remote authors' inboxes
+            self._send_to_remote_authors(entry)
+
+        return response
+
+    def update(self, request, *args, **kwargs):
+        """Handle PUT requests for entry updates with logging"""
+        logger.debug(f"Updating entry (PUT) - User: {request.user}, Data: {request.data}")
+        print(f"DEBUG: update called for entry update")
+
+        # Get the entry before update
+        entry = self.get_object()
+        old_visibility = entry.visibility
+
+        response = super().update(request, *args, **kwargs)
+
+        print(f"DEBUG: Update (PUT) response status: {response.status_code}")
+
+        # If update was successful, check if we need to send to remote nodes
+        if response.status_code == 200:
+            entry.refresh_from_db()
+            print(f"DEBUG: Calling _send_to_remote_authors for updated entry {entry.id}")
 
             # Send updated entry to remote authors' inboxes
             self._send_to_remote_authors(entry)
@@ -982,7 +1016,11 @@ class EntryViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(entry, data=request.data, partial=False)
             if serializer.is_valid():
                 updated_entry = serializer.save()
-                # Remote functionality removed
+                
+                # Send updated entry to remote authors' inboxes
+                print(f"DEBUG: update_author_entry - sending updated entry {updated_entry.id} to remote inboxes")
+                self._send_to_remote_authors(updated_entry)
+                
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
