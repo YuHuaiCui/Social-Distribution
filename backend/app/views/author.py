@@ -747,7 +747,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
             defaults={
                 "username": username,
                 "displayName": author_data.get("displayName", ""),
-                "profileImage": author_data.get("profileImage", ""),
+                "profileImage": author_data.get("profileImage") or "",  # Handle None/null values
                 "host": author_data.get("host", ""),
                 "web": author_data.get("web", ""),
             },
