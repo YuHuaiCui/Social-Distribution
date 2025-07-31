@@ -268,6 +268,19 @@ class AddNodeView(APIView):
                 print(f"Author data missing ID: {author_data}")
                 return False
             
+            # Check if author's host matches the remote node's host
+            author_host = author_data.get("host", "")
+            node_host = node.host.rstrip("/")
+            
+            # Normalize hosts for comparison (remove trailing slashes)
+            author_host_normalized = author_host.rstrip("/")
+            
+            # Check if the author is local to this remote node
+            # The author's host should contain the node's host URL
+            if not author_host_normalized or node_host not in author_host_normalized:
+                print(f"Skipping author from different host: {author_host} (expected to contain {node_host})")
+                return False
+            
             # Try to parse UUID from the URL
             # Remove trailing slash and split
             url_parts = author_url.rstrip("/").split("/")
@@ -293,7 +306,7 @@ class AddNodeView(APIView):
                 existing_author.displayName = author_data.get("displayName", "")
                 existing_author.github_username = self._extract_github_username(author_data.get("github", ""))
                 existing_author.profileImage = author_data.get("profileImage") or ""  # Ensure empty string instead of None
-                existing_author.host = author_data.get("host", node.host)
+                existing_author.host = author_data.get("host", "")
                 existing_author.web = author_data.get("web", "")
                 existing_author.node = node
                 existing_author.is_approved = True  # Remote authors are auto-approved
@@ -308,7 +321,7 @@ class AddNodeView(APIView):
                     displayName=author_data.get("displayName", ""),
                     github_username=self._extract_github_username(author_data.get("github", "")),
                     profileImage=author_data.get("profileImage") or "",  # Ensure empty string instead of None
-                    host=author_data.get("host", node.host),
+                    host=author_data.get("host", ""),
                     web=author_data.get("web", ""),
                     node=node,
                     is_approved=True,  # Remote authors are auto-approved
