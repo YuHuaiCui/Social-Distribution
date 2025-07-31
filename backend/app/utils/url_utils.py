@@ -3,6 +3,8 @@ URL utilities for encoding, decoding, parsing, and validation.
 """
 
 from urllib.parse import quote, unquote, urlparse, urljoin
+import re
+import uuid
 
 
 def percent_encode_url(url):
@@ -112,3 +114,42 @@ def join_urls(base_url, path):
         str: The joined URL
     """
     return urljoin(normalize_url(base_url), path.lstrip('/'))
+
+
+def parse_uuid_from_url(url):
+    """
+    Extract a UUID from a URL.
+    
+    This function searches for a valid UUID pattern in the URL and returns it.
+    Useful for extracting IDs from federated activity URLs.
+    
+    Args:
+        url (str): The URL containing a UUID
+        
+    Returns:
+        str: The extracted UUID string, or None if no valid UUID found
+        
+    Examples:
+        >>> parse_uuid_from_url("http://example.com/api/authors/123e4567-e89b-12d3-a456-426614174000/")
+        '123e4567-e89b-12d3-a456-426614174000'
+        >>> parse_uuid_from_url("http://example.com/entries/550e8400-e29b-41d4-a716-446655440000")
+        '550e8400-e29b-41d4-a716-446655440000'
+    """
+    if not url:
+        return None
+        
+    # UUID regex pattern
+    uuid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+    
+    # Search for UUID in the URL
+    match = re.search(uuid_pattern, url)
+    
+    if match:
+        # Validate it's a proper UUID
+        try:
+            uuid.UUID(match.group(0))
+            return match.group(0)
+        except ValueError:
+            return None
+    
+    return None

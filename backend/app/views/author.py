@@ -8,6 +8,7 @@ from django.http import Http404
 from urllib.parse import unquote
 
 from app.models import Author, Entry, Follow, Like, Comment, Inbox
+from app.utils.url_utils import parse_uuid_from_url
 from app.serializers.author import AuthorSerializer, AuthorListSerializer
 from app.serializers.entry import EntrySerializer
 from app.serializers.follow import FollowSerializer
@@ -724,21 +725,46 @@ class AuthorViewSet(viewsets.ModelViewSet):
             
             # Create or update the entry
             entry_url = activity_data.get('id')
-            entry, _ = Entry.objects.get_or_create(
-                url=entry_url,
-                defaults={
-                    'author': author,
-                    'title': activity_data.get('title', ''),
-                    'description': activity_data.get('description', ''),
-                    'content': activity_data.get('content', ''),
-                    'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
-                    'visibility': activity_data.get('visibility', Entry.PUBLIC),
-                    'source': activity_data.get('source', ''),
-                    'origin': activity_data.get('origin', ''),
-                    'web': activity_data.get('web', ''),
-                    'published': activity_data.get('published'),
-                }
-            )
+            entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
+            
+            # Use UUID if we can parse it, otherwise use the URL
+            entry_id = entry_uuid if entry_uuid else None
+            
+            if entry_id:
+                # If we have a UUID, try to find existing entry by ID first
+                entry, created = Entry.objects.update_or_create(
+                    id=entry_id,
+                    defaults={
+                        'author': author,
+                        'title': activity_data.get('title', ''),
+                        'description': activity_data.get('description', ''),
+                        'content': activity_data.get('content', ''),
+                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                        'visibility': activity_data.get('visibility', Entry.PUBLIC),
+                        'source': activity_data.get('source', ''),
+                        'origin': activity_data.get('origin', ''),
+                        'url': entry_url,
+                        'web': activity_data.get('web', ''),
+                        'published': activity_data.get('published'),
+                    }
+                )
+            else:
+                # Fallback to URL-based creation
+                entry, created = Entry.objects.get_or_create(
+                    url=entry_url,
+                    defaults={
+                        'author': author,
+                        'title': activity_data.get('title', ''),
+                        'description': activity_data.get('description', ''),
+                        'content': activity_data.get('content', ''),
+                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                        'visibility': activity_data.get('visibility', Entry.PUBLIC),
+                        'source': activity_data.get('source', ''),
+                        'origin': activity_data.get('origin', ''),
+                        'web': activity_data.get('web', ''),
+                        'published': activity_data.get('published'),
+                    }
+                )
             
             # Return serialized entry data instead of the model object
             from app.serializers.entry import EntrySerializer
@@ -834,25 +860,55 @@ class AuthorViewSet(viewsets.ModelViewSet):
             entry = None
             comment = None
             
-            try:
-                entry = Entry.objects.get(url=object_url)
-            except Entry.DoesNotExist:
+            # Try to parse UUID from object URL
+            object_uuid = parse_uuid_from_url(object_url) if object_url else None
+            
+            # Try to find by UUID first, then by URL
+            if object_uuid:
                 try:
-                    comment = Comment.objects.get(url=object_url)
-                except Comment.DoesNotExist:
-                    logger.error(f"Like object not found: {object_url}")
-                    return None
+                    entry = Entry.objects.get(id=object_uuid)
+                except Entry.DoesNotExist:
+                    try:
+                        comment = Comment.objects.get(id=object_uuid)
+                    except Comment.DoesNotExist:
+                        pass
+            
+            # Fallback to URL-based lookup if UUID lookup failed
+            if not entry and not comment:
+                try:
+                    entry = Entry.objects.get(url=object_url)
+                except Entry.DoesNotExist:
+                    try:
+                        comment = Comment.objects.get(url=object_url)
+                    except Comment.DoesNotExist:
+                        logger.error(f"Like object not found: {object_url}")
+                        return None
             
             # Create the like
             like_url = activity_data.get('id')
-            like, _ = Like.objects.get_or_create(
-                url=like_url,
-                defaults={
-                    'author': liker,
-                    'entry': entry,
-                    'comment': comment,
-                }
-            )
+            like_uuid = parse_uuid_from_url(like_url) if like_url else None
+            
+            if like_uuid:
+                # If we have a UUID, use it for the like ID
+                like, _ = Like.objects.update_or_create(
+                    id=like_uuid,
+                    defaults={
+                        'author': liker,
+                        'entry': entry,
+                        'comment': comment,
+                        'url': like_url,
+                    }
+                )
+            else:
+                # Fallback to URL-based creation
+                like, _ = Like.objects.get_or_create(
+                    url=like_url,
+                    defaults={
+                        'author': liker,
+                        'entry': entry,
+                        'comment': comment,
+                    }
+                )
             
             # Return serialized like data instead of the model object
             from app.serializers.like import LikeSerializer
@@ -894,23 +950,52 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 logger.error("Comment activity missing entry URL")
                 return None
             
-            try:
-                entry = Entry.objects.get(url=entry_url)
-            except Entry.DoesNotExist:
-                logger.error(f"Comment target entry not found: {entry_url}")
-                return None
+            # Try to parse UUID from entry URL
+            entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
+            
+            # Try to find by UUID first, then by URL
+            entry = None
+            if entry_uuid:
+                try:
+                    entry = Entry.objects.get(id=entry_uuid)
+                except Entry.DoesNotExist:
+                    pass
+            
+            # Fallback to URL-based lookup
+            if not entry:
+                try:
+                    entry = Entry.objects.get(url=entry_url)
+                except Entry.DoesNotExist:
+                    logger.error(f"Comment target entry not found: {entry_url}")
+                    return None
             
             # Create the comment
             comment_url = activity_data.get('id')
-            comment, _ = Comment.objects.get_or_create(
-                url=comment_url,
-                defaults={
-                    'author': commenter,
-                    'entry': entry,
-                    'content': activity_data.get('comment', ''),
-                    'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
-                }
-            )
+            comment_uuid = parse_uuid_from_url(comment_url) if comment_url else None
+            
+            if comment_uuid:
+                # If we have a UUID, use it for the comment ID
+                comment, _ = Comment.objects.update_or_create(
+                    id=comment_uuid,
+                    defaults={
+                        'author': commenter,
+                        'entry': entry,
+                        'content': activity_data.get('comment', ''),
+                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                        'url': comment_url,
+                    }
+                )
+            else:
+                # Fallback to URL-based creation
+                comment, _ = Comment.objects.get_or_create(
+                    url=comment_url,
+                    defaults={
+                        'author': commenter,
+                        'entry': entry,
+                        'content': activity_data.get('comment', ''),
+                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
+                    }
+                )
             
             # Return serialized comment data instead of the model object
             from app.serializers.comment import CommentSerializer
