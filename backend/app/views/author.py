@@ -517,7 +517,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     image_file = request.FILES["profileImage"]
                 elif "profile_image_file" in request.FILES:
                     image_file = request.FILES["profile_image_file"]
-                
+
                 if image_file:
 
                     # Convert uploaded image to base64 data URL (consistent with post images)
@@ -584,16 +584,16 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """
         GET [local]: retrieve the author's inbox contents
         POST [remote]: send an activity to the author's inbox
-        
+
         GET: Returns all activities (entries, follows, likes, comments) in the author's inbox.
              Only the author themselves can access their own inbox.
-        
+
         POST: The inbox receives activities from remote nodes:
         - if the type is "entry" then add that entry to AUTHOR_SERIAL's inbox
         - if the type is "follow" then add that follow to AUTHOR_SERIAL's inbox to approve later
-        - if the type is "Like" then add that like to AUTHOR_SERIAL's inbox  
+        - if the type is "Like" then add that like to AUTHOR_SERIAL's inbox
         - if the type is "comment" then add that comment to AUTHOR_SERIAL's inbox
-        
+
         URL: /api/authors/{AUTHOR_SERIAL}/inbox
         """
         if request.method == "GET":
@@ -605,32 +605,35 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Handle GET requests to retrieve inbox contents."""
         try:
             author = self.get_object()
-            
+
             # Only allow authors to access their own inbox
             if request.user != author:
                 return Response(
-                    {"error": "You can only access your own inbox"}, 
-                    status=status.HTTP_403_FORBIDDEN
+                    {"error": "You can only access your own inbox"},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-            
+
             # Get all inbox items for this author
             from app.serializers.inbox import InboxSerializer
-            inbox_items = Inbox.objects.filter(recipient=author).order_by('-delivered_at')
-            
+
+            inbox_items = Inbox.objects.filter(recipient=author).order_by(
+                "-delivered_at"
+            )
+
             # Apply pagination
             page = self.paginate_queryset(inbox_items)
             if page is not None:
                 serializer = InboxSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
-            
+
             serializer = InboxSerializer(inbox_items, many=True)
             return Response({"type": "inbox", "items": serializer.data})
-            
+
         except Exception as e:
             logger.error(f"Error retrieving inbox for author {pk}: {str(e)}")
             return Response(
-                {"error": "Failed to retrieve inbox"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Failed to retrieve inbox"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def _post_to_inbox(self, request, pk=None):
@@ -638,138 +641,153 @@ class AuthorViewSet(viewsets.ModelViewSet):
         try:
             # Get the recipient author
             author = self.get_object()
-            
+
             # Validate the incoming activity
             serializer = ActivitySerializer(data=request.data)
             if not serializer.is_valid():
                 return Response(
-                    {"errors": serializer.errors}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             activity_data = serializer.validated_data
-            activity_type = activity_data.get('type', '')
-            
+            activity_type = activity_data.get("type", "")
+
             # Process the activity based on its type to get serialized object data
             object_data = None
-            
-            if activity_type == 'entry':
+
+            if activity_type == "entry":
                 object_data = self._process_entry_activity(activity_data, author)
-            elif activity_type == 'follow':
+            elif activity_type == "follow":
                 object_data = self._process_follow_activity(activity_data, author)
-            elif activity_type == 'like':
+            elif activity_type == "like":
                 object_data = self._process_like_activity(activity_data, author)
-            elif activity_type == 'comment':
+            elif activity_type == "comment":
                 object_data = self._process_comment_activity(activity_data, author)
-            
+
             if object_data is None:
                 return Response(
-                    {"error": f"Failed to process {activity_type} activity"}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": f"Failed to process {activity_type} activity"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             # Create inbox entry with object data stored directly
             # Use a simple hash of object data to prevent duplicates
             import hashlib
             import json
-            data_hash = hashlib.md5(json.dumps(object_data, sort_keys=True).encode()).hexdigest()
-            
+
+            data_hash = hashlib.md5(
+                json.dumps(object_data, sort_keys=True).encode()
+            ).hexdigest()
+
             inbox_item, created = Inbox.objects.get_or_create(
                 recipient=author,
                 activity_type=activity_type,
                 object_data=object_data,
-                defaults={
-                    'raw_data': request.data
-                }
+                defaults={"raw_data": request.data},
             )
-            
+
             if created:
                 logger.info(f"Added {activity_type} to {author.username}'s inbox")
-                return Response({"message": "Activity added to inbox"}, status=status.HTTP_201_CREATED)
+                return Response(
+                    {"message": "Activity added to inbox"},
+                    status=status.HTTP_201_CREATED,
+                )
             else:
-                logger.info(f"Duplicate {activity_type} for {author.username}'s inbox - ignored")
-                return Response({"message": "Activity already in inbox"}, status=status.HTTP_200_OK)
-                
+                logger.info(
+                    f"Duplicate {activity_type} for {author.username}'s inbox - ignored"
+                )
+                return Response(
+                    {"message": "Activity already in inbox"}, status=status.HTTP_200_OK
+                )
+
         except Exception as e:
             logger.error(f"Error processing inbox activity: {str(e)}")
             return Response(
-                {"error": "Failed to process inbox activity"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Failed to process inbox activity"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def _process_entry_activity(self, activity_data, recipient):
         """Process an entry activity and create/update the entry per spec, return serialized data."""
         try:
             # Get or create the entry author
-            author_data = activity_data.get('author', {})
-            author_url = author_data.get('id')
-            
+            author_data = activity_data.get("author", {})
+            author_url = author_data.get("id")
+
             if not author_url:
                 logger.error("Entry activity missing author id")
                 return None
-            
+
             # Extract username from displayName or URL
-            display_name = author_data.get('displayName', '')
-            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
-            
+            display_name = author_data.get("displayName", "")
+            username = (
+                display_name.lower().replace(" ", "_") if display_name else "unknown"
+            )
+
             author, _ = Author.objects.get_or_create(
                 url=author_url,
                 defaults={
-                    'username': username,
-                    'displayName': author_data.get('displayName', ''),
-                    'profileImage': author_data.get('profileImage', ''),
-                    'host': author_data.get('host', ''),
-                    'web': author_data.get('web', ''),
-                }
+                    "id": activity_data.get("id"),
+                    "username": username,
+                    "displayName": author_data.get("displayName", ""),
+                    "profileImage": author_data.get("profileImage", ""),
+                    "host": author_data.get("host", ""),
+                    "web": author_data.get("web", ""),
+                },
             )
-            
+
             # Create or update the entry
-            entry_url = activity_data.get('id')
+            entry_url = activity_data.get("id")
             entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
-            
+
             # Use UUID if we can parse it, otherwise use the URL
             entry_id = entry_uuid if entry_uuid else None
-            
+
             if entry_id:
                 # If we have a UUID, try to find existing entry by ID first
                 entry, created = Entry.objects.update_or_create(
                     id=entry_id,
                     defaults={
-                        'author': author,
-                        'title': activity_data.get('title', ''),
-                        'description': activity_data.get('description', ''),
-                        'content': activity_data.get('content', ''),
-                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
-                        'visibility': activity_data.get('visibility', Entry.PUBLIC),
-                        'source': activity_data.get('source', ''),
-                        'origin': activity_data.get('origin', ''),
-                        'url': entry_url,
-                        'web': activity_data.get('web', ''),
-                        'published': activity_data.get('published'),
-                    }
+                        "author": author,
+                        "title": activity_data.get("title", ""),
+                        "description": activity_data.get("description", ""),
+                        "content": activity_data.get("content", ""),
+                        "content_type": activity_data.get(
+                            "contentType", Entry.TEXT_PLAIN
+                        ),
+                        "visibility": activity_data.get("visibility", Entry.PUBLIC),
+                        "source": activity_data.get("source", ""),
+                        "origin": activity_data.get("origin", ""),
+                        "url": entry_url,
+                        "web": activity_data.get("web", ""),
+                        "published": activity_data.get("published"),
+                    },
                 )
             else:
                 # Fallback to URL-based creation
                 entry, created = Entry.objects.get_or_create(
                     url=entry_url,
                     defaults={
-                        'author': author,
-                        'title': activity_data.get('title', ''),
-                        'description': activity_data.get('description', ''),
-                        'content': activity_data.get('content', ''),
-                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
-                        'visibility': activity_data.get('visibility', Entry.PUBLIC),
-                        'source': activity_data.get('source', ''),
-                        'origin': activity_data.get('origin', ''),
-                        'web': activity_data.get('web', ''),
-                        'published': activity_data.get('published'),
-                    }
+                        "author": author,
+                        "title": activity_data.get("title", ""),
+                        "description": activity_data.get("description", ""),
+                        "content": activity_data.get("content", ""),
+                        "content_type": activity_data.get(
+                            "contentType", Entry.TEXT_PLAIN
+                        ),
+                        "visibility": activity_data.get("visibility", Entry.PUBLIC),
+                        "source": activity_data.get("source", ""),
+                        "origin": activity_data.get("origin", ""),
+                        "web": activity_data.get("web", ""),
+                        "published": activity_data.get("published"),
+                    },
                 )
-            
+
             # Return serialized entry data instead of the model object
             from app.serializers.entry import EntrySerializer
+
             return EntrySerializer(entry).data
-            
+
         except Exception as e:
             logger.error(f"Error processing entry activity: {str(e)}")
             return None
@@ -778,48 +796,51 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Process a follow activity and create the follow request per spec, return serialized data."""
         try:
             # Get follower information from actor
-            actor_data = activity_data.get('actor', {})
-            actor_url = actor_data.get('id')
-            
+            actor_data = activity_data.get("actor", {})
+            actor_url = actor_data.get("id")
+
             if not actor_url:
                 logger.error("Follow activity missing actor id")
                 return None
-            
+
             # Extract username from displayName or URL
-            display_name = actor_data.get('displayName', '')
-            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
-            
+            display_name = actor_data.get("displayName", "")
+            username = (
+                display_name.lower().replace(" ", "_") if display_name else "unknown"
+            )
+
             follower, _ = Author.objects.get_or_create(
                 url=actor_url,
                 defaults={
-                    'username': username,
-                    'displayName': actor_data.get('displayName', ''),
-                    'profileImage': actor_data.get('profileImage', ''),
-                    'host': actor_data.get('host', ''),
-                    'web': actor_data.get('web', ''),
-                }
+                    "username": username,
+                    "displayName": actor_data.get("displayName", ""),
+                    "profileImage": actor_data.get("profileImage", ""),
+                    "host": actor_data.get("host", ""),
+                    "web": actor_data.get("web", ""),
+                },
             )
-            
+
             # Verify the object matches the recipient
-            object_data = activity_data.get('object', {})
-            object_url = object_data.get('id')
-            
+            object_data = activity_data.get("object", {})
+            object_url = object_data.get("id")
+
             if object_url != recipient.url:
-                logger.warning(f"Follow object {object_url} doesn't match recipient {recipient.url}")
-            
+                logger.warning(
+                    f"Follow object {object_url} doesn't match recipient {recipient.url}"
+                )
+
             # Create the follow request
             follow, _ = Follow.objects.get_or_create(
                 follower=follower,
                 followed=recipient,
-                defaults={
-                    'status': Follow.REQUESTING
-                }
+                defaults={"status": Follow.REQUESTING},
             )
-            
+
             # Return serialized follow data instead of the model object
             from app.serializers.follow import FollowSerializer
+
             return FollowSerializer(follow).data
-            
+
         except Exception as e:
             logger.error(f"Error processing follow activity: {str(e)}")
             return None
@@ -828,41 +849,43 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Process a like activity and create the like per spec, return serialized data."""
         try:
             # Get liker information
-            author_data = activity_data.get('author', {})
-            author_url = author_data.get('id')
-            
+            author_data = activity_data.get("author", {})
+            author_url = author_data.get("id")
+
             if not author_url:
                 logger.error("Like activity missing author id")
                 return None
-            
+
             # Extract username from displayName or URL
-            display_name = author_data.get('displayName', '')
-            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
-            
+            display_name = author_data.get("displayName", "")
+            username = (
+                display_name.lower().replace(" ", "_") if display_name else "unknown"
+            )
+
             liker, _ = Author.objects.get_or_create(
                 url=author_url,
                 defaults={
-                    'username': username,
-                    'displayName': author_data.get('displayName', ''),
-                    'profileImage': author_data.get('profileImage', ''),
-                    'host': author_data.get('host', ''),
-                    'web': author_data.get('web', ''),
-                }
+                    "username": username,
+                    "displayName": author_data.get("displayName", ""),
+                    "profileImage": author_data.get("profileImage", ""),
+                    "host": author_data.get("host", ""),
+                    "web": author_data.get("web", ""),
+                },
             )
-            
+
             # Get the liked object URL
-            object_url = activity_data.get('object')
+            object_url = activity_data.get("object")
             if not object_url:
                 logger.error("Like activity missing object URL")
                 return None
-            
+
             # Try to find the entry or comment being liked
             entry = None
             comment = None
-            
+
             # Try to parse UUID from object URL
             object_uuid = parse_uuid_from_url(object_url) if object_url else None
-            
+
             # Try to find by UUID first, then by URL
             if object_uuid:
                 try:
@@ -872,7 +895,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                         comment = Comment.objects.get(id=object_uuid)
                     except Comment.DoesNotExist:
                         pass
-            
+
             # Fallback to URL-based lookup if UUID lookup failed
             if not entry and not comment:
                 try:
@@ -883,37 +906,38 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     except Comment.DoesNotExist:
                         logger.error(f"Like object not found: {object_url}")
                         return None
-            
+
             # Create the like
-            like_url = activity_data.get('id')
+            like_url = activity_data.get("id")
             like_uuid = parse_uuid_from_url(like_url) if like_url else None
-            
+
             if like_uuid:
                 # If we have a UUID, use it for the like ID
                 like, _ = Like.objects.update_or_create(
                     id=like_uuid,
                     defaults={
-                        'author': liker,
-                        'entry': entry,
-                        'comment': comment,
-                        'url': like_url,
-                    }
+                        "author": liker,
+                        "entry": entry,
+                        "comment": comment,
+                        "url": like_url,
+                    },
                 )
             else:
                 # Fallback to URL-based creation
                 like, _ = Like.objects.get_or_create(
                     url=like_url,
                     defaults={
-                        'author': liker,
-                        'entry': entry,
-                        'comment': comment,
-                    }
+                        "author": liker,
+                        "entry": entry,
+                        "comment": comment,
+                    },
                 )
-            
+
             # Return serialized like data instead of the model object
             from app.serializers.like import LikeSerializer
+
             return LikeSerializer(like).data
-            
+
         except Exception as e:
             logger.error(f"Error processing like activity: {str(e)}")
             return None
@@ -922,37 +946,39 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Process a comment activity and create the comment per spec, return serialized data."""
         try:
             # Get commenter information
-            author_data = activity_data.get('author', {})
-            author_url = author_data.get('id')
-            
+            author_data = activity_data.get("author", {})
+            author_url = author_data.get("id")
+
             if not author_url:
                 logger.error("Comment activity missing author id")
                 return None
-            
+
             # Extract username from displayName or URL
-            display_name = author_data.get('displayName', '')
-            username = display_name.lower().replace(' ', '_') if display_name else 'unknown'
-            
+            display_name = author_data.get("displayName", "")
+            username = (
+                display_name.lower().replace(" ", "_") if display_name else "unknown"
+            )
+
             commenter, _ = Author.objects.get_or_create(
                 url=author_url,
                 defaults={
-                    'username': username,
-                    'displayName': author_data.get('displayName', ''),
-                    'profileImage': author_data.get('profileImage', ''),
-                    'host': author_data.get('host', ''),
-                    'web': author_data.get('web', ''),
-                }
+                    "username": username,
+                    "displayName": author_data.get("displayName", ""),
+                    "profileImage": author_data.get("profileImage", ""),
+                    "host": author_data.get("host", ""),
+                    "web": author_data.get("web", ""),
+                },
             )
-            
+
             # Get the entry being commented on (from 'entry' field per spec)
-            entry_url = activity_data.get('entry')
+            entry_url = activity_data.get("entry")
             if not entry_url:
                 logger.error("Comment activity missing entry URL")
                 return None
-            
+
             # Try to parse UUID from entry URL
             entry_uuid = parse_uuid_from_url(entry_url) if entry_url else None
-            
+
             # Try to find by UUID first, then by URL
             entry = None
             if entry_uuid:
@@ -960,7 +986,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     entry = Entry.objects.get(id=entry_uuid)
                 except Entry.DoesNotExist:
                     pass
-            
+
             # Fallback to URL-based lookup
             if not entry:
                 try:
@@ -968,39 +994,44 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 except Entry.DoesNotExist:
                     logger.error(f"Comment target entry not found: {entry_url}")
                     return None
-            
+
             # Create the comment
-            comment_url = activity_data.get('id')
+            comment_url = activity_data.get("id")
             comment_uuid = parse_uuid_from_url(comment_url) if comment_url else None
-            
+
             if comment_uuid:
                 # If we have a UUID, use it for the comment ID
                 comment, _ = Comment.objects.update_or_create(
                     id=comment_uuid,
                     defaults={
-                        'author': commenter,
-                        'entry': entry,
-                        'content': activity_data.get('comment', ''),
-                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
-                        'url': comment_url,
-                    }
+                        "author": commenter,
+                        "entry": entry,
+                        "content": activity_data.get("comment", ""),
+                        "content_type": activity_data.get(
+                            "contentType", Entry.TEXT_PLAIN
+                        ),
+                        "url": comment_url,
+                    },
                 )
             else:
                 # Fallback to URL-based creation
                 comment, _ = Comment.objects.get_or_create(
                     url=comment_url,
                     defaults={
-                        'author': commenter,
-                        'entry': entry,
-                        'content': activity_data.get('comment', ''),
-                        'content_type': activity_data.get('contentType', Entry.TEXT_PLAIN),
-                    }
+                        "author": commenter,
+                        "entry": entry,
+                        "content": activity_data.get("comment", ""),
+                        "content_type": activity_data.get(
+                            "contentType", Entry.TEXT_PLAIN
+                        ),
+                    },
                 )
-            
+
             # Return serialized comment data instead of the model object
             from app.serializers.comment import CommentSerializer
+
             return CommentSerializer(comment).data
-            
+
         except Exception as e:
             logger.error(f"Error processing comment activity: {str(e)}")
             return None
@@ -1329,10 +1360,10 @@ class AuthorViewSet(viewsets.ModelViewSet):
     def retrieve_by_fqid(self, request, author_fqid=None):
         """
         GET [remote]: retrieve AUTHOR_FQID's profile
-        
+
         This endpoint retrieves an author by their FQID (Fully Qualified ID),
         which is their complete URL. It supports fetching both local and remote authors.
-        
+
         For remote authors, it attempts to fetch fresh data from the remote node
         and falls back to local cached data if the remote fetch fails.
         """
@@ -1348,7 +1379,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
             # Try to find the author by URL first (handles both local and remote)
             try:
                 author = Author.objects.get(url=decoded_fqid)
-                
+
                 # If this is a remote author, try to fetch fresh data
                 if author.node is not None:
                     import requests
@@ -1356,46 +1387,64 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     import logging
 
                     logger = logging.getLogger(__name__)
-                    
+
                     try:
                         # Make request to the remote author endpoint for fresh data
                         response = requests.get(
                             decoded_fqid,
-                            auth=HTTPBasicAuth(author.node.username, author.node.password),
+                            auth=HTTPBasicAuth(
+                                author.node.username, author.node.password
+                            ),
                             timeout=5,
-                            headers={'Accept': 'application/json'}
+                            headers={"Accept": "application/json"},
                         )
-                        
+
                         if response.status_code == 200:
-                            logger.info(f"Successfully fetched fresh remote author data from {decoded_fqid}")
-                            
+                            logger.info(
+                                f"Successfully fetched fresh remote author data from {decoded_fqid}"
+                            )
+
                             # Update local cached data with fresh remote data
                             try:
                                 remote_data = response.json()
-                                
+
                                 # Update the local author record with fresh data
-                                author.displayName = remote_data.get("displayName", author.displayName)
-                                author.github_username = self._extract_github_username(remote_data.get("github", ""))
-                                author.profileImage = remote_data.get("profileImage", "") or ""
+                                author.displayName = remote_data.get(
+                                    "displayName", author.displayName
+                                )
+                                author.github_username = self._extract_github_username(
+                                    remote_data.get("github", "")
+                                )
+                                author.profileImage = (
+                                    remote_data.get("profileImage", "") or ""
+                                )
                                 author.host = remote_data.get("host", author.host)
                                 author.web = remote_data.get("web", author.web)
                                 author.save()
-                                
-                                logger.info(f"Updated local cache for remote author: {author.displayName}")
-                                
+
+                                logger.info(
+                                    f"Updated local cache for remote author: {author.displayName}"
+                                )
+
                             except Exception as e:
-                                logger.error(f"Failed to update local cache for remote author: {str(e)}")
+                                logger.error(
+                                    f"Failed to update local cache for remote author: {str(e)}"
+                                )
                                 # Continue with returning the remote data even if cache update fails
-                            
+
                             return Response(response.json())
                         else:
-                            logger.warning(f"Failed to fetch fresh remote author data from {decoded_fqid}: {response.status_code}")
+                            logger.warning(
+                                f"Failed to fetch fresh remote author data from {decoded_fqid}: {response.status_code}"
+                            )
                             # Fall back to local cached data
-                            
+
                     except requests.RequestException as e:
-                        logger.error(f"Network error fetching fresh remote author data from {decoded_fqid}: {str(e)}")
+                        logger.error(
+                            f"Network error fetching fresh remote author data from {decoded_fqid}: {str(e)}"
+                        )
                         # Fall back to local cached data
-                
+
                 # Return local cached data (for local authors or as fallback for remote authors)
                 serializer = AuthorSerializer(author, context={"request": request})
                 return Response(serializer.data)
@@ -1416,81 +1465,108 @@ class AuthorViewSet(viewsets.ModelViewSet):
                     # Extract the base host from the FQID
                     parsed_url = urlparse(decoded_fqid)
                     base_host = f"{parsed_url.scheme}://{parsed_url.netloc}"
-                    
+
                     # Find the corresponding node in our database
                     from app.models import Node
+
                     try:
-                        node = Node.objects.get(host__icontains=parsed_url.netloc, is_active=True)
-                    except Node.DoesNotExist:
-                        logger.warning(f"No active node found for host {parsed_url.netloc}")
-                        return Response(
-                            {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                        node = Node.objects.get(
+                            host__icontains=parsed_url.netloc, is_active=True
                         )
-                    
+                    except Node.DoesNotExist:
+                        logger.warning(
+                            f"No active node found for host {parsed_url.netloc}"
+                        )
+                        return Response(
+                            {"error": "Author not found"},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+
                     # Make request to the remote author endpoint
                     response = requests.get(
                         decoded_fqid,
                         auth=HTTPBasicAuth(node.username, node.password),
                         timeout=5,
-                        headers={'Accept': 'application/json'}
+                        headers={"Accept": "application/json"},
                     )
-                    
+
                     if response.status_code == 200:
-                        logger.info(f"Successfully fetched remote author data from {decoded_fqid}")
-                        
+                        logger.info(
+                            f"Successfully fetched remote author data from {decoded_fqid}"
+                        )
+
                         # Save the newly fetched remote author to our local database for caching
                         try:
                             remote_data = response.json()
-                            
+
                             # Extract author ID from the FQID
-                            author_id_str = decoded_fqid.split("/")[-2] if decoded_fqid.endswith("/") else decoded_fqid.split("/")[-1]
-                            
+                            author_id_str = (
+                                decoded_fqid.split("/")[-2]
+                                if decoded_fqid.endswith("/")
+                                else decoded_fqid.split("/")[-1]
+                            )
+
                             # Create new remote author record
                             from app.models import Author
                             import uuid
-                            
+
                             try:
                                 author_id = uuid.UUID(author_id_str)
                             except ValueError:
-                                logger.warning(f"Could not extract valid UUID from FQID: {decoded_fqid}")
+                                logger.warning(
+                                    f"Could not extract valid UUID from FQID: {decoded_fqid}"
+                                )
                                 # Return the data without caching if we can't parse the ID
                                 return Response(response.json())
-                            
+
                             remote_author = Author(
                                 id=author_id,
                                 url=decoded_fqid,
-                                username=remote_data.get("displayName", f"remote_user_{str(author_id)[:8]}"),
+                                username=remote_data.get(
+                                    "displayName", f"remote_user_{str(author_id)[:8]}"
+                                ),
                                 displayName=remote_data.get("displayName", ""),
-                                github_username=self._extract_github_username(remote_data.get("github", "")),
+                                github_username=self._extract_github_username(
+                                    remote_data.get("github", "")
+                                ),
                                 profileImage=remote_data.get("profileImage") or "",
                                 host=remote_data.get("host", base_host),
                                 web=remote_data.get("web", ""),
                                 node=node,
                                 is_approved=True,  # Remote authors are auto-approved
-                                is_active=False,   # Remote authors can't log in
-                                password="!",      # Unusable password
+                                is_active=False,  # Remote authors can't log in
+                                password="!",  # Unusable password
                             )
                             remote_author.save()
-                            logger.info(f"Cached new remote author: {remote_author.displayName}")
-                            
+                            logger.info(
+                                f"Cached new remote author: {remote_author.displayName}"
+                            )
+
                         except Exception as e:
                             logger.error(f"Failed to cache new remote author: {str(e)}")
                             # Continue with returning the remote data even if caching fails
-                        
+
                         return Response(response.json())
                     else:
-                        logger.warning(f"Failed to fetch remote author from {decoded_fqid}: {response.status_code}")
-                        return Response(
-                            {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
+                        logger.warning(
+                            f"Failed to fetch remote author from {decoded_fqid}: {response.status_code}"
                         )
-                        
+                        return Response(
+                            {"error": "Author not found"},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+
                 except requests.RequestException as e:
-                    logger.error(f"Network error fetching remote author from {decoded_fqid}: {str(e)}")
+                    logger.error(
+                        f"Network error fetching remote author from {decoded_fqid}: {str(e)}"
+                    )
                     return Response(
                         {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
                     )
                 except Exception as e:
-                    logger.error(f"Unexpected error fetching remote author from {decoded_fqid}: {str(e)}")
+                    logger.error(
+                        f"Unexpected error fetching remote author from {decoded_fqid}: {str(e)}"
+                    )
                     return Response(
                         {"error": "Author not found"}, status=status.HTTP_404_NOT_FOUND
                     )
@@ -1508,22 +1584,22 @@ class AuthorViewSet(viewsets.ModelViewSet):
     def _extract_github_username(self, github_url):
         """
         Extract GitHub username from GitHub URL.
-        
+
         Args:
             github_url: GitHub URL or username
-            
+
         Returns:
             str: GitHub username or empty string
         """
         if not github_url:
             return ""
-        
+
         # If it's already just a username, return it
         if "/" not in github_url:
             return github_url
-        
+
         # Extract username from GitHub URL
         if "github.com/" in github_url:
             return github_url.split("github.com/")[-1].rstrip("/")
-        
+
         return ""
