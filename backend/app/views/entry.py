@@ -469,11 +469,13 @@ class EntryViewSet(viewsets.ModelViewSet):
         """
         entry = self.get_object()
 
-        # Remote functionality removed
-
         # Perform soft delete by changing visibility
         entry.visibility = Entry.DELETED
         entry.save()
+
+        # Send deleted entry to remote authors' inboxes
+        # This will update the entry on remote nodes to also mark it as DELETED
+        self._send_to_remote_authors(entry)
 
         logger.info(f"Entry {entry.id} soft-deleted by user {request.user}")
         return Response(
