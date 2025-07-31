@@ -25,6 +25,25 @@ class ActivitySerializer(serializers.Serializer):
     """
 
     type = serializers.CharField()
+    
+    # Declare all possible fields to ensure DRF processes them
+    id = serializers.CharField(required=False, allow_blank=True)
+    title = serializers.CharField(required=False, allow_blank=True)
+    content = serializers.CharField(required=False, allow_blank=True)
+    contentType = serializers.CharField(required=False, allow_blank=True)
+    description = serializers.CharField(required=False, allow_blank=True)
+    visibility = serializers.CharField(required=False, allow_blank=True)
+    source = serializers.CharField(required=False, allow_blank=True)
+    origin = serializers.CharField(required=False, allow_blank=True)
+    web = serializers.CharField(required=False, allow_blank=True)
+    published = serializers.CharField(required=False, allow_blank=True)
+    
+    # Nested objects
+    author = serializers.DictField(required=False)
+    actor = serializers.DictField(required=False)
+    object = serializers.JSONField(required=False)  # For likes (string) and follows (dict)
+    entry = serializers.CharField(required=False, allow_blank=True)   # For comments - URL as string
+    comment = serializers.CharField(required=False, allow_blank=True) # For comments - content
 
     def validate_type(self, value):
         """Validate that the activity type is supported."""
