@@ -115,6 +115,96 @@ def send_like_to_remote_inbox(like):
         print(f"DEBUG: Exception in send_like_to_remote_inbox: {str(e)}")
 
 
+def send_unlike_to_remote_inbox(like):
+    """
+    Send unlike (undo like) activity to remote author's inbox.
+    Handles both entry and comment unlikes.
+    """
+    print(f"DEBUG: send_unlike_to_remote_inbox called for like {like.id}")
+    try:
+        # Determine if it's an entry or comment like
+        if like.entry:
+            # Entry like
+            target = like.entry
+            target_author = like.entry.author
+            target_url = like.entry.url
+            print(f"DEBUG: Entry unlike - target: {target.title}, author: {target_author.displayName}")
+        elif like.comment:
+            # Comment like
+            target = like.comment
+            target_author = like.comment.author
+            target_url = like.comment.url
+            print(f"DEBUG: Comment unlike - target: {target.content[:50]}..., author: {target_author.displayName}")
+        else:
+            logger.error("Like has neither entry nor comment")
+            return
+            
+        print(f"DEBUG: Target author is_remote: {target_author.is_remote}, has node: {target_author.node is not None}")
+        
+        # Only send if the target author is remote
+        if not target_author.is_remote or not target_author.node:
+            print(f"DEBUG: Skipping unlike federation - target author is local or has no node")
+            return
+            
+        remote_author = target_author
+        remote_node = remote_author.node
+        
+        print(f"DEBUG: Sending unlike to remote node: {remote_node.name} ({remote_node.host})")
+        
+        # Create undo activity in the spec format
+        undo_data = {
+            "type": "undo",
+            "id": f"{like.author.url}/undo/{like.id}",
+            "actor": {
+                "type": "author",
+                "id": like.author.url,
+                "host": like.author.host,
+                "displayName": like.author.displayName,
+                "web": like.author.web,
+                "profileImage": like.author.profileImage,
+            },
+            "object": {
+                "type": "like",
+                "id": like.url,
+                "author": {
+                    "type": "author",
+                    "id": like.author.url,
+                    "host": like.author.host,
+                    "displayName": like.author.displayName,
+                    "web": like.author.web,
+                    "profileImage": like.author.profileImage,
+                },
+                "object": target_url,
+            },
+            "published": like.created_at.isoformat() if hasattr(like, 'created_at') else None,
+        }
+        
+        # Construct inbox URL with trailing slash
+        inbox_url = f"{remote_node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
+        
+        print(f"DEBUG: Sending unlike to inbox URL: {inbox_url}")
+        print(f"DEBUG: Undo data: {undo_data}")
+        
+        response = requests.post(
+            inbox_url,
+            json=undo_data,
+            auth=HTTPBasicAuth(remote_node.username, remote_node.password),
+            headers={"Content-Type": "application/json"},
+            timeout=10,
+        )
+        
+        print(f"DEBUG: Unlike federation response: {response.status_code} - {response.text}")
+        
+        if response.status_code in [200, 201]:
+            logger.info(f"Successfully sent unlike to {remote_author.displayName}")
+        else:
+            logger.warning(f"Failed to send unlike to {inbox_url}: {response.status_code}")
+            
+    except Exception as e:
+        logger.error(f"Error sending unlike to remote inbox: {str(e)}")
+        print(f"DEBUG: Exception in send_unlike_to_remote_inbox: {str(e)}")
+
+
 class EntryLikeView(APIView):
     """
     API endpoint for managing likes on entries (posts).
@@ -331,6 +421,9 @@ class EntryLikeView(APIView):
         # Find and delete the like if it exists
         like = Like.objects.filter(author=author, entry=entry).first()
         if like:
+            # Send unlike to remote node if entry author is remote
+            send_unlike_to_remote_inbox(like)
+            
             like.delete()
             print(f"[DEBUG] Like deleted successfully: {like.id}")
             return Response({"detail": "Unliked."}, status=status.HTTP_200_OK)
@@ -558,6 +651,9 @@ class CommentLikeView(APIView):
         # Find and delete the like if it exists
         like = Like.objects.filter(author=author, comment=comment).first()
         if like:
+            # Send unlike to remote node if comment author is remote
+            send_unlike_to_remote_inbox(like)
+            
             like.delete()
             return Response({"detail": "Unliked."}, status=status.HTTP_200_OK)
         # If no like found, return success for idempotent behavior
