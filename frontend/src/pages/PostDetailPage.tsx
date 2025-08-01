@@ -387,8 +387,8 @@ export const PostDetailPage: React.FC = () => {
         }
       }
 
-      if (!replyingTo || isRemotePost) {
-        // Add to the comments list (only if not a reply to local comment)
+      if (isRemotePost && !replyingTo) {
+        // Add to the comments list (only for remote posts and not replies)
         setComments((prev) => [newComment as CommentWithReplies, ...prev]);
       }
 

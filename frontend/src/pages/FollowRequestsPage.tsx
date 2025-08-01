@@ -226,7 +226,7 @@ export const FollowRequestsPage: React.FC = () => {
         <div className="space-y-4">
           <AnimatePresence>
             {requests.map((request, index) => {
-              const follower = request.follower;
+              const follower = request.actor;
               const isProcessing = processingIds.has(request.id);
 
               return (
@@ -255,12 +255,12 @@ export const FollowRequestsPage: React.FC = () => {
                             <Avatar
                               imgSrc={
                                 isAuthorObject(follower)
-                                  ? follower.profileImage || follower.profile_image
+                                  ? follower.profileImage
                                   : undefined
                               }
                               alt={
                                 isAuthorObject(follower)
-                                  ? follower.displayName || follower.display_name
+                                  ? follower.displayName
                                   : "User"
                               }
                               size="lg"
@@ -278,7 +278,7 @@ export const FollowRequestsPage: React.FC = () => {
                           >
                             <h3 className="font-semibold text-text-1">
                               {isAuthorObject(follower)
-                                ? follower.display_name
+                                ? follower.displayName
                                 : "Unknown User"}
                             </h3>
                           </Link>

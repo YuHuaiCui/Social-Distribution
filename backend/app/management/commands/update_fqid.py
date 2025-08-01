@@ -2,42 +2,20 @@ from django.core.management.base import BaseCommand
 from app.models import Entry, Author
 
 class Command(BaseCommand):
-    help = "Remove trailing slashes from FQIDs and set fqid field for all remote entries"
+    help = "Set fqid field for all remote entries (database migration for trailing slashes disabled due to foreign key constraints)"
 
     def handle(self, *args, **kwargs):
-        # Fix author URLs with trailing slashes
+        # NOTE: Database migration for author URLs is disabled due to foreign key constraints
+        # The serializer has been updated to handle trailing slashes automatically
         authors_with_slash = Author.objects.filter(url__endswith='/')
         author_count = authors_with_slash.count()
         
-        self.stdout.write(f"Processing {author_count} authors with trailing slashes...")
-        
-        author_updated = 0
-        for author in authors_with_slash:
-            old_url = author.url
-            new_url = old_url.rstrip('/')
-            author.url = new_url
-            author.save(update_fields=['url'])
-            author_updated += 1
-            self.stdout.write(f"Updated author {author.username}: {old_url} -> {new_url}")
-        
-        self.stdout.write(self.style.SUCCESS(f">>> Updated {author_updated} authors to remove trailing slashes."))
-        
-        # Fix host URLs with missing trailing slashes (they should have trailing slashes)
-        authors_missing_host_slash = Author.objects.filter(host__isnull=False).exclude(host__endswith='/')
-        host_count = authors_missing_host_slash.count()
-        
-        self.stdout.write(f"Processing {host_count} authors with host URLs missing trailing slashes...")
-        
-        host_updated = 0
-        for author in authors_missing_host_slash:
-            old_host = author.host
-            new_host = old_host + '/'
-            author.host = new_host
-            author.save(update_fields=['host'])
-            host_updated += 1
-            self.stdout.write(f"Updated author {author.username} host: {old_host} -> {new_host}")
-        
-        self.stdout.write(self.style.SUCCESS(f">>> Updated {host_updated} authors to add trailing slashes to host URLs."))
+        if author_count > 0:
+            self.stdout.write(f"Found {author_count} authors with trailing slashes in database.")
+            self.stdout.write("Database migration skipped due to foreign key constraints.")
+            self.stdout.write("The serializer automatically handles trailing slash removal in API responses.")
+        else:
+            self.stdout.write("No authors with trailing slashes found.")
         
         # Original fqid logic for entries
         updated = 0

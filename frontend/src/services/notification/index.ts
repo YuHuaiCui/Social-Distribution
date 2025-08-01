@@ -95,7 +95,7 @@ export class NotificationService extends BaseApiService {
     const followNotifications = followRequests.map((follow) => ({
       id: `follow-${follow.id}`,
       item_type: "follow" as const,
-      sender: follow.follower,
+      sender: follow.actor,
       content_data: {
         type: "follow",
         data: {
