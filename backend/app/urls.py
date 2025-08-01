@@ -310,6 +310,12 @@ urlpatterns = [
         AuthorViewSet.as_view({"get": "following"}),
         name="author-following-by-fqid",
     ),
+    # Follow by FQID: /api/authors/{AUTHOR_FQID}/follow/
+    path(
+        "authors/<path:author_fqid>/follow/",
+        AuthorViewSet.as_view({"post": "follow", "delete": "follow"}),
+        name="author-follow-by-fqid",
+    ),
     # Author by FQID: /api/authors/{AUTHOR_FQID}/ (most general, should be last)
     path(
         "authors/<path:author_fqid>/",

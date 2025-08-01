@@ -308,7 +308,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         methods=["post", "delete"],
         permission_classes=[permissions.IsAuthenticated],
     )
-    def follow(self, request, pk=None):
+    def follow(self, request, pk=None, author_fqid=None):
         """Follow or unfollow an author"""
         try:
             # Try to get the author normally
@@ -351,7 +351,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
         if request.method == "POST":
             # Check if trying to follow self
-            if current_user.url == author_to_follow.url:
+            if str(current_user.id) == str(author_to_follow.id):
                 return Response(
                     {"error": "Cannot follow yourself"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -379,20 +379,25 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 elif existing_follow.status == Follow.REJECTED:
                     existing_follow.delete()
 
-            # Create follow request
-            follow = Follow.objects.create(
-                follower=current_user,
-                followed=author_to_follow,
-                status=Follow.REQUESTING,
-            )
-
-            # If following a remote author, we would send follow request to remote node
-            # For now, we'll just create the local follow record
-            if author_to_follow.is_remote:
-                print(f"Following remote author {author_to_follow.username} - follow request created locally")
-                # Still create the local follow record, but mark it as requesting
-                follow.status = Follow.REQUESTING
-                follow.save()
+            # Create follow request with appropriate status
+            if author_to_follow.is_remote and author_to_follow.node:
+                # For remote authors, create with ACCEPTED status and send federation request
+                follow = Follow.objects.create(
+                    follower=current_user,
+                    followed=author_to_follow,
+                    status=Follow.ACCEPTED,
+                )
+                
+                # Send follow request to remote author's inbox
+                self._send_follow_request_to_remote(current_user, author_to_follow)
+                print(f"Following remote author {author_to_follow.displayName} - follow request sent to remote inbox")
+            else:
+                # For local authors, create with REQUESTING status (needs approval)
+                follow = Follow.objects.create(
+                    follower=current_user,
+                    followed=author_to_follow,
+                    status=Follow.REQUESTING,
+                )
 
             serializer = FollowSerializer(follow)
             return Response(
@@ -1462,6 +1467,52 @@ class AuthorViewSet(viewsets.ModelViewSet):
             {"success": True, "follow": serializer.data},
             status=status.HTTP_201_CREATED,
         )
+
+    def _send_follow_request_to_remote(self, follower, remote_author):
+        """Send follow request to remote author's inbox using ActivityPub format"""
+        import requests
+        from requests.auth import HTTPBasicAuth
+        from django.conf import settings
+
+        try:
+            # Create ActivityPub follow activity
+            follow_activity = {
+                "type": "follow",
+                "actor": {
+                    "id": follower.url or f"{settings.SITE_URL}/api/authors/{follower.id}/",
+                    "displayName": follower.displayName,
+                    "username": follower.username,
+                    "profileImage": follower.profileImage or "",
+                    "host": settings.SITE_URL,
+                    "web": follower.web or f"{settings.SITE_URL}/profile/{follower.id}/",
+                    "github": follower.github_username or "",
+                },
+                "object": {
+                    "id": remote_author.url,
+                    "displayName": remote_author.displayName,
+                    "username": remote_author.username,
+                }
+            }
+
+            # Send to remote author's inbox
+            inbox_url = f"{remote_author.node.host.rstrip('/')}/api/authors/{remote_author.id}/inbox/"
+
+            response = requests.post(
+                inbox_url,
+                json=follow_activity,
+                auth=HTTPBasicAuth(remote_author.node.username, remote_author.node.password),
+                headers={"Content-Type": "application/json"},
+                timeout=10,
+            )
+
+            if response.status_code not in [200, 201, 202]:
+                print(f"Failed to send follow request to remote node: {response.status_code}")
+                print(f"Response: {response.text}")
+            else:
+                print(f"Successfully sent follow request to {remote_author.displayName}")
+                
+        except Exception as e:
+            print(f"Error sending follow request to remote node: {str(e)}")
 
     def _send_follow_to_remote(self, follow, remote_author, node):
         """Send follow request to remote node using compliant format"""
