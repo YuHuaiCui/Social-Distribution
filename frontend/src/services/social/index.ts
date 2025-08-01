@@ -251,12 +251,12 @@ export class SocialService extends BaseApiService {
     // For local authors, we need to use the backend host, not frontend host
     if (!followerIdOrUrl.includes('http')) {
       // This is a local author ID, construct URL with backend host
-      followerUrl = `${window.location.protocol}//${window.location.hostname}:8000/api/authors/${followerIdOrUrl}/`;
+      followerUrl = `${window.location.protocol}//${window.location.hostname}:8000/api/authors/${followerIdOrUrl}`;
     }
     
     if (!followedIdOrUrl.includes('http')) {
       // This is a local author ID, construct URL with backend host
-      followedUrl = `${window.location.protocol}//${window.location.hostname}:8000/api/authors/${followedIdOrUrl}/`;
+      followedUrl = `${window.location.protocol}//${window.location.hostname}:8000/api/authors/${followedIdOrUrl}`;
     }
     
     // Properly encode URLs for query parameters

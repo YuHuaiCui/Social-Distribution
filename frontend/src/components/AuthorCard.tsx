@@ -89,12 +89,11 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         const authorId = extractUUID(author.id);
         
         // Use backend host for URL construction, not frontend host
-        const backendHost = `${window.location.protocol}//${window.location.hostname}:8000`;
         const currentUserUrl =
           currentUser.url ||
-          `${backendHost}/api/authors/${currentUserId}/`;
+          `${currentUser.host}authors/${currentUserId}`;
         const authorUrl =
-          author.url || `${backendHost}/api/authors/${authorId}/`;
+          author.url || `${author.host}authors/${authorId}`;
         const status = await socialService.checkFollowStatus(
           currentUserUrl,
           authorUrl
