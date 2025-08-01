@@ -275,116 +275,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["get"])
-    def followers(self, request, pk=None):
-        """Get all followers of this author (accepted follow requests)"""
-        author = self.get_object()
 
-        # Get all accepted follow relationships where this author is followed
-        follows = Follow.objects.filter(followed=author, status=Follow.ACCEPTED)
-        local_followers = [follow.follower for follow in follows]
-        
-        # For remote authors, also fetch followers from their remote host
-        # IMPORTANT: Only fetch if the author is truly from a different host
-        if author.is_remote and author.node:
-            try:
-                import requests
-                from requests.auth import HTTPBasicAuth
-                from django.conf import settings
-                import urllib.parse
-                
-                # Get the current host info from the request to compare against
-                request_host = request.get_host()
-                current_host_url = f"{request.scheme}://{request_host}"
-                
-                # Parse the remote node's host
-                remote_host_url = author.node.host.rstrip('/')
-                
-                # Check if this is actually a different host
-                is_same_host = (
-                    remote_host_url == current_host_url or
-                    remote_host_url.startswith('http://127.0.0.1') or
-                    remote_host_url.startswith('http://localhost') or
-                    urllib.parse.urlparse(remote_host_url).netloc == request.get_host()
-                )
-                
-                if is_same_host:
-                    print(f"DEBUG: Skipping remote fetch - author {author.displayName} is from same host ({remote_host_url} == {current_host_url})")
-                    # This is actually a local author, skip remote fetching
-                    pass
-                else:
-                    print(f"DEBUG: Author {author.displayName} is truly remote from {remote_host}, fetching followers...")
-                    
-                    # Extract author ID from the author's URL/ID
-                    if author.url:
-                        author_id = author.url.rstrip('/').split('/')[-1]
-                    else:
-                        author_id = str(author.id)
-                    
-                    # Construct the remote followers endpoint
-                    remote_url = f"{author.node.host.rstrip('/')}/api/authors/{author_id}/followers/"
-                    
-                    # Make the request to the remote node
-                    response = requests.get(
-                        remote_url,
-                        auth=HTTPBasicAuth(author.node.username, author.node.password),
-                        timeout=10,
-                    )
-                    
-                    if response.status_code == 200:
-                        remote_data = response.json()
-                        remote_followers_data = remote_data.get("followers", [])
-                        
-                        # Create or update remote followers locally and add them to the list
-                        for follower_data in remote_followers_data:
-                            try:
-                                follower_url = follower_data.get("url") or follower_data.get("id")
-                                if not follower_url:
-                                    continue
-                                    
-                                # Look for existing author by URL (try both normalized and original)
-                                try:
-                                    from app.utils.url_utils import normalize_author_url
-                                    normalized_follower_url = normalize_author_url(follower_url)
-                                    
-                                    # Try normalized URL first
-                                    try:
-                                        existing_follower = Author.objects.get(url=normalized_follower_url)
-                                    except Author.DoesNotExist:
-                                        # Fallback to original URL
-                                        existing_follower = Author.objects.get(url=follower_url)
-                                    
-                                    if existing_follower not in local_followers:
-                                        local_followers.append(existing_follower)
-                                except Author.DoesNotExist:
-                                    # Create a new remote author record
-                                    from app.utils.url_utils import normalize_author_url
-                                    normalized_follower_url = normalize_author_url(follower_url)
-                                    remote_follower = Author.objects.create(
-                                        username=follower_data.get("username", "unknown"),
-                                        displayName=follower_data.get("displayName") or follower_data.get("display_name", "Unknown User"),
-                                        url=normalized_follower_url,
-                                        profile_image=follower_data.get("profileImage") or follower_data.get("profile_image", ""),
-                                        github_username=follower_data.get("github_username", ""),
-                                        node=author.node,
-                                        is_active=True,
-                                        is_approved=True,
-                                    )
-                                    local_followers.append(remote_follower)
-                            except Exception as e:
-                                continue
-                            
-            except Exception as e:
-                # Continue with local followers only
-                pass
-
-        serializer = AuthorListSerializer(
-            local_followers, many=True, context={"request": request}
-        )
-        return Response({"type": "followers", "followers": serializer.data})
-
-    @action(detail=True, methods=["get"])
-    def following(self, request, pk=None):
+    @action(detail=True, methods=["get"], url_path="following")
+    def following(self, request, pk=None, author_fqid=None):
         """Get all users this author is following (accepted follow requests)"""
         author = self.get_object()
 
@@ -1308,7 +1201,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"], url_path="followers")
-    def followers(self, request, pk=None):
+    def followers(self, request, pk=None, author_fqid=None):
         """
         GET [local, remote]: get a list of authors who are AUTHOR_SERIAL's followers
 

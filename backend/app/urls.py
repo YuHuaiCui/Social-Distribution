@@ -298,6 +298,18 @@ urlpatterns = [
         remote_followers,
         name="remote-followers",
     ),
+    # Followers by FQID: /api/authors/{AUTHOR_FQID}/followers/
+    path(
+        "authors/<path:author_fqid>/followers/",
+        AuthorViewSet.as_view({"get": "followers"}),
+        name="author-followers-by-fqid",
+    ),
+    # Following by FQID: /api/authors/{AUTHOR_FQID}/following/
+    path(
+        "authors/<path:author_fqid>/following/",
+        AuthorViewSet.as_view({"get": "following"}),
+        name="author-following-by-fqid",
+    ),
     # Author by FQID: /api/authors/{AUTHOR_FQID}/ (most general, should be last)
     path(
         "authors/<path:author_fqid>/",
