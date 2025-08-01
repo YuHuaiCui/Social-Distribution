@@ -139,6 +139,17 @@ class AddNodeView(APIView):
 
             url_validator(host)
 
+            # Check if trying to add self as a remote node
+            from django.conf import settings
+            current_host = settings.SITE_URL.rstrip('/')
+            normalized_host = host.rstrip('/')
+            
+            if normalized_host == current_host:
+                return Response(
+                    {"error": "Cannot add this node as a remote node (this is the current node)"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             # Check if node already exists
             if Node.objects.filter(host=host).exists():
                 return Response(
