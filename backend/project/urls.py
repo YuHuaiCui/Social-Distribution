@@ -22,7 +22,6 @@ from app.views.frontend import ReactAppView
 
 from django.conf import settings
 from django.conf.urls.static import static
-from app.views.follow import FollowViewSet
 from rest_framework.routers import DefaultRouter
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -31,7 +30,8 @@ from drf_spectacular.views import (
 )
 
 router = DefaultRouter()
-router.register(r"api/follows", FollowViewSet, basename="follow")
+# Follows are now handled by app/urls.py router
+# router.register(r"api/follows", FollowViewSet, basename="follow")
 
 urlpatterns = [
     path("admin/", admin.site.urls),

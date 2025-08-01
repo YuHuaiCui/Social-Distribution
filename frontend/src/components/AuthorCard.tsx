@@ -88,11 +88,13 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
         const currentUserId = extractUUID(currentUser.id);
         const authorId = extractUUID(author.id);
         
+        // Use backend host for URL construction, not frontend host
+        const backendHost = `${window.location.protocol}//${window.location.hostname}:8000`;
         const currentUserUrl =
           currentUser.url ||
-          `${window.location.origin}/api/authors/${currentUserId}/`;
+          `${backendHost}/api/authors/${currentUserId}/`;
         const authorUrl =
-          author.url || `${window.location.origin}/api/authors/${authorId}/`;
+          author.url || `${backendHost}/api/authors/${authorId}/`;
         const status = await socialService.checkFollowStatus(
           currentUserUrl,
           authorUrl
@@ -177,8 +179,9 @@ export const AuthorCard: React.FC<AuthorCardProps> = ({
           try {
             const currentUserId = extractUUID(currentUser.id);
             const authorId = extractUUID(author.id);
-            const currentUserUrl = currentUser.url || `${window.location.origin}/api/authors/${currentUserId}/`;
-            const authorUrl = author.url || `${window.location.origin}/api/authors/${authorId}/`;
+            const backendHost = `${window.location.protocol}//${window.location.hostname}:8000`;
+            const currentUserUrl = currentUser.url || `${backendHost}/api/authors/${currentUserId}/`;
+            const authorUrl = author.url || `${backendHost}/api/authors/${authorId}/`;
             const updatedStatus = await socialService.checkFollowStatus(currentUserUrl, authorUrl);
             setFollowStatus(updatedStatus.follow_status || "none");
             setIsFollowing(updatedStatus.is_following);

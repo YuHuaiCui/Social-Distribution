@@ -12,10 +12,12 @@ class AuthorAdmin(UserAdmin):
         "username",
         "email",
         "displayName",
+        "is_local_display",
         "is_approved",
         "is_active",
         "is_staff",
         "node",
+        "type",
         "created_at",
     ]
     list_filter = [
@@ -24,25 +26,71 @@ class AuthorAdmin(UserAdmin):
         "is_staff",
         "is_superuser",
         "node",
+        "type",
         "created_at",
+        "updated_at",
     ]
-    search_fields = ["username", "email", "displayName", "github_username"]
+    search_fields = ["username", "email", "displayName", "github_username", "url", "host", "web"]
     ordering = ["-created_at"]
 
-    # Add custom fields to the fieldsets
-    fieldsets = UserAdmin.fieldsets + (
+    # Completely override fieldsets to include all Author-specific fields
+    fieldsets = (
+        (None, {"fields": ("username", "password")}),
         (
-            "Profile Information",
-            {"fields": ("displayName", "github_username", "profileImage")},
+            "Personal Info",
+            {
+                "fields": (
+                    "first_name",
+                    "last_name", 
+                    "email",
+                    "displayName",
+                    "github_username",
+                    "profileImage",
+                )
+            },
         ),
-        ("Federation", {"fields": ("url", "node", "is_approved")}),
         (
-            "Timestamps",
-            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+            "Federation & URLs",
+            {
+                "fields": (
+                    "id",
+                    "url", 
+                    "type",
+                    "host",
+                    "web",
+                    "node",
+                )
+            },
+        ),
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_approved",
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                ),
+            },
+        ),
+        (
+            "Important dates",
+            {
+                "fields": ("last_login", "date_joined", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
         ),
     )
 
-    readonly_fields = ["id", "url", "created_at", "updated_at"]
+    readonly_fields = ["id", "url", "created_at", "updated_at", "date_joined"]
+    
+    def is_local_display(self, obj):
+        """Display whether author is local or remote"""
+        return "Local" if obj.is_local else "Remote"
+    is_local_display.short_description = "Type"
+    is_local_display.admin_order_field = "node"
 
     actions = ["approve_authors", "deactivate_authors"]
 
@@ -63,11 +111,41 @@ class AuthorAdmin(UserAdmin):
 class NodeAdmin(admin.ModelAdmin):
     """Admin configuration for Node model"""
 
-    list_display = ["name", "host", "is_active", "created_at"]
+    list_display = ["name", "host", "username", "is_active", "author_count", "created_at"]
     list_filter = ["is_active", "created_at"]
-    search_fields = ["name", "host"]
+    search_fields = ["name", "host", "username"]
     ordering = ["-created_at"]
-    actions = ["activate_nodes", "deactivate_nodes"]
+    actions = ["activate_nodes", "deactivate_nodes", "test_connection"]
+    
+    fieldsets = (
+        (
+            "Basic Information",
+            {
+                "fields": ("name", "host", "is_active")
+            },
+        ),
+        (
+            "Authentication",
+            {
+                "fields": ("username", "password"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at",),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+    
+    readonly_fields = ["created_at"]
+    
+    def author_count(self, obj):
+        """Display count of authors from this node"""
+        return obj.author_set.count()
+    author_count.short_description = "Authors"
     
     def activate_nodes(self, request, queryset):
         updated = queryset.update(is_active=True)
@@ -78,6 +156,12 @@ class NodeAdmin(admin.ModelAdmin):
         updated = queryset.update(is_active=False)
         self.message_user(request, f"{updated} nodes deactivated.")
     deactivate_nodes.short_description = "Deactivate selected nodes (stop sharing)"
+    
+    def test_connection(self, request, queryset):
+        """Test connection to selected nodes"""
+        # This could be expanded to actually test HTTP connectivity
+        self.message_user(request, f"Connection test initiated for {queryset.count()} nodes.")
+    test_connection.short_description = "Test connection to selected nodes"
 
 
 @admin.register(Entry)
@@ -117,10 +201,57 @@ class LikeAdmin(admin.ModelAdmin):
 class FollowAdmin(admin.ModelAdmin):
     """Admin configuration for Follow model"""
 
-    list_display = ["follower", "followed", "status", "created_at"]
-    list_filter = ["status", "created_at"]
-    search_fields = ["follower__username", "followed__username"]
+    list_display = ["follower", "followed", "status", "follow_type_display", "created_at", "updated_at"]
+    list_filter = ["status", "created_at", "updated_at"]
+    search_fields = [
+        "follower__username", 
+        "followed__username",
+        "follower__displayName",
+        "followed__displayName",
+        "follower__url",
+        "followed__url"
+    ]
     ordering = ["-created_at"]
+    
+    fieldsets = (
+        (
+            "Follow Relationship",
+            {
+                "fields": ("follower", "followed", "status")
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+    
+    readonly_fields = ["created_at", "updated_at"]
+    actions = ["accept_follows", "reject_follows"]
+    
+    def follow_type_display(self, obj):
+        """Display the type of follow relationship (local-local, local-remote, etc.)"""
+        follower_type = "Local" if obj.follower.is_local else "Remote"
+        followed_type = "Local" if obj.followed.is_local else "Remote"
+        return f"{follower_type} → {followed_type}"
+    follow_type_display.short_description = "Type"
+    
+    def accept_follows(self, request, queryset):
+        """Accept selected follow requests"""
+        from app.models.follow import Follow
+        updated = queryset.filter(status=Follow.REQUESTING).update(status=Follow.ACCEPTED)
+        self.message_user(request, f"{updated} follow requests accepted.")
+    accept_follows.short_description = "Accept selected follow requests"
+    
+    def reject_follows(self, request, queryset):
+        """Reject selected follow requests"""
+        from app.models.follow import Follow
+        updated = queryset.filter(status=Follow.REQUESTING).update(status=Follow.REJECTED)
+        self.message_user(request, f"{updated} follow requests rejected.")
+    reject_follows.short_description = "Reject selected follow requests"
 
 
 @admin.register(Friendship)

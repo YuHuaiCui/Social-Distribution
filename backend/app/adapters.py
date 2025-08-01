@@ -91,7 +91,7 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
         
         # Ensure URL is set for local authors
         if not user.url and not user.node:
-            user.url = f"{settings.SITE_URL}/api/authors/{user.id}/"
+            user.url = f"{settings.SITE_URL}/api/authors/{user.id}"
             user.save(update_fields=['url'])
         
         return user

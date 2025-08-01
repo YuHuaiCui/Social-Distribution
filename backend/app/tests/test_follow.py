@@ -16,7 +16,7 @@ class FollowTest(TestCase):
             username="userA",
             password="pass123",
             displayName="User A",
-            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
+            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}",
             is_approved=True,
         )
 
@@ -24,7 +24,7 @@ class FollowTest(TestCase):
             username="userB",
             password="pass123",
             displayName="User B",
-            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
+            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}",
             is_approved=True,
         )
 
@@ -32,7 +32,7 @@ class FollowTest(TestCase):
             username="userC",
             password="pass123",
             displayName="User C",
-            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
+            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}",
             is_approved=True,
         )
 
@@ -73,7 +73,7 @@ class FollowTest(TestCase):
         self.client.force_authenticate(user=self.author_a)
         response = self.client.post(
             "/api/follows/",
-            {"followed": f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/"},
+            {"followed": f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}"},
             format="json",
         )
         self.assertEqual(response.status_code, 500)
@@ -189,7 +189,7 @@ class FollowTest(TestCase):
                 username=f"follower{i}",
                 password="pass123",
                 displayName=f"Follower {i}",
-                url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
+                url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}",
                 is_approved=True,
             )
             Follow.objects.create(

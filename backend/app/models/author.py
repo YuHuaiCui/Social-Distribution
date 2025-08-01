@@ -214,7 +214,7 @@ class Author(AbstractUser):
 
             # Generate canonical API URL if not set
             if not self.url:
-                self.url = f"{settings.SITE_URL}/api/authors/{self.id}/"
+                self.url = f"{settings.SITE_URL}/api/authors/{self.id}"
                 update_fields.append("url")
 
             # Generate API host URL if not set

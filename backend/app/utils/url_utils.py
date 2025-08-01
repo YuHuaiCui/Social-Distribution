@@ -146,12 +146,10 @@ def normalize_author_url(url):
         else:
             netloc = f"{parsed.username}@{netloc}"
     
-    # Normalize path - ensure trailing slash for author URLs
+    # Normalize path - remove trailing slash for author URLs
     path = parsed.path.rstrip('/')
-    if path and not path.endswith('.html'):  # Don't add slash to file extensions
-        path += '/'
-    elif not path:
-        path = '/'
+    if not path:
+        path = ''
     
     # Reconstruct the URL
     normalized = f"{scheme}://{netloc}{path}"

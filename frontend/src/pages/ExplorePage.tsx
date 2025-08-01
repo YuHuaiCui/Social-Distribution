@@ -130,12 +130,13 @@ export const ExplorePage: React.FC = () => {
                   return author;
                 }
 
+                const backendHost = `${window.location.protocol}//${window.location.hostname}:8000`;
                 const currentUserUrl =
                   user?.url ||
-                  `${window.location.origin}/api/authors/${user?.id}`;
+                  `${backendHost}/api/authors/${user?.id}`;
                 const authorUrl =
                   author.url ||
-                  `${window.location.origin}/api/authors/${author.id}`;
+                  `${backendHost}/api/authors/${author.id}`;
 
                 const status = await socialService.checkFollowStatus(
                   currentUserUrl,
@@ -221,11 +222,12 @@ export const ExplorePage: React.FC = () => {
       console.log("Current user ID:", currentUserId);
 
       // Check current follow status from backend to ensure accuracy
+      const backendHost = `${window.location.protocol}//${window.location.hostname}:8000`;
       const currentUserUrl =
-        user?.url || `${window.location.origin}/api/authors/${user?.id}`;
+        user?.url || `${backendHost}/api/authors/${user?.id}`;
       const authorUrl =
         authors.find((a) => a.id === authorId)?.url ||
-        `${window.location.origin}/api/authors/${authorId}`;
+        `${backendHost}/api/authors/${authorId}`;
 
       let followStatus;
       try {
@@ -288,11 +290,12 @@ export const ExplorePage: React.FC = () => {
       // Revert optimistic update on error by refetching the author data
       try {
         // Check the actual follow status from backend
+        const backendHost = `${window.location.protocol}//${window.location.hostname}:8000`;
         const currentUserUrl =
-          user?.url || `${window.location.origin}/api/authors/${user?.id}`;
+          user?.url || `${backendHost}/api/authors/${user?.id}`;
         const authorUrl =
           authors.find((a) => a.id === authorId)?.url ||
-          `${window.location.origin}/api/authors/${authorId}`;
+          `${backendHost}/api/authors/${authorId}`;
         const status = await socialService.checkFollowStatus(
           currentUserUrl,
           authorUrl

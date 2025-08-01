@@ -235,17 +235,33 @@ export class SocialService extends BaseApiService {
    * Check follow status between two authors
    */
   async checkFollowStatus(
-    followerId: string,
-    followedId: string
+    followerIdOrUrl: string,
+    followedIdOrUrl: string
   ): Promise<{
     is_following: boolean;
     is_followed_by: boolean;
     is_friends: boolean;
     follow_status?: "requesting" | "accepted" | "rejected" | "none";
   }> {
+    // Convert IDs to proper author URLs using their host field
+    let followerUrl = followerIdOrUrl;
+    let followedUrl = followedIdOrUrl;
+    
+    // If we have IDs instead of URLs, we need to construct proper URLs
+    // For local authors, we need to use the backend host, not frontend host
+    if (!followerIdOrUrl.includes('http')) {
+      // This is a local author ID, construct URL with backend host
+      followerUrl = `${window.location.protocol}//${window.location.hostname}:8000/api/authors/${followerIdOrUrl}/`;
+    }
+    
+    if (!followedIdOrUrl.includes('http')) {
+      // This is a local author ID, construct URL with backend host
+      followedUrl = `${window.location.protocol}//${window.location.hostname}:8000/api/authors/${followedIdOrUrl}/`;
+    }
+    
     // Properly encode URLs for query parameters
-    const encodedFollowerId = encodeURIComponent(followerId);
-    const encodedFollowedId = encodeURIComponent(followedId);
+    const encodedFollowerUrl = encodeURIComponent(followerUrl);
+    const encodedFollowedUrl = encodeURIComponent(followedUrl);
     
     const response = await this.request<{
       follower: string;
@@ -253,7 +269,7 @@ export class SocialService extends BaseApiService {
       status: string;
       created_at?: string;
     }>(
-      `/api/follows/status/?follower_url=${encodedFollowerId}&followed_url=${encodedFollowedId}`
+      `/api/follows/status/?follower_url=${encodedFollowerUrl}&followed_url=${encodedFollowedUrl}`
     );
 
     // Map backend response to frontend expected format

@@ -540,7 +540,7 @@ class NodeConnectivityTest(BaseFederationTestCase):
             email="remote1@remotenode1.com",
             displayName="Remote User 1",
             host=f"{self.federation_server_1.get_base_url()}/api/",
-            url=f"{self.federation_server_1.get_base_url()}/api/authors/remoteuser1/",
+            url=f"{self.federation_server_1.get_base_url()}/api/authors/remoteuser1",
             web=f"{self.federation_server_1.get_base_url()}/authors/remoteuser1",
             node=self.remote_node_1,
             password="testpass123",  # Required field
@@ -553,7 +553,7 @@ class NodeConnectivityTest(BaseFederationTestCase):
             email="remote2@remotenode2.com", 
             displayName="Remote User 2",
             host=f"{self.federation_server_2.get_base_url()}/api/",
-            url=f"{self.federation_server_2.get_base_url()}/api/authors/remoteuser2/",
+            url=f"{self.federation_server_2.get_base_url()}/api/authors/remoteuser2",
             web=f"{self.federation_server_2.get_base_url()}/authors/remoteuser2",
             node=self.remote_node_2,
             password="testpass123",  # Required field
@@ -564,7 +564,7 @@ class NodeConnectivityTest(BaseFederationTestCase):
         # Add author data to the test servers
         self.federation_server_1.add_author("remoteuser1", {
             "type": "author",
-            "id": f"{self.federation_server_1.get_base_url()}/api/authors/remoteuser1/",
+            "id": f"{self.federation_server_1.get_base_url()}/api/authors/remoteuser1",
             "displayName": "Remote User 1 - Live Federation Data",
             "host": f"{self.federation_server_1.get_base_url()}/api/",
             "web": f"{self.federation_server_1.get_base_url()}/authors/remoteuser1",
@@ -574,7 +574,7 @@ class NodeConnectivityTest(BaseFederationTestCase):
         
         self.federation_server_2.add_author("remoteuser2", {
             "type": "author",
-            "id": f"{self.federation_server_2.get_base_url()}/api/authors/remoteuser2/",
+            "id": f"{self.federation_server_2.get_base_url()}/api/authors/remoteuser2",
             "displayName": "Remote User 2 - Live Federation Data",
             "host": f"{self.federation_server_2.get_base_url()}/api/",
             "web": f"{self.federation_server_2.get_base_url()}/authors/remoteuser2",
@@ -714,7 +714,7 @@ class NodeConnectivityTest(BaseFederationTestCase):
         import requests
         
         # Make a direct HTTP request to our test server
-        response = requests.get(f"{self.federation_server_1.get_base_url()}/api/authors/remoteuser1/")
+        response = requests.get(f"{self.federation_server_1.get_base_url()}/api/authors/remoteuser1")
         
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -723,7 +723,7 @@ class NodeConnectivityTest(BaseFederationTestCase):
         self.assertEqual(data["displayName"], "Remote User 1 - Live Federation Data")
         
         # Test that it returns 404 for unknown authors
-        response_404 = requests.get(f"{self.federation_server_1.get_base_url()}/api/authors/unknownuser/")
+        response_404 = requests.get(f"{self.federation_server_1.get_base_url()}/api/authors/unknownuser")
         self.assertEqual(response_404.status_code, 404)
 
 
@@ -757,7 +757,7 @@ class NodeFederationInteractionTest(BaseFederationTestCase):
             email="remote1@fed1.com",
             displayName="Remote Author 1",
             host=f"{self.federation_server_1.get_base_url()}/api/",
-            url=f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1/",
+            url=f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1",
             web=f"{self.federation_server_1.get_base_url()}/authors/remoteauthor1",
             node=self.remote_node_1,
             password="testpass123",
@@ -770,7 +770,7 @@ class NodeFederationInteractionTest(BaseFederationTestCase):
             email="remote2@fed2.com",
             displayName="Remote Author 2",
             host=f"{self.federation_server_2.get_base_url()}/api/",
-            url=f"{self.federation_server_2.get_base_url()}/api/authors/remoteauthor2/",
+            url=f"{self.federation_server_2.get_base_url()}/api/authors/remoteauthor2",
             web=f"{self.federation_server_2.get_base_url()}/authors/remoteauthor2",
             node=self.remote_node_2,
             password="testpass123",
@@ -781,7 +781,7 @@ class NodeFederationInteractionTest(BaseFederationTestCase):
         # Set up federation server responses
         self.federation_server_1.add_author("remoteauthor1", {
             "type": "author",
-            "id": f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1/",
+            "id": f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1",
             "displayName": "Remote Author 1",
             "host": f"{self.federation_server_1.get_base_url()}/api/",
             "web": f"{self.federation_server_1.get_base_url()}/authors/remoteauthor1",
@@ -791,7 +791,7 @@ class NodeFederationInteractionTest(BaseFederationTestCase):
         
         self.federation_server_2.add_author("remoteauthor2", {
             "type": "author", 
-            "id": f"{self.federation_server_2.get_base_url()}/api/authors/remoteauthor2/",
+            "id": f"{self.federation_server_2.get_base_url()}/api/authors/remoteauthor2",
             "displayName": "Remote Author 2",
             "host": f"{self.federation_server_2.get_base_url()}/api/",
             "web": f"{self.federation_server_2.get_base_url()}/authors/remoteauthor2",
@@ -1158,7 +1158,7 @@ class NodeFederationInteractionTest(BaseFederationTestCase):
         self.assertEqual(response.data["host"], expected_host)
         
         # Verify IDs are correctly formed for remote author (required for federation)
-        expected_id = f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1/"
+        expected_id = f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1"
         self.assertIn("id", response.data, "Remote author profile must include ID for federation")
         self.assertEqual(response.data["id"], expected_id)
 
@@ -1168,7 +1168,7 @@ class NodeFederationInteractionTest(BaseFederationTestCase):
         # Update the federation server with new data
         updated_data = {
             "type": "author",
-            "id": f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1/",
+            "id": f"{self.federation_server_1.get_base_url()}/api/authors/remoteauthor1",
             "username": "remoteauthor1",
             "displayName": "Remote Author 1 - Updated",
 
@@ -1335,7 +1335,7 @@ class NodeFederationInteractionTest(BaseFederationTestCase):
             email="unreachable@unreachable.com",
             displayName="Unreachable Author",
             host="http://unreachable-federation.example.com/api/",
-            url="http://unreachable-federation.example.com/api/authors/unreachableauthor/",
+            url="http://unreachable-federation.example.com/api/authors/unreachableauthor",
             web="http://unreachable-federation.example.com/authors/unreachableauthor",
             node=unreachable_node,
             password="testpass123",
@@ -1662,7 +1662,7 @@ class AdvancedFederationTest(BaseFederationTestCase):
             email="advremote@testnode.com",
             displayName="Advanced Remote User",
             host=f"{self.federation_server_1.get_base_url()}/api/",
-            url=f"{self.federation_server_1.get_base_url()}/api/authors/advremoteuser/",
+            url=f"{self.federation_server_1.get_base_url()}/api/authors/advremoteuser",
             web=f"{self.federation_server_1.get_base_url()}/authors/advremoteuser",
             node=self.remote_node,
             password="testpass123",
@@ -1673,7 +1673,7 @@ class AdvancedFederationTest(BaseFederationTestCase):
         # Set up federation server responses
         self.federation_server_1.add_author("advremoteuser", {
             "type": "author",
-            "id": f"{self.federation_server_1.get_base_url()}/api/authors/advremoteuser/",
+            "id": f"{self.federation_server_1.get_base_url()}/api/authors/advremoteuser",
             "displayName": "Advanced Remote User",
             "host": f"{self.federation_server_1.get_base_url()}/api/",
             "web": f"{self.federation_server_1.get_base_url()}/authors/advremoteuser",
@@ -1831,7 +1831,7 @@ class AdvancedFederationTest(BaseFederationTestCase):
             email="special@test.com",
             displayName="Spëcîál Ãuthør 测试",
             host=f"{self.federation_server_1.get_base_url()}/api/",
-            url=f"{self.federation_server_1.get_base_url()}/api/authors/special-üser/",
+            url=f"{self.federation_server_1.get_base_url()}/api/authors/special-üser",
             web=f"{self.federation_server_1.get_base_url()}/authors/special-üser",
             node=self.remote_node,
             password="testpass123",
@@ -1842,7 +1842,7 @@ class AdvancedFederationTest(BaseFederationTestCase):
         # Add to federation server
         self.federation_server_1.add_author("special-üser", {
             "type": "author",
-            "id": f"{self.federation_server_1.get_base_url()}/api/authors/special-üser/",
+            "id": f"{self.federation_server_1.get_base_url()}/api/authors/special-üser",
             "username": "special-üser",
             "displayName": "Spëcîál Ãuthør 测试",
             "host": f"{self.federation_server_1.get_base_url()}/api/",
@@ -1869,7 +1869,7 @@ class AdvancedFederationTest(BaseFederationTestCase):
         # Update federation server data
         updated_data = {
             "type": "author",
-            "id": f"{self.federation_server_1.get_base_url()}/api/authors/advremoteuser/",
+            "id": f"{self.federation_server_1.get_base_url()}/api/authors/advremoteuser",
             "displayName": "Advanced Remote User - Cache Test",
             "host": f"{self.federation_server_1.get_base_url()}/api/",
             "web": f"{self.federation_server_1.get_base_url()}/authors/advremoteuser",
@@ -1910,7 +1910,7 @@ class AdvancedFederationTest(BaseFederationTestCase):
             email="second@remote.com",
             displayName="Second Remote Author",
             host=f"{self.federation_server_1.get_base_url()}/api/",  # Same server for simplicity
-            url=f"{self.federation_server_1.get_base_url()}/api/authors/secondremote/",
+            url=f"{self.federation_server_1.get_base_url()}/api/authors/secondremote",
             web=f"{self.federation_server_1.get_base_url()}/authors/secondremote",
             node=self.remote_node,
             password="testpass123",

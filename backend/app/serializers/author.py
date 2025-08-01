@@ -153,6 +153,9 @@ class AuthorSerializer(serializers.ModelSerializer):
         if instance.node is not None:  # Remote author
             # Use the stored host and web URLs from the remote node
             host_url = instance.host if instance.host else f"{instance.node.host}/api/"
+            # Ensure host_url has trailing slash
+            if host_url and not host_url.endswith('/'):
+                host_url += '/'
             web_url = (
                 instance.web
                 if instance.web
@@ -166,7 +169,7 @@ class AuthorSerializer(serializers.ModelSerializer):
         # CMPUT 404 compliant format - only required fields
         result = {
             "type": "author",
-            "id": instance.url,  # Full URL as ID per spec
+            "id": instance.url.rstrip('/') if instance.url else None,  # Full URL as ID per spec, remove trailing slash
             "host": host_url,
             "displayName": instance.displayName,
             "github": (
@@ -255,6 +258,9 @@ class AuthorListSerializer(serializers.ModelSerializer):
         if instance.node is not None:  # Remote author
             # Use the stored host and web URLs from the remote node
             host_url = instance.host if instance.host else f"{instance.node.host}/api/"
+            # Ensure host_url has trailing slash
+            if host_url and not host_url.endswith('/'):
+                host_url += '/'
             web_url = (
                 instance.web
                 if instance.web
@@ -268,7 +274,7 @@ class AuthorListSerializer(serializers.ModelSerializer):
         # CMPUT 404 compliant format - only required fields
         result = {
             "type": "author",
-            "id": instance.url,  # Full URL as ID per spec
+            "id": instance.url.rstrip('/') if instance.url else None,  # Full URL as ID per spec, remove trailing slash
             "host": host_url,
             "displayName": instance.displayName,
             "github": (

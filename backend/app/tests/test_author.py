@@ -372,14 +372,14 @@ class AuthorAPITest(BaseAPITestCase):
             password="remotepass123",
             displayName="Remote User",
             node=remote_node,
-            url="https://remote.example.com/api/authors/123/",
+            url="https://remote.example.com/api/authors/123",
             is_approved=True,
         )
 
         # Mock the remote fetch to return updated data
         mock_remote_data = {
             "type": "author",
-            "id": "https://remote.example.com/api/authors/123/",
+            "id": "https://remote.example.com/api/authors/123",
             "username": "remoteuser",
             "displayName": "Updated Remote User",  # Different from local cache
             "github": "https://github.com/remoteuser",
@@ -421,7 +421,7 @@ class AuthorAPITest(BaseAPITestCase):
             password="remotepass123",
             displayName="Remote User 2",
             node=remote_node,
-            url="https://remote.example.com/api/authors/456/",
+            url="https://remote.example.com/api/authors/456",
             is_approved=True,
         )
 

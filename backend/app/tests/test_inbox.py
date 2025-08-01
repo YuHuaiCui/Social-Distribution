@@ -16,7 +16,7 @@ class InboxTest(TestCase):
             username="userA",
             password="pass123",
             displayName="User A",
-            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
+            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}",
             is_approved=True,
         )
 
@@ -24,7 +24,7 @@ class InboxTest(TestCase):
             username="userB",
             password="pass123",
             displayName="User B",
-            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
+            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}",
             is_approved=True,
         )
 
@@ -192,7 +192,7 @@ class InboxTest(TestCase):
             username="userC",
             password="pass123",
             displayName="User C",
-            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}/",
+            url=f"{settings.SITE_URL}/api/authors/{uuid.uuid4()}",
             is_approved=True,
         )
 

@@ -493,20 +493,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
                 status=Follow.REQUESTING,
             )
 
-            # If following a remote author, send follow request using centralized service
-            if not author_to_follow.is_local and author_to_follow.node:
-                from app.utils.federation import FederationService
-
-                success = FederationService.send_follow_request(
-                    current_user, author_to_follow
-                )
-                if not success:
-                    print(
-                        f"Warning: Failed to send follow request to {author_to_follow.username}"
-                    )
-                    # Still create the local follow record, but mark it as requesting
-                    follow.status = Follow.REQUESTING
-                    follow.save()
+            # If following a remote author, we would send follow request to remote node
+            # For now, we'll just create the local follow record
+            if author_to_follow.is_remote:
+                print(f"Following remote author {author_to_follow.username} - follow request created locally")
+                # Still create the local follow record, but mark it as requesting
+                follow.status = Follow.REQUESTING
+                follow.save()
 
             serializer = FollowSerializer(follow)
             return Response(

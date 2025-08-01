@@ -202,6 +202,10 @@ class FollowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Decode URL parameters in case they are percent-encoded
+        follower_url = url_utils.percent_decode_url(follower_url)
+        followed_url = url_utils.percent_decode_url(followed_url)
+
         try:
             follower = Author.objects.get(url=follower_url)
             followed = Author.objects.get(url=followed_url)
