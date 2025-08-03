@@ -42,12 +42,12 @@ if os.environ.get("HEROKU_APP_NAME"):
         ]
     )
 
-# Override SITE_URL for production - use HTTPS with Heroku app name
-if os.environ.get("HEROKU_APP_NAME"):
-    SITE_URL = f"https://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com"
-elif not os.environ.get("SITE_URL"):
-    # Default production URL if no environment variable is set
-    SITE_URL = "https://your-app.herokuapp.com"
+# # Override SITE_URL for production - use HTTPS with Heroku app name
+# if os.environ.get("HEROKU_APP_NAME"):
+#     SITE_URL = f"https://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com"
+# elif not os.environ.get("SITE_URL"):
+#     # Default production URL if no environment variable is set
+#     SITE_URL = "https://your-app.herokuapp.com"
 
 # Database
 DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=True)}
