@@ -17,7 +17,7 @@ ALLOWED_HOSTS = [
     "cmp404-black-prod-melrita-66c4dd1f85d5.herokuapp.com",
     "s25-black-yangwang-4d3e16ddc539.herokuapp.com",
     "cmput404-black-prod-70809c3143a8.herokuapp.com",
-    "social-distribution-101-df09f9c1db3e.herokuapp.com"
+    "social-distribution-101-df09f9c1db3e.herokuapp.com",
     os.environ.get("HEROKU_APP_NAME", "") + ".herokuapp.com",
 ]
 
