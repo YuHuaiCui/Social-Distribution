@@ -1,6 +1,8 @@
 """
-Custom middleware for handling cross-origin session cookies in development
+Custom middleware for handling cross-origin session cookies
 """
+
+from django.conf import settings
 
 class CrossOriginSessionMiddleware:
     def __init__(self, get_response):
@@ -9,15 +11,17 @@ class CrossOriginSessionMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         
-        # In development, allow cross-origin session cookies
+        # Handle cross-origin session cookies
         if hasattr(response, 'cookies') and 'sessionid' in response.cookies:
-            # Remove SameSite restriction for development
+            # SameSite=None is required for cross-origin requests
             response.cookies['sessionid']['samesite'] = 'None'
-            response.cookies['sessionid']['secure'] = False
+            # Secure must be True when using SameSite=None and HTTPS
+            response.cookies['sessionid']['secure'] = not settings.DEBUG
             
         if hasattr(response, 'cookies') and 'csrftoken' in response.cookies:
-            # Remove SameSite restriction for CSRF token too
+            # SameSite=None is required for cross-origin requests
             response.cookies['csrftoken']['samesite'] = 'None'
-            response.cookies['csrftoken']['secure'] = False
+            # Secure must be True when using SameSite=None and HTTPS
+            response.cookies['csrftoken']['secure'] = not settings.DEBUG
             
         return response 

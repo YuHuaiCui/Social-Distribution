@@ -42,6 +42,29 @@ if os.environ.get("HEROKU_APP_NAME"):
         ]
     )
 
+# CORS Configuration for authentication with credentials
+CORS_ALLOW_CREDENTIALS = True
+
+# Allow all headers for cross-origin requests
+CORS_ALLOWED_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
+# Additional CORS settings for production
+CORS_EXPOSE_HEADERS = [
+    "content-type",
+    "x-csrftoken",
+    "set-cookie",
+]
+
 # Override SITE_URL for production - use HTTPS with Heroku app name
 if os.environ.get("HEROKU_APP_NAME"):
     SITE_URL = f"https://{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com"
