@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
 import base64
-import base64.binascii
+import binascii
 from app.models import Author
 from app.serializers.author import AuthorSerializer
 
