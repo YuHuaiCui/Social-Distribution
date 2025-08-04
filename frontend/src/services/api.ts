@@ -86,9 +86,20 @@ class ApiService {
 
   // Authentication endpoints
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    // Create Basic Auth header
+    const basicAuth = btoa(`${credentials.username}:${credentials.password}`);
+    
+    // Only send remember_me in request body
+    const requestBody = credentials.remember_me !== undefined 
+      ? { remember_me: credentials.remember_me }
+      : {};
+
     const response = await this.request<any>("/api/auth/login/", {
       method: "POST",
-      body: JSON.stringify(credentials),
+      body: JSON.stringify(requestBody),
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+      },
     });
     return response;
   }

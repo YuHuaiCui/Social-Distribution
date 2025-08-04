@@ -6,8 +6,31 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
+import base64
 from app.models import Author
 from app.serializers.author import AuthorSerializer
+
+
+def parse_basic_auth(request):
+    """
+    Parse HTTP Basic Authentication from Authorization header.
+    
+    Returns:
+        tuple: (username, password) if valid Basic Auth header exists
+        tuple: (None, None) if no valid Basic Auth header
+    """
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Basic '):
+        return None, None
+    
+    try:
+        # Remove 'Basic ' prefix and decode base64
+        encoded_credentials = auth_header[6:]
+        decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':', 1)
+        return username, password
+    except (ValueError, UnicodeDecodeError):
+        return None, None
 
 
 @api_view(["GET", "POST"])
@@ -57,7 +80,8 @@ def signup(request):
     """
     Handle user registration with validation and approval workflow.
 
-    Creates a new user account with the provided information. Users may require
+    Creates a new user account with the provided information. Accepts credentials
+    from either HTTP Basic Authentication header or request body. Users may require
     admin approval before they can log in, depending on the AUTO_APPROVE_NEW_USERS
     setting.
 
@@ -70,7 +94,15 @@ def signup(request):
         201 Created: User created successfully
         400 Bad Request: Validation errors or duplicate data
     """
-    data = request.data
+    # Try to get credentials from Authorization header first
+    auth_username, auth_password = parse_basic_auth(request)
+    
+    data = request.data.copy() if request.data else {}
+    
+    # Use Basic Auth credentials if available, otherwise use request body
+    if auth_username and auth_password:
+        data['username'] = auth_username
+        data['password'] = auth_password
 
     # Validate required fields
     required_fields = ["username", "password", "displayName"]
@@ -126,8 +158,9 @@ def login_view(request):
     """
     Handle user login with authentication and approval checks.
 
-    Authenticates the user credentials and creates a session. Includes
-    security checks for account approval and session timeout configuration.
+    Authenticates the user credentials using HTTP Basic Authentication from
+    Authorization header only. Includes security checks for account approval 
+    and session timeout configuration.
 
     Security features:
     - Validates credentials using Django's authentication backend
@@ -137,16 +170,17 @@ def login_view(request):
 
     Returns:
         200 OK: Login successful with user data
-        400 Bad Request: Missing credentials
+        400 Bad Request: Missing Authorization header with Basic authentication
         401 Unauthorized: Invalid credentials
         403 Forbidden: Account awaiting approval
     """
-    username = request.data.get("username")
-    password = request.data.get("password")
+    # Get credentials from Authorization header only
+    username, password = parse_basic_auth(request)
+    
     remember_me = request.data.get("remember_me", False)
 
     if not username or not password:
-        return Response({"message": "Username and password are required"}, status=400)
+        return Response({"message": "Authorization header with Basic authentication is required"}, status=400)
 
     # Authenticate user credentials
     user = authenticate(request, username=username, password=password)
