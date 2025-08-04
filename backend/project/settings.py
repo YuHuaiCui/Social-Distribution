@@ -69,6 +69,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "project.settings.csrf_exempt_api",  # Custom middleware to exempt API endpoints from CSRF
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "app.authentication.BasicAuthenticationMiddleware",  # Custom basic auth middleware
@@ -133,6 +134,20 @@ CSRF_TRUSTED_ORIGINS = [
 ]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
 CSRF_COOKIE_NAME = "csrftoken"
+
+# Disable referer check for CSRF
+CSRF_COOKIE_HTTPONLY = False
+CSRF_TRUSTED_ORIGINS.extend([
+    "null",  # Allow requests with no referer
+])
+
+# Disable CSRF for API endpoints
+def csrf_exempt_api(get_response):
+    def middleware(request):
+        if request.path.startswith('/api/'):
+            setattr(request, '_dont_enforce_csrf_checks', True)
+        return get_response(request)
+    return middleware
 
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
