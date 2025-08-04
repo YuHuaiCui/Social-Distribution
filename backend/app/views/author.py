@@ -95,6 +95,7 @@ class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
         return has_perm
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class AuthorViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing Author users.
@@ -640,7 +641,6 @@ class AuthorViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=["get", "post"], url_path="inbox")
-    @method_decorator(csrf_exempt)
     def post_to_inbox(self, request, pk=None):
         """
         GET [local]: retrieve the author's inbox contents
