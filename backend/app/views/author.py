@@ -32,28 +32,65 @@ class IsAdminOrOwnerOrReadOnly(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
+        print(f"DEBUG 403: has_permission check for user {request.user} (authenticated: {request.user.is_authenticated})")
+        print(f"DEBUG 403: Method: {request.method}, Action: {getattr(view, 'action', 'unknown')}")
+        print(f"DEBUG 403: Safe methods: {permissions.SAFE_METHODS}")
+        print(f"DEBUG 403: User is_staff: {getattr(request.user, 'is_staff', False)}")
+        
+        # Debug authentication header
+        from app.views.auth import parse_basic_auth
+        auth_username, auth_password = parse_basic_auth(request)
+        print(f"DEBUG 403: Decoded auth header - username: {auth_username}, password: {'*' * len(auth_password) if auth_password else None}")
+        
+        # Debug request body
+        try:
+            print(f"DEBUG 403: Request body: {request.data if hasattr(request, 'data') else 'No data attribute'}")
+        except Exception as e:
+            print(f"DEBUG 403: Error reading request body: {str(e)}")
+        
         # Read permissions are allowed for authenticated users
         if request.method in permissions.SAFE_METHODS:
-            return request.user.is_authenticated
+            has_perm = request.user.is_authenticated
+            print(f"DEBUG 403: Safe method permission result: {has_perm}")
+            if not has_perm:
+                print(f"DEBUG 403: DENIED - User not authenticated for safe method")
+            return has_perm
 
         # For create operations, only admin users
         if view.action == "create":
-            return request.user.is_authenticated and request.user.is_staff
+            has_perm = request.user.is_authenticated and request.user.is_staff
+            print(f"DEBUG 403: Create permission result: {has_perm}")
+            if not has_perm:
+                print(f"DEBUG 403: DENIED - User not authenticated or not staff for create")
+            return has_perm
 
         # For other write operations, we'll check object-level permissions
-        return request.user.is_authenticated
+        has_perm = request.user.is_authenticated
+        print(f"DEBUG 403: Write operation permission result: {has_perm}")
+        if not has_perm:
+            print(f"DEBUG 403: DENIED - User not authenticated for write operation")
+        return has_perm
 
     def has_object_permission(self, request, view, obj):
+        print(f"DEBUG 403: has_object_permission check for user {request.user} on object {obj}")
+        print(f"DEBUG 403: Method: {request.method}, Object ID: {obj.id}, User ID: {getattr(request.user, 'id', None)}")
+        
         # Read permissions for any authenticated user
         if request.method in permissions.SAFE_METHODS:
+            print(f"DEBUG 403: Safe method object permission: True")
             return True
 
         # Admin users can edit any author
         if request.user.is_staff:
+            print(f"DEBUG 403: Admin user object permission: True")
             return True
 
         # Use UUIDs for comparison or convert to strings if needed
-        return str(obj.id) == str(request.user.id)
+        has_perm = str(obj.id) == str(request.user.id)
+        print(f"DEBUG 403: Owner check - obj.id: {obj.id}, user.id: {request.user.id}, result: {has_perm}")
+        if not has_perm:
+            print(f"DEBUG 403: DENIED - User is not owner and not admin")
+        return has_perm
 
 
 class AuthorViewSet(viewsets.ModelViewSet):
@@ -1178,15 +1215,37 @@ class AuthorViewSet(viewsets.ModelViewSet):
             "authors": [...]
         }
         """
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
+        print(f"DEBUG 403: AuthorViewSet.list called by user {request.user}")
+        print(f"DEBUG 403: User authenticated: {request.user.is_authenticated}")
+        print(f"DEBUG 403: User is_staff: {getattr(request.user, 'is_staff', False)}")
+        print(f"DEBUG 403: Request method: {request.method}")
+        print(f"DEBUG 403: Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'None')}")
+        
+        # Debug authentication header parsing
+        from app.views.auth import parse_basic_auth
+        auth_username, auth_password = parse_basic_auth(request)
+        print(f"DEBUG 403: Decoded auth header - username: {auth_username}, password: {'*' * len(auth_password) if auth_password else None}")
+        
+        # Debug request body
+        try:
+            print(f"DEBUG 403: Request body: {request.data if hasattr(request, 'data') else 'No data attribute'}")
+        except Exception as e:
+            print(f"DEBUG 403: Error reading request body: {str(e)}")
+        
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
 
-        if page is not None:
-            serializer = AuthorSerializer(page, many=True, context={"request": request})
-            return self.get_paginated_response(serializer.data)
+            if page is not None:
+                serializer = AuthorSerializer(page, many=True, context={"request": request})
+                return self.get_paginated_response(serializer.data)
 
-        serializer = AuthorSerializer(queryset, many=True, context={"request": request})
-        return Response({"type": "authors", "authors": serializer.data})
+            serializer = AuthorSerializer(queryset, many=True, context={"request": request})
+            return Response({"type": "authors", "authors": serializer.data})
+        except Exception as e:
+            print(f"DEBUG 403: Exception in list method: {str(e)}")
+            print(f"DEBUG 403: Exception type: {type(e)}")
+            raise
 
     def retrieve(self, request, *args, **kwargs):
         """

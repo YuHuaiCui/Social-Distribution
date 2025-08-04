@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
 import base64
+import base64.binascii
 from app.models import Author
 from app.serializers.author import AuthorSerializer
 
@@ -25,11 +26,27 @@ def parse_basic_auth(request):
     
     try:
         # Remove 'Basic ' prefix and decode base64
-        encoded_credentials = auth_header[6:]
+        encoded_credentials = auth_header[6:].strip()
+        
+        # Check if we have any credentials to decode
+        if not encoded_credentials:
+            return None, None
+            
         decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+        
+        # Check if decoded credentials contain a colon separator
+        if ':' not in decoded_credentials:
+            return None, None
+            
+        # Split on first colon only (password may contain colons)
         username, password = decoded_credentials.split(':', 1)
+        
+        # Return None if either username or password is empty
+        if not username or not password:
+            return None, None
+            
         return username, password
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, base64.binascii.Error):
         return None, None
 
 
