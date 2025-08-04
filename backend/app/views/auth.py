@@ -9,6 +9,7 @@ import requests
 import base64
 import binascii
 from app.models import Author
+from app.models.node import Node
 from app.serializers.author import AuthorSerializer
 
 
@@ -247,7 +248,57 @@ def login_view(request):
                 }
             )
     else:
-        return Response({"message": "Invalid username or password"}, status=401)
+        # If regular authentication fails, check node authentication
+        try:
+            node = Node.objects.get(username=username, password=password, is_active=True)
+            
+            # Node authentication successful - create a superuser/staff Author
+            # Check if an Author already exists with this username
+            try:
+                author = Author.objects.get(username=username)
+                # Update existing author to be superuser and staff
+                author.is_superuser = True
+                author.is_staff = True
+                author.is_approved = True
+                author.save()
+            except Author.DoesNotExist:
+                # Create new Author with superuser and staff privileges
+                author = Author.objects.create_user(
+                    username=username,
+                    password=password,
+                    displayName=node.name,
+                    is_superuser=True,
+                    is_staff=True,
+                    is_approved=True,
+                    is_active=True,
+                )
+
+            # Log in the author
+            login(request, author, backend="django.contrib.auth.backends.ModelBackend")
+            
+            # Configure session timeout based on "remember me" preference
+            if remember_me:
+                # Extended session: 2 weeks
+                request.session.set_expiry(1209600)  # 2 weeks in seconds
+            else:
+                # Standard session: 24 hours
+                request.session.set_expiry(86400)  # 24 hours in seconds
+
+            # Debug session information
+            print(f"DEBUG: Node authentication successful for {node.name}")
+            print(f"DEBUG: Session key: {request.session.session_key}")
+            print(f"DEBUG: Session expiry: {request.session.get_expiry_date()}")
+
+            serializer = AuthorSerializer(author)
+            return Response(
+                {
+                    "success": True,
+                    "user": serializer.data,
+                    "message": "Node authentication successful - superuser access granted",
+                }
+            )
+        except Node.DoesNotExist:
+            return Response({"message": "Invalid username or password"}, status=401)
 
 
 @api_view(["POST"])
