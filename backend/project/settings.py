@@ -137,9 +137,6 @@ CSRF_COOKIE_NAME = "csrftoken"
 
 # Disable referer check for CSRF
 CSRF_COOKIE_HTTPONLY = False
-CSRF_TRUSTED_ORIGINS.extend([
-    "null",  # Allow requests with no referer
-])
 
 # Disable CSRF for API endpoints
 def csrf_exempt_api(get_response):
