@@ -1238,7 +1238,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
             if page is not None:
                 serializer = AuthorSerializer(page, many=True, context={"request": request})
-                return self.get_paginated_response(serializer.data)
+                return Response({"type": "authors", "authors": serializer.data})
 
             serializer = AuthorSerializer(queryset, many=True, context={"request": request})
             return Response({"type": "authors", "authors": serializer.data})
