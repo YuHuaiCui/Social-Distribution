@@ -188,6 +188,16 @@ export const SettingsPage: React.FC = () => {
     setIsSaving(true);
     setSaveMessage(null);
 
+    // Validate displayName doesn't contain spaces
+    if (displayName.includes(' ')) {
+      setSaveMessage({
+        type: "error",
+        text: "Display name cannot contain spaces",
+      });
+      setIsSaving(false);
+      return;
+    }
+
     try {
       let updatedUser: Author;
 
@@ -500,7 +510,13 @@ export const SettingsPage: React.FC = () => {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Your display name"
+                    className={displayName.includes(' ') ? 'border-red-500 focus:ring-red-500' : ''}
                   />
+                  {displayName.includes(' ') && (
+                    <p className="mt-1 text-sm text-red-500">
+                      Display name cannot contain spaces
+                    </p>
+                  )}
                 </div>
 
 

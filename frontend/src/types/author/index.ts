@@ -10,7 +10,7 @@ export interface Author {
   host: string; // API host URL for this author's node
   displayName: string; // How the user wants their name displayed
   github: string; // Full GitHub URL or empty string
-  profileImage: string | null; // URL of profile image or null
+  profileImage: string; // URL of profile image or empty string
   web: string; // Frontend URL where profile can be viewed
   
   // Backwards compatibility fields (may be removed in future)

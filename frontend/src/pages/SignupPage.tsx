@@ -42,6 +42,8 @@ export const SignupPage: React.FC = () => {
       newErrors.username = 'Username is required';
     } else if (formData.username.length < 3) {
       newErrors.username = 'Username must be at least 3 characters';
+    } else if (formData.username.includes(' ')) {
+      newErrors.username = 'Username cannot contain spaces';
     }
 
     if (!formData.password) {
@@ -58,6 +60,8 @@ export const SignupPage: React.FC = () => {
 
     if (!formData.displayName.trim()) {
       newErrors.displayName = 'Display name is required';
+    } else if (formData.displayName.includes(' ')) {
+      newErrors.displayName = 'Display name cannot contain spaces';
     }
 
     setErrors(newErrors);
@@ -75,9 +79,8 @@ export const SignupPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Don't send password_confirm to backend
-      const { password_confirm, ...signupData } = formData;
-      await api.signup(signupData);
+      // Backend expects the password_confirm field for validation
+      await api.signup(formData);
       showSuccess('Account created successfully! Redirecting to login...');
       setTimeout(() => {
         navigate('/');

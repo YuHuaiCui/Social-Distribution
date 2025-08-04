@@ -25,7 +25,7 @@ class BaseAPITestCase(APITestCase):
             username="testuser",
             email="test@example.com",
             password="testpass123",
-            displayName="Test User",
+            displayName="TestUser",
             is_approved=True,
         )
 
@@ -33,7 +33,7 @@ class BaseAPITestCase(APITestCase):
             username="anotheruser",
             email="another@example.com",
             password="anotherpass123",
-            displayName="Another User",
+            displayName="AnotherUser",
             is_approved=True,
         )
 
@@ -167,7 +167,7 @@ class AuthorAPITest(BaseAPITestCase):
         # Test authenticated access
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["displayName"], "Test User")
+        self.assertEqual(response.data["displayName"], "TestUser")
 
     def test_author_create(self):
         """Test creating new authors"""
@@ -177,7 +177,7 @@ class AuthorAPITest(BaseAPITestCase):
             "email": "new@example.com",
             "password": "newpass123",
             "password_confirm": "newpass123",
-            "displayName": "New Author",
+            "displayName": "NewAuthor",
             "github_username": "newauthor",
             "location": "Test location",
             "website": "https://test.com",
@@ -195,12 +195,12 @@ class AuthorAPITest(BaseAPITestCase):
         # Test admin creation
         response = self.admin_client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["author"]["displayName"], "New Author")
+        self.assertEqual(response.data["author"]["displayName"], "NewAuthor")
 
         # Verify author was created
         author = Author.objects.get(username="newauthor")
         self.assertTrue(author.check_password("newpass123"))
-        self.assertEqual(author.displayName, "New Author")
+        self.assertEqual(author.displayName, "NewAuthor")
         self.assertEqual(author.github_username, "newauthor")
         # self.assertEqual(author.location, 'Test location') in the model but not in serializer
         # self.assertEqual(author.website, 'https://test.com') in the model but not in serializer
@@ -210,7 +210,7 @@ class AuthorAPITest(BaseAPITestCase):
     def test_author_update(self):
         """Test updating author details"""
         url = reverse("social-distribution:authors-detail", args=[self.regular_user.id])
-        data = {"displayName": "Updated Name"}
+        data = {"displayName": "UpdatedName"}
 
         # Test unauthorized update
         response = self.another_user_client.patch(url, data)
@@ -219,7 +219,7 @@ class AuthorAPITest(BaseAPITestCase):
         # Test self update
         response = self.user_client.patch(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["displayName"], "Updated Name")
+        self.assertEqual(response.data["displayName"], "UpdatedName")
 
         # Test admin update
         response = self.admin_client.patch(url, {"is_approved": True})
@@ -302,13 +302,13 @@ class AuthorAPITest(BaseAPITestCase):
         # Test get profile
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["displayName"], "Test User")
+        self.assertEqual(response.data["displayName"], "TestUser")
 
         # Test update profile
-        data = {"displayName": "Updated Me"}
+        data = {"displayName": "UpdatedMe"}
         response = self.user_client.patch(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["displayName"], "Updated Me")
+        self.assertEqual(response.data["displayName"], "UpdatedMe")
 
         # Test profile image upload
         image_content = b"fake-image-content"
@@ -328,7 +328,7 @@ class AuthorAPITest(BaseAPITestCase):
         # Authenticated user can view other users' profiles
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["displayName"], "Another User")
+        self.assertEqual(response.data["displayName"], "AnotherUser")
         # created_at not included in CMPUT 404 spec format
         self.assertIn("displayName", response.data)
 
@@ -351,7 +351,7 @@ class AuthorAPITest(BaseAPITestCase):
         )
         response = self.user_client.get(own_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["displayName"], "Test User")
+        self.assertEqual(response.data["displayName"], "TestUser")
 
     # @patch("app.utils.remote.RemoteObjectFetcher.fetch_author_by_url")  # Module removed
     def test_remote_author_federation(self):
@@ -370,7 +370,7 @@ class AuthorAPITest(BaseAPITestCase):
             username="remoteuser",
             email="remote@example.com",
             password="remotepass123",
-            displayName="Remote User",
+            displayName="RemoteUser",
             node=remote_node,
             url="https://remote.example.com/api/authors/123",
             is_approved=True,
@@ -419,7 +419,7 @@ class AuthorAPITest(BaseAPITestCase):
             username="remoteuser2",
             email="remote2@example.com",
             password="remotepass123",
-            displayName="Remote User 2",
+            displayName="RemoteUser2",
             node=remote_node,
             url="https://remote.example.com/api/authors/456",
             is_approved=True,
@@ -439,7 +439,7 @@ class AuthorAPITest(BaseAPITestCase):
         # mock_fetch.assert_called_once_with(remote_author.url)
 
         # Verify that the response contains local cached data
-        self.assertEqual(response.data["displayName"], "Remote User 2")
+        self.assertEqual(response.data["displayName"], "RemoteUser2")
 
     def test_local_author_no_federation(self):
         """Test that local authors don't trigger federation calls"""
@@ -459,7 +459,7 @@ class AuthorAPITest(BaseAPITestCase):
         # mock_fetch.assert_not_called()
 
         # Verify that the response contains local data
-        self.assertEqual(response.data["displayName"], "Test User")
+        self.assertEqual(response.data["displayName"], "TestUser")
 
 
 class AuthorModelTest(TestCase):
@@ -471,13 +471,62 @@ class AuthorModelTest(TestCase):
             username="testuser",
             email="test@example.com",
             password="testpassword",
-            displayName="Test User",
+            displayName="TestUser",
         )
 
         self.assertEqual(author.username, "testuser")
         self.assertEqual(author.email, "test@example.com")
-        self.assertEqual(author.displayName, "Test User")
+        self.assertEqual(author.displayName, "TestUser")
         self.assertTrue(author.check_password("testpassword"))
         self.assertTrue(author.is_active)
         self.assertFalse(author.is_staff)
         self.assertFalse(author.is_superuser)
+
+    def test_username_validation_no_spaces(self):
+        """Test that username cannot contain spaces"""
+        from django.core.exceptions import ValidationError
+        
+        author = Author(
+            username="user with spaces",
+            email="test@example.com",
+            password="testpassword",
+            displayName="TestUser",
+        )
+        
+        with self.assertRaises(ValidationError) as cm:
+            author.full_clean()
+        
+        self.assertIn('username', cm.exception.message_dict)
+        self.assertIn('Username cannot contain spaces', str(cm.exception.message_dict['username']))
+
+    def test_displayname_validation_no_spaces(self):
+        """Test that displayName cannot contain spaces"""
+        from django.core.exceptions import ValidationError
+        
+        author = Author(
+            username="testuser",
+            email="test@example.com", 
+            password="testpassword",
+            displayName="Display Name With Spaces",
+        )
+        
+        with self.assertRaises(ValidationError) as cm:
+            author.full_clean()
+        
+        self.assertIn('displayName', cm.exception.message_dict)
+        self.assertIn('Display name cannot contain spaces', str(cm.exception.message_dict['displayName']))
+
+    def test_profileimage_and_github_username_not_null(self):
+        """Test that profileImage and github_username default to empty string, not null"""
+        author = Author.objects.create_user(
+            username="testuser2",
+            email="test2@example.com",
+            password="testpassword",
+            displayName="TestUser2",
+        )
+        
+        # These fields should be empty strings, not None/null
+        self.assertEqual(author.profileImage, "")
+        self.assertEqual(author.github_username, "")
+        self.assertIsNotNone(author.profileImage)
+        self.assertIsNotNone(author.github_username)

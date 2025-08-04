@@ -177,7 +177,7 @@ class AuthorSerializer(serializers.ModelSerializer):
                 if instance.github_username
                 else ""
             ),
-            "profileImage": instance.profileImage or None,
+            "profileImage": instance.profileImage or "",
             "web": web_url,
         }
 
@@ -282,7 +282,7 @@ class AuthorListSerializer(serializers.ModelSerializer):
                 if instance.github_username
                 else ""
             ),
-            "profileImage": instance.profileImage or None,
+            "profileImage": instance.profileImage or "",
             "web": web_url,
         }
 

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
 import uuid
+import re
 
 from .node import Node
 
@@ -63,10 +64,10 @@ class Author(AbstractUser):
     )
 
     # Profile information
-    displayName = models.CharField(max_length=255, blank=True)
-    github_username = models.CharField(max_length=255, blank=True)
+    displayName = models.CharField(max_length=255, blank=True, default="")
+    github_username = models.CharField(max_length=255, blank=True, default="", null=False)
     profileImage = models.TextField(
-        blank=True, help_text="Profile image as data URL or regular URL"
+        blank=True, default="", null=False, help_text="Profile image as data URL or regular URL"
     )
 
     # Federation: null for local authors, set for remote authors
@@ -115,6 +116,14 @@ class Author(AbstractUser):
                 validate_password(self.password, self)
             except ValidationError as e:
                 raise ValidationError({"password": list(e.messages)})
+
+        # Validate that username contains no spaces
+        if self.username and ' ' in self.username:
+            raise ValidationError({"username": "Username cannot contain spaces."})
+
+        # Validate that displayName contains no spaces
+        if self.displayName and ' ' in self.displayName:
+            raise ValidationError({"displayName": "Display name cannot contain spaces."})
 
     def get_friends(self):
         """
