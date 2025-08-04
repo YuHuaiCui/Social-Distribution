@@ -18,6 +18,8 @@ import AuthorProfilePage from "./pages/AuthorProfilePage";
 import LikedPostsPage from "./pages/LikedPostsPage";
 import FollowRequestsPage from "./pages/FollowRequestsPage";
 import DocsPage from "./pages/DocsPage";
+import AboutPage from "./pages/AboutPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import NodeManagementPage from "./pages/NodeManagementPage";
 
 export const routes: RouteObject[] = [
@@ -160,6 +162,14 @@ export const routes: RouteObject[] = [
       {
         path: "/docs",
         element: <DocsPage />,
+      },
+      {
+        path: "/about",
+        element: <AboutPage />,
+      },
+      {
+        path: "/privacy",
+        element: <PrivacyPage />,
       },
     ],
   },
