@@ -576,27 +576,7 @@ export const PostDetailPage: React.FC = () => {
       );
     }
 
-    // For regular image posts with image URL
-    if (contentType === "image/png" || contentType === "image/jpeg") {
-      return (
-        <div className="space-y-4">
-          {post?.image && (
-            <div className="rounded-lg overflow-hidden">
-              <img
-                src={post.image}
-                alt={post?.title}
-                className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
-              />
-            </div>
-          )}
-          {content && content !== "Image post" && (
-            <p className="text-text-1 text-center italic">{content}</p>
-          )}
-        </div>
-      );
-    }
-
-    // Handle all image types that aren't base64
+    // Handle all image types that aren't base64 - unified handling like PostCard
     if (contentType?.startsWith('image/') && !contentType.includes('base64')) {
       return (
         <div className="space-y-4">
