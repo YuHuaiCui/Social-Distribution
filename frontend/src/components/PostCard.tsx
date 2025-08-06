@@ -265,72 +265,46 @@ const PostCardComponent: React.FC<PostCardProps> = ({
   const renderContent = () => {
     const contentType = post.contentType;
     
+    
     // Handle base64 image content types
     if (contentType?.includes('base64') || 
         contentType === 'image/png;base64' || 
         contentType === 'image/jpeg;base64' ||
         contentType === 'application/base64') {
       
-      // Check if this is a remote entry
-      if (isRemoteEntry(post)) {
-        // For remote entries, display the base64 content directly
-        let imageSrc = post.content;
-        
-        // Add data URL prefix if not present
-        if (!imageSrc.startsWith('data:')) {
-          if (contentType === 'image/png;base64' || contentType === 'image/png') {
-            imageSrc = `data:image/png;base64,${imageSrc}`;
-          } else if (contentType === 'image/jpeg;base64' || contentType === 'image/jpeg') {
-            imageSrc = `data:image/jpeg;base64,${imageSrc}`;
-          } else {
-            // Default to PNG for generic base64
-            imageSrc = `data:image/png;base64,${imageSrc}`;
-          }
+      // For both local and remote entries, display the base64 content directly
+      let imageSrc = post.content;
+      
+      // Add data URL prefix if not present
+      if (!imageSrc.startsWith('data:')) {
+        if (contentType === 'image/png;base64' || contentType === 'image/png') {
+          imageSrc = `data:image/png;base64,${imageSrc}`;
+        } else if (contentType === 'image/jpeg;base64' || contentType === 'image/jpeg') {
+          imageSrc = `data:image/jpeg;base64,${imageSrc}`;
+        } else {
+          // Default to PNG for generic base64
+          imageSrc = `data:image/png;base64,${imageSrc}`;
         }
-        
-        return (
-          <div className="mb-4 rounded-lg overflow-hidden">
-            <LoadingImage
-              src={imageSrc}
-              alt={post.title || "Post image"}
-              className="w-full h-auto max-h-96 object-contain rounded-lg"
-              fallback={
-                <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
-                  <FileText size={48} />
-                </div>
-              }
-            />
-            {/* Show description as caption if it exists */}
-            {post.description && (
-              <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
-            )}
-          </div>
-        );
-      } else {
-        // For local entries, use the image API endpoint
-        const authorId = extractUUID(post.author.id);
-        const entryId = extractUUID(post.id);
-        const imageUrl = `/api/authors/${authorId}/entries/${entryId}/image`;
-        
-        return (
-          <div className="mb-4 rounded-lg overflow-hidden">
-            <LoadingImage
-              src={imageUrl}
-              alt={post.title || "Post image"}
-              className="w-full h-auto max-h-96 object-contain rounded-lg"
-              fallback={
-                <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
-                  <FileText size={48} />
-                </div>
-              }
-            />
-            {/* Show description as caption if it exists */}
-            {post.description && (
-              <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
-            )}
-          </div>
-        );
       }
+      
+      return (
+        <div className="mb-4 rounded-lg overflow-hidden">
+          <LoadingImage
+            src={imageSrc}
+            alt={post.title || "Post image"}
+            className="w-full h-auto max-h-96 object-contain rounded-lg"
+            fallback={
+              <div className="w-full h-48 bg-background-2 flex items-center justify-center text-text-2">
+                <FileText size={48} />
+              </div>
+            }
+          />
+          {/* Show description as caption if it exists */}
+          {post.description && (
+            <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
+          )}
+        </div>
+      );
     }
 
     if (contentType === "text/markdown") {
@@ -340,6 +314,11 @@ const PostCardComponent: React.FC<PostCardProps> = ({
           dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
         />
       );
+    }
+
+    // Don't render content as text if it's an image type - it should be handled above
+    if (contentType?.startsWith('image/')) {
+      return null; // Let the legacy image section handle it or it's already handled above
     }
 
     return <p className="text-text-1 whitespace-pre-wrap">{post.content}</p>;
@@ -546,17 +525,24 @@ const PostCardComponent: React.FC<PostCardProps> = ({
             {renderContent()}
           </div>
 
-          {/* Post image if it's an image type (legacy format) */}
-          {(post.contentType === "image/png" ||
-            post.contentType === "image/jpeg") &&
-            post.image && (
+          {/* Unified image handling for all image types */}
+          {post.contentType?.startsWith('image/') && !post.contentType.includes('base64') && (
               <div className="mb-4 rounded-lg overflow-hidden">
                 <LoadingImage
-                  src={`${post.image}?v=${post.updated_at}`}
+                  src={
+                    // Handle different image sources based on content
+                    (post.content && (post.content.startsWith('http://') || post.content.startsWith('https://'))) 
+                      ? post.content  // URL-based image
+                      : (post.image ? `${post.image}?v=${post.updated_at}` : post.content) // File-based image
+                  }
                   alt="Post attachment"
                   className="w-full h-auto max-h-96 object-cover"
                   loaderSize={24}
                 />
+                {/* Show description as caption if it exists */}
+                {post.description && (
+                  <p className="text-text-2 text-sm mt-2 italic">{post.description}</p>
+                )}
               </div>
             )}
 

@@ -7,7 +7,7 @@ import {
   AlertCircle,
   Check,
   Loader2,
-  Plus,
+  Link,
 } from "lucide-react";
 import LoadingImage from "./ui/LoadingImage";
 import { imageService, type ImageUploadResponse } from "../services/image";
@@ -21,11 +21,14 @@ interface UploadedImage {
   error?: string;
   uploaded?: boolean;
   uploadedData?: ImageUploadResponse;
+  isUrl?: boolean; // Track if this is a URL-based image
+  originalUrl?: string; // Store the original URL
 }
 
 interface ImageUploaderProps {
   onImagesChange: (images: File[]) => void;
   onImagesUploaded?: (images: ImageUploadResponse[]) => void;
+  onUrlImagesChange?: (urls: string[]) => void; // New callback for URL images
   maxImages?: number;
   maxSizeInMB?: number;
   acceptedFormats?: string[];
@@ -37,6 +40,7 @@ interface ImageUploaderProps {
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImagesChange,
   onImagesUploaded,
+  onUrlImagesChange,
   maxImages = 4,
   maxSizeInMB = 5,
   acceptedFormats = ["image/jpeg", "image/png", "image/gif", "image/webp"],
@@ -46,6 +50,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 }) => {
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showError } = useToast();
 
@@ -110,6 +116,64 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     },
     [showError]
   );
+
+  const handleUrlSubmit = useCallback(async () => {
+    if (!urlInput.trim()) return;
+
+    // Check if we've reached max images
+    if (images.length >= maxImages) {
+      showError(`Maximum ${maxImages} images allowed`);
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(urlInput);
+    } catch {
+      showError("Please enter a valid URL");
+      return;
+    }
+
+    // Create image from URL
+    const img = new Image();
+    const imageId = `url-${Date.now()}-${urlInput.split('/').pop() || 'image'}`;
+    
+    // Add image with loading state
+    const uploadedImage: UploadedImage = {
+      id: imageId,
+      file: new File([], urlInput.split('/').pop() || 'image', { type: 'image/url' }), // Placeholder file (still needed for UI)
+      preview: urlInput,
+      progress: 0,
+      uploaded: false,
+      isUrl: true, // Mark as URL image
+      originalUrl: urlInput, // Store the original URL
+    };
+
+    setImages((prev) => [...prev, uploadedImage]);
+
+    img.onload = () => {
+      // Image loaded successfully
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageId ? { ...img, progress: 100, uploaded: true } : img
+        )
+      );
+    };
+
+    img.onerror = () => {
+      // Image failed to load
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageId ? { ...img, error: "Failed to load image", progress: 0 } : img
+        )
+      );
+      showError("Failed to load image from URL");
+    };
+
+    img.src = urlInput;
+    setUrlInput("");
+    setShowUrlInput(false);
+  }, [urlInput, images.length, maxImages, showError]);
 
   const handleFiles = useCallback(
     (files: FileList) => {
@@ -229,7 +293,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     const readyImages = uploadToServer
       ? images.filter((img) => img.uploaded)
       : images.filter((img) => !img.error);
-    const readyFiles = readyImages.map((img) => img.file);
+    
+    // Separate file images from URL images
+    const fileImages = readyImages.filter((img) => !img.isUrl);
+    const urlImages = readyImages.filter((img) => img.isUrl);
+    
+    const readyFiles = fileImages.map((img) => img.file);
+    const readyUrls = urlImages.map((img) => img.originalUrl!);
 
     // Only call onImagesChange if the files have actually changed
     const filesChanged =
@@ -241,6 +311,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       onImagesChange(readyFiles);
     }
 
+    // Notify about URL images if callback provided
+    if (onUrlImagesChange && readyUrls.length > 0) {
+      onUrlImagesChange(readyUrls);
+    }
+
     // Also notify about uploaded image data if callback provided
     if (onImagesUploaded && uploadToServer) {
       const uploadedData = readyImages
@@ -250,7 +325,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         onImagesUploaded(uploadedData);
       }
     }
-  }, [images, uploadToServer]); // Remove onImagesChange from dependencies to prevent infinite loops
+  }, [images, uploadToServer, onUrlImagesChange]); // Add onUrlImagesChange to dependencies
 
   return (
     <div className={className}>
@@ -333,20 +408,71 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           ))}
         </AnimatePresence>
 
-        {/* Add More Button */}
-        {images.length < maxImages && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
-            className="aspect-square rounded-lg glass-card-subtle border-2 border-dashed border-border-1 flex flex-col items-center justify-center hover:border-[var(--primary-violet)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus size={24} className="text-text-2 mb-1" />
-            <span className="text-xs text-text-2">Add Image</span>
-          </motion.button>
-        )}
       </div>
+
+      {/* URL Input Section */}
+      {images.length < maxImages && (
+        <div className="mb-4">
+          {!showUrlInput ? (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowUrlInput(true)}
+              disabled={disabled}
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg glass-card-subtle border border-border-1 hover:border-[var(--primary-violet)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <Link size={16} className="text-text-2" />
+              <span className="text-text-2">Add image from URL</span>
+            </motion.button>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex items-center space-x-2"
+            >
+              <div className="flex-1">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="Enter image URL (https://example.com/image.jpg)"
+                  className="w-full px-3 py-2 bg-input-bg border border-border-1 rounded-lg text-text-1 placeholder:text-text-2 focus:ring-2 focus:ring-[var(--primary-violet)] focus:border-transparent transition-all duration-200 text-sm"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleUrlSubmit();
+                    }
+                  }}
+                  autoFocus
+                  disabled={disabled}
+                />
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleUrlSubmit}
+                disabled={disabled || !urlInput.trim()}
+                className="px-4 py-2 bg-[var(--primary-violet)] text-white rounded-lg hover:bg-[var(--primary-purple)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              >
+                Add
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setShowUrlInput(false);
+                  setUrlInput("");
+                }}
+                disabled={disabled}
+                className="p-2 rounded-lg glass-card-subtle hover:bg-glass-low transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={16} className="text-text-2" />
+              </motion.button>
+            </motion.div>
+          )}
+        </div>
+      )}
 
       {/* Drop Zone */}
       <motion.div
@@ -398,7 +524,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <span className="text-[var(--primary-violet)] hover:underline">
               browse
             </span>{" "}
-            to upload
+            to upload, or add from URL above
           </p>
 
           <div className="flex flex-wrap justify-center gap-2 text-xs text-text-2">

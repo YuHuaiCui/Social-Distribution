@@ -540,68 +540,40 @@ export const PostDetailPage: React.FC = () => {
         contentType === 'image/jpeg;base64' ||
         contentType === 'application/base64') {
       
-      // Check if this is a remote entry
-      if (post && isRemoteEntry(post)) {
-        // For remote entries, display the base64 content directly
-        let imageSrc = content;
-        
-        // Add data URL prefix if not present
-        if (!imageSrc.startsWith('data:')) {
-          if (contentType === 'image/png;base64' || contentType === 'image/png') {
-            imageSrc = `data:image/png;base64,${imageSrc}`;
-          } else if (contentType === 'image/jpeg;base64' || contentType === 'image/jpeg') {
-            imageSrc = `data:image/jpeg;base64,${imageSrc}`;
-          } else {
-            // Default to PNG for generic base64
-            imageSrc = `data:image/png;base64,${imageSrc}`;
-          }
+      // For both local and remote entries, display the base64 content directly
+      let imageSrc = content;
+      
+      // Add data URL prefix if not present
+      if (!imageSrc.startsWith('data:')) {
+        if (contentType === 'image/png;base64' || contentType === 'image/png') {
+          imageSrc = `data:image/png;base64,${imageSrc}`;
+        } else if (contentType === 'image/jpeg;base64' || contentType === 'image/jpeg') {
+          imageSrc = `data:image/jpeg;base64,${imageSrc}`;
+        } else {
+          // Default to PNG for generic base64
+          imageSrc = `data:image/png;base64,${imageSrc}`;
         }
-        
-        return (
-          <div className="space-y-4">
-            <div className="rounded-lg overflow-hidden">
-              <LoadingImage
-                src={imageSrc}
-                alt={post?.title || "Post image"}
-                className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
-                fallback={
-                  <div className="w-full h-64 bg-background-2 flex items-center justify-center text-text-2">
-                    <FileText size={64} />
-                  </div>
-                }
-              />
-            </div>
-            {post?.description && (
-              <p className="text-text-1 text-center italic">{post.description}</p>
-            )}
-          </div>
-        );
-      } else {
-        // For local entries, use the image API endpoint
-        const authorId = extractUUID(post?.author?.id || '');
-        const entryId = extractUUID(post?.id || postId || '');
-        const imageUrl = `/api/authors/${authorId}/entries/${entryId}/image`;
-        
-        return (
-          <div className="space-y-4">
-            <div className="rounded-lg overflow-hidden">
-              <LoadingImage
-                src={imageUrl}
-                alt={post?.title || "Post image"}
-                className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
-                fallback={
-                  <div className="w-full h-64 bg-background-2 flex items-center justify-center text-text-2">
-                    <FileText size={64} />
-                  </div>
-                }
-              />
-            </div>
-            {post?.description && (
-              <p className="text-text-1 text-center italic">{post.description}</p>
-            )}
-          </div>
-        );
       }
+      
+      return (
+        <div className="space-y-4">
+          <div className="rounded-lg overflow-hidden">
+            <LoadingImage
+              src={imageSrc}
+              alt={post?.title || "Post image"}
+              className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
+              fallback={
+                <div className="w-full h-64 bg-background-2 flex items-center justify-center text-text-2">
+                  <FileText size={64} />
+                </div>
+              }
+            />
+          </div>
+          {post?.description && (
+            <p className="text-text-1 text-center italic">{post.description}</p>
+          )}
+        </div>
+      );
     }
 
     // For regular image posts with image URL
@@ -624,6 +596,34 @@ export const PostDetailPage: React.FC = () => {
       );
     }
 
+    // Handle all image types that aren't base64
+    if (contentType?.startsWith('image/') && !contentType.includes('base64')) {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-lg overflow-hidden">
+            <LoadingImage
+              src={
+                // Handle different image sources based on content
+                (content && (content.startsWith('http://') || content.startsWith('https://'))) 
+                  ? content  // URL-based image
+                  : (post?.image ? post.image : content) // File-based image or fallback to content
+              }
+              alt={post?.title || "Post image"}
+              className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
+              fallback={
+                <div className="w-full h-64 bg-background-2 flex items-center justify-center text-text-2">
+                  <FileText size={64} />
+                </div>
+              }
+            />
+          </div>
+          {post?.description && (
+            <p className="text-text-1 text-center italic">{post.description}</p>
+          )}
+        </div>
+      );
+    }
+    
     return <p className="text-text-1 whitespace-pre-wrap">{content}</p>;
   };
 

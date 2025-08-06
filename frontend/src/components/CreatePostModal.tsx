@@ -20,7 +20,7 @@ import PrivacySelector from "./PrivacySelector";
 import { useDefaultVisibility, type Visibility } from "../utils/privacy";
 import { usePosts } from "./context/PostsContext";
 
-type ContentType = "text/plain" | "text/markdown" | "image/png" | "image/jpeg" | "image/png;base64" | "image/jpeg;base64" | "application/base64";
+type ContentType = "text/plain" | "text/markdown" | "image";
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -45,10 +45,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
-  const [contentType, setContentType] = useState<ContentType>("text/markdown");
+  const [contentType, setContentType] = useState<ContentType>("text/plain");
   const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [replacingImage, setReplacingImage] = useState(false);
 
   const [expandedSection, setExpandedSection] = useState<
@@ -73,6 +74,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setReplacingImage(false);
       // DO NOT reset images[] here
       setImages([]);
+      setImageUrls([]);
     } else {
       setTitle("");
       setDescription("");
@@ -81,6 +83,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
+      setImageUrls([]);
       setReplacingImage(false);
     }
   }, [editingPost, defaultVisibility]);
@@ -89,6 +92,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const handleImagesChange = useCallback((newImages: File[]) => {
     setImages(newImages);
     setReplacingImage(true); // hide uploader after user picks a file
+  }, []);
+
+  // Handle URL images separately
+  const handleUrlImagesChange = useCallback((newUrls: string[]) => {
+    setImageUrls(newUrls);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,18 +112,18 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       return;
     }
 
-    if (!content.trim() && contentType && !contentType.startsWith("image/")) {
+    if (!content.trim() && contentType !== "image") {
       setError("Please enter some content");
       return;
     }
 
     if (
-      contentType &&
-      contentType.startsWith("image/") &&
+      contentType === "image" &&
       images.length === 0 &&
+      imageUrls.length === 0 &&
       (!editingPost || !editingPost.image)
     ) {
-      setError("Please upload at least one image");
+      setError("Please upload at least one image or provide an image URL");
       return;
     }
 
@@ -123,18 +131,53 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
     setError("");
 
     try {
-      const entryData: CreateEntryData = {
-        title,
-        description, // Use the form description field
-        content: contentType.startsWith("image/")
-          ? content || "Image post" // Use caption for image posts
-          : content,
-        contentType: contentType, // Always use camelCase as per API spec
-        visibility,
-        categories,
-        // Include image file for image posts
-        ...(images.length > 0 && { image: images[0] }),
-      };
+      // Handle URL images vs file images
+      let entryData: CreateEntryData;
+      
+      if (contentType === "image") {
+        if (imageUrls.length > 0) {
+          // URL-based image - put URL in content field
+          entryData = {
+            title,
+            description,
+            content: imageUrls[0], // Put URL in content field
+            contentType: "image/png", // Backend expects image content type
+            visibility,
+            categories,
+          };
+        } else if (images.length > 0) {
+          // File-based image - put file in image field
+          entryData = {
+            title,
+            description,
+            content: content || "Image post", // Use caption for file-based images
+            contentType: "image/png",
+            visibility,
+            categories,
+            image: images[0],
+          };
+        } else {
+          // Existing image case (for editing)
+          entryData = {
+            title,
+            description,
+            content: content || "Image post",
+            contentType: "image/png",
+            visibility,
+            categories,
+          };
+        }
+      } else {
+        // Text-based content
+        entryData = {
+          title,
+          description,
+          content,
+          contentType,
+          visibility,
+          categories,
+        };
+      }
       if (editingPost) {
         // Update existing post
         if (!editingPost.id) {
@@ -155,6 +198,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         triggerRefresh(); // Trigger posts refresh
         setReplacingImage(false);
         setImages([]); // clear images
+        setImageUrls([]); // clear image URLs
         setContent(updatedPost.content);
         setContentType((updatedPost.contentType || "text/markdown") as ContentType);
         setTitle(updatedPost.title);
@@ -192,6 +236,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setVisibility(defaultVisibility);
       setCategories([]);
       setImages([]);
+      setImageUrls([]);
       setReplacingImage(false);
       setError("");
       setExpandedSection("content");
@@ -201,12 +246,9 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   };
 
   const contentTypeOptions = [
-    { value: "text/markdown", label: "Markdown", icon: FileText },
     { value: "text/plain", label: "Plain Text", icon: FileText },
-    { value: "image/png", label: "Image (Legacy)", icon: ImageIcon },
-    { value: "image/png;base64", label: "PNG Image", icon: ImageIcon },
-    { value: "image/jpeg;base64", label: "JPEG Image", icon: ImageIcon },
-    { value: "application/base64", label: "Base64 Data", icon: ImageIcon },
+    { value: "text/markdown", label: "Markdown", icon: FileText },
+    { value: "image", label: "Image", icon: ImageIcon },
   ];
 
   return (
@@ -312,10 +354,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                 <div className="flex items-center space-x-2">
                   {contentTypeOptions.map((option) => {
                     const Icon = option.icon;
-                    const isSelected =
-                      option.value === "image/png"
-                        ? contentType?.startsWith("image/")
-                        : contentType === option.value;
+                    const isSelected = contentType === option.value;
 
                     return (
                       <motion.button
@@ -323,13 +362,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                         type="button"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          const value =
-                            option.value === "image/png"
-                              ? "image/png"
-                              : option.value;
-                          setContentType(value as ContentType);
-                        }}
+                        onClick={() => setContentType(option.value as ContentType)}
                         className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                           isSelected
                             ? "bg-[var(--primary-violet)] text-white"
@@ -378,13 +411,14 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                           transition={{ duration: 0.2 }}
                           className="px-4 pb-4"
                         >
-                          {contentType && contentType.startsWith("image/") ? (
+                          {contentType === "image" ? (
                             <div>
                               {replacingImage ||
                               images.length > 0 ||
                               !editingPost?.image ? (
                                 <ImageUploader
                                   onImagesChange={handleImagesChange}
+                                  onUrlImagesChange={handleUrlImagesChange}
                                   maxImages={1}
                                   className="mt-3"
                                   uploadToServer={false}
@@ -410,7 +444,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
                                   </button>
                                 </div>
                               )}
-                              {(images.length > 0 || editingPost?.image) && (
+                              {(images.length > 0 || imageUrls.length > 0 || editingPost?.image) && (
                                 <div className="mt-3">
                                   <label className="block text-sm font-medium text-text-2 mb-2">
                                     Image Caption

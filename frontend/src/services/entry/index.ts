@@ -75,6 +75,11 @@ export class EntryService extends BaseApiService {
       return this.createImageEntry(data);
     }
 
+    // Check if this is an image URL (content starts with http and contentType is image)
+    if (data.contentType?.startsWith("image/") && data.content?.startsWith(("http://", "https://"))) {
+      return this.createImageUrlEntry(data);
+    }
+
     // Prepare data for API - convert to API format
     const apiData = {
       type: "entry",
@@ -114,6 +119,27 @@ export class EntryService extends BaseApiService {
     };
 
     return this.request<Entry>(`/api/authors/${authorId}/entries/`, {
+      method: "POST",
+      body: JSON.stringify(apiData),
+    });
+  }
+
+  /**
+   * Handle image URL entry creation
+   */
+  private async createImageUrlEntry(data: CreateEntryData): Promise<Entry> {
+    const apiData = {
+      type: "entry",
+      title: data.title,
+      description: data.description || "",
+      content: data.content, // This is the URL
+      contentType: data.contentType, // e.g., "image/png;base64"
+      visibility: data.visibility,
+      categories: data.categories || [],
+      // published field will be set by the server if not provided
+    };
+
+    return this.request<Entry>("/api/entries/", {
       method: "POST",
       body: JSON.stringify(apiData),
     });

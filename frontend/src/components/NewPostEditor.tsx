@@ -37,6 +37,7 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState('');
 
   // Update visibility when default changes
   React.useEffect(() => {
@@ -79,9 +80,23 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
     }
   };
 
+  const handleImageUrlChange = (url: string) => {
+    setImageUrl(url);
+    if (url.trim()) {
+      setImagePreview(url);
+      setImageFile(null); // Clear file if URL is provided
+      setContentType('image');
+    } else {
+      if (!imageFile) {
+        setImagePreview(null);
+      }
+    }
+  };
+
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    setImageUrl('');
     if (contentType === 'image') {
       setContentType('text/plain');
     }
@@ -95,9 +110,9 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
     // For image posts, content can be empty (will use image)
     if (contentType !== 'image' && !content.trim()) return;
     
-    // For image posts, require an image file
-    if (contentType === 'image' && !imageFile) {
-      alert('Please select an image for image posts');
+    // For image posts, require either an image file or URL
+    if (contentType === 'image' && !imageFile && !imageUrl.trim()) {
+      alert('Please select an image file or enter an image URL');
       return;
     }
 
@@ -108,20 +123,33 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
 
     // Determine the actual content type for the backend
     let backendContentType: string = contentType;
-    if (contentType === 'image' && imageFile) {
-      const mimeType = imageFile.type;
-      if (mimeType === 'image/png') {
-        backendContentType = 'image/png;base64';
-      } else if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
-        backendContentType = 'image/jpeg;base64';
-      } else {
-        backendContentType = 'application/base64';
+    if (contentType === 'image') {
+      if (imageFile) {
+        // File upload - use base64 content types
+        const mimeType = imageFile.type;
+        if (mimeType === 'image/png') {
+          backendContentType = 'image/png;base64';
+        } else if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+          backendContentType = 'image/jpeg;base64';
+        } else {
+          backendContentType = 'application/base64';
+        }
+      } else if (imageUrl.trim()) {
+        // URL - determine type from URL extension or default to PNG
+        const url = imageUrl.trim().toLowerCase();
+        if (url.includes('.jpg') || url.includes('.jpeg')) {
+          backendContentType = 'image/jpeg';
+        } else if (url.includes('.png')) {
+          backendContentType = 'image/png';
+        } else {
+          backendContentType = 'image/png'; // Default
+        }
       }
     }
 
     onSubmit({
       title: title.trim(),
-      content: content.trim(),
+      content: imageUrl.trim() || content.trim(), // Use URL as content if provided
       contentType: backendContentType,
       visibility,
       categories: categoryList,
@@ -257,8 +285,20 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
 
         {/* Image Upload Section */}
         {contentType === 'image' && (
-          <div className="mb-3">
-            {!imageFile ? (
+          <div className="mb-3 space-y-4">
+            {/* Image URL Input - Always visible */}
+            <div>
+              <Input
+                placeholder="Enter image URL (e.g., https://example.com/image.jpg)"
+                value={imageUrl}
+                onChange={(e) => handleImageUrlChange(e.target.value)}
+                className="mb-2"
+              />
+              <p className="text-xs text-text-2">Or upload a file below</p>
+            </div>
+            
+            {/* File Upload - Always visible */}
+            {!imagePreview ? (
               <div className="border-2 border-dashed border-border-1 rounded-lg p-6 text-center">
                 <input
                   type="file"
@@ -291,6 +331,9 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
                 >
                   <X size={16} />
                 </button>
+                <div className="mt-2 text-sm text-text-2">
+                  {imageFile ? `File: ${imageFile.name}` : `URL: ${imageUrl}`}
+                </div>
               </div>
             )}
           </div>
@@ -390,7 +433,7 @@ export const NewPostEditor: React.FC<NewPostEditorProps> = ({
               variant="primary"
               size="md"
               loading={isLoading}
-              disabled={!title.trim() || (contentType !== 'image' && !content.trim()) || (contentType === 'image' && !imageFile)}
+              disabled={!title.trim() || (contentType !== 'image' && !content.trim()) || (contentType === 'image' && !imageFile && !imageUrl.trim())}
             >
               Post
             </Button>

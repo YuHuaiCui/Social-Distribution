@@ -35,6 +35,7 @@ export const CreatePostPage: React.FC = () => {
   const [visibility, setVisibility] = useState<Visibility>(defaultVisibility);
   const [categories, setCategories] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   // Update visibility when default changes
   React.useEffect(() => {
@@ -54,22 +55,57 @@ export const CreatePostPage: React.FC = () => {
       return;
     }
 
-    if (contentType.startsWith("image/") && images.length === 0) {
-      setError("Please upload at least one image");
+    if (contentType.startsWith("image/") && images.length === 0 && imageUrls.length === 0) {
+      setError("Please upload at least one image or provide an image URL");
       return;
     }
 
     setIsLoading(true);
     setError("");
 
-    const entryData: CreateEntryData = {
-      title: title.trim(),
-      content: content.trim(),
-      contentType: contentType,
-      visibility,
-      categories: categories.length > 0 ? categories : undefined,
-      image: images.length > 0 ? images[0] : undefined, // Only send first image if multiple
-    };
+    // Handle URL images vs file images
+    let entryData: CreateEntryData;
+    
+    if (contentType.startsWith("image/")) {
+      if (imageUrls.length > 0) {
+        // URL-based image - put URL in content field
+        entryData = {
+          title: title.trim(),
+          content: imageUrls[0], // Put URL in content field
+          contentType: contentType,
+          visibility,
+          categories: categories.length > 0 ? categories : undefined,
+        };
+      } else if (images.length > 0) {
+        // File-based image - put file in image field
+        entryData = {
+          title: title.trim(),
+          content: content.trim() || "Image post", // Use caption for file-based images
+          contentType: contentType,
+          visibility,
+          categories: categories.length > 0 ? categories : undefined,
+          image: images[0],
+        };
+      } else {
+        // Should not happen due to validation
+        entryData = {
+          title: title.trim(),
+          content: content.trim(),
+          contentType: contentType,
+          visibility,
+          categories: categories.length > 0 ? categories : undefined,
+        };
+      }
+    } else {
+      // Text-based content
+      entryData = {
+        title: title.trim(),
+        content: content.trim(),
+        contentType: contentType,
+        visibility,
+        categories: categories.length > 0 ? categories : undefined,
+      };
+    }
 
     try {
       const response = await entryService.createEntry(entryData);
@@ -225,8 +261,12 @@ export const CreatePostPage: React.FC = () => {
                   <label className="block text-sm font-medium text-text-2 mb-4">
                     Upload Images
                   </label>
-                  <ImageUploader onImagesChange={setImages} maxImages={10} />
-                  {images.length > 0 && (
+                  <ImageUploader 
+                    onImagesChange={setImages} 
+                    onUrlImagesChange={setImageUrls} 
+                    maxImages={10} 
+                  />
+                  {(images.length > 0 || imageUrls.length > 0) && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-text-2 mb-2">
                         Image Caption (Optional)

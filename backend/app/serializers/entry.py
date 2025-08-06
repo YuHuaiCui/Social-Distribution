@@ -57,6 +57,18 @@ class EntrySerializer(serializers.ModelSerializer):
             image_file = request.FILES["image"]
             # Read the image file and store as binary data
             validated_data["image_data"] = image_file.read()
+        
+        # Handle image URL case: if content_type is image/* and content looks like a URL
+        content = validated_data.get("content", "")
+        content_type = validated_data.get("content_type", "")
+        
+        if (content_type in ["image/png", "image/jpeg", "image/png;base64", "image/jpeg;base64"] 
+            and content.startswith(("http://", "https://")) 
+            and not content.startswith("data:")):
+            # This is an image URL, store it as-is in content
+            # Don't convert to binary data, just keep the URL
+            pass  # The URL will be stored in content field
+        
         return super().create(validated_data)
 
     def get_comments_count(self, obj):
@@ -70,13 +82,19 @@ class EntrySerializer(serializers.ModelSerializer):
         return Like.objects.filter(entry=obj).count()
 
     def get_image(self, obj):
-        """Get the image data as base64 for image posts"""
-        if obj.content_type in ["image/png", "image/jpeg"] and obj.image_data:
-            import base64
-
-            # Convert binary data to base64 data URL
-            image_base64 = base64.b64encode(obj.image_data).decode("utf-8")
-            return f"data:{obj.content_type};base64,{image_base64}#v={obj.updated_at.timestamp()}"
+        """Get the image data as base64 for image posts or URL for URL-based images"""
+        if obj.content_type in ["image/png", "image/jpeg", "image/png;base64", "image/jpeg;base64"]:
+            # Check if content is a URL
+            if obj.content and obj.content.startswith(("http://", "https://")):
+                return obj.content  # Return the URL directly
+            
+            # Handle binary image data
+            if obj.image_data:
+                import base64
+                # Convert binary data to base64 data URL
+                image_base64 = base64.b64encode(obj.image_data).decode("utf-8")
+                return f"data:{obj.content_type.replace(';base64', '')};base64,{image_base64}#v={obj.updated_at.timestamp()}"
+        
         return None
 
     def get_is_liked(self, obj):
@@ -230,22 +248,30 @@ class EntrySerializer(serializers.ModelSerializer):
                 else:
                     viewing_author = request.user
 
-            # Handle base64 content for images
+            # Handle different types of image content
             content = instance.content
             if instance.content_type in [
                 "image/png;base64",
                 "image/jpeg;base64",
                 "application/base64",
+                "image/png",
+                "image/jpeg",
             ]:
-                # Content is already base64, ensure it's properly formatted
-                if instance.image_data:
+                # Check if content is a URL (keep URLs as-is)
+                if content and content.startswith(("http://", "https://")):
+                    content = content  # Keep URL as-is
+                # Handle base64 images from binary data
+                elif instance.image_data:
                     import base64
-
                     content = base64.b64encode(instance.image_data).decode("utf-8")
-                elif not content.startswith("data:"):
+                    # Ensure proper data URL format for base64 content
+                    if not content.startswith("data:"):
+                        base_type = instance.content_type.replace(";base64", "")
+                        content = f"data:{base_type};base64,{content}"
+                # Handle existing base64 content
+                elif content and not content.startswith("data:") and instance.content_type.startswith("image/"):
                     # If content doesn't have data URL prefix, add it for images
-                    if instance.content_type.startswith("image/"):
-                        content = f"data:{instance.content_type};base64,{content}"
+                    content = f"data:{instance.content_type};base64,{content}"
 
             # CMPUT 404 compliant format
             result = {
