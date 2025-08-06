@@ -121,15 +121,15 @@ CSRF_TRUSTED_ORIGINS = [
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
     "http://172.24.134.109:5173",  # current IP address
-    "http://192.168.48.1:5173",   # current frontend IP
-    "http://10.0.0.83:5173",      # current frontend IP
+    "http://192.168.48.1:5173",  # current frontend IP
+    "http://10.0.0.83:5173",  # current frontend IP
     # Add backend origins for CSRF
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://192.168.1.72:8000",  # pc backend
     "http://192.168.1.75:8000",  # laptop backend
     "http://172.24.134.109:8000",  # current backend IP
-    "http://10.0.0.83:8000",      # current backend IP
+    "http://10.0.0.83:8000",  # current backend IP
     "http://172.19.110.73:5173",  # friend's IP address
 ]  # Add your frontend domain
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie rather than session
@@ -138,13 +138,16 @@ CSRF_COOKIE_NAME = "csrftoken"
 # Disable referer check for CSRF
 CSRF_COOKIE_HTTPONLY = False
 
+
 # Disable CSRF for API endpoints
 def csrf_exempt_api(get_response):
     def middleware(request):
-        if request.path.startswith('/api/'):
-            setattr(request, '_dont_enforce_csrf_checks', True)
+        if request.path.startswith("/api/"):
+            setattr(request, "_dont_enforce_csrf_checks", True)
         return get_response(request)
+
     return middleware
+
 
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
@@ -230,15 +233,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.1.75:5173",  # laptop
     "http://192.168.1.72:5173",  # pc
     "http://172.24.134.109:5173",  # current IP address
-    "http://192.168.48.1:5173",   # current frontend IP
-    "http://10.0.0.83:5173",      # current backend IP
+    "http://192.168.48.1:5173",  # current frontend IP
+    "http://10.0.0.83:5173",  # current backend IP
     # Add backend origins for session cookies
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://192.168.1.72:8000",  # pc backend
     "http://192.168.1.75:8000",  # laptop backend
     "http://172.24.134.109:8000",  # current backend IP
-    "http://10.0.0.83:8000",      # current backend IP
+    "http://10.0.0.83:8000",  # current backend IP
     "http://172.19.110.73:5173",  # friend's IP address
 ]
 

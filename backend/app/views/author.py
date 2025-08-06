@@ -569,7 +569,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
 
                 # Copy non-file fields from request data
                 for key, value in request.data.items():
-                    if key not in ["profile_image_file", "profileImage"]:
+                    if key not in ["profile_image_file"]:
                         update_data[key] = value
 
                 # Handle profile image upload if present (support both camelCase and snake_case)

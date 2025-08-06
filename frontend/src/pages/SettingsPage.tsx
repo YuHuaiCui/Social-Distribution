@@ -62,6 +62,7 @@ export const SettingsPage: React.FC = () => {
     null
   );
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string>("");
   const [isValidatingGithub, setIsValidatingGithub] = useState(false);
   const [githubValidation, setGithubValidation] = useState<{
     valid: boolean;
@@ -130,12 +131,26 @@ export const SettingsPage: React.FC = () => {
     if (file) {
       // Store the actual file for upload
       setProfileImageFile(file);
+      // Clear URL input when file is selected
+      setProfileImageUrl("");
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfileImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleProfileImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setProfileImageUrl(url);
+    // Clear file input when URL is entered
+    if (url) {
+      setProfileImageFile(null);
+      setProfileImagePreview(url);
+    } else {
+      setProfileImagePreview(null);
     }
   };
 
@@ -201,23 +216,39 @@ export const SettingsPage: React.FC = () => {
     try {
       let updatedUser: Author;
 
-      // First, upload profile image if there's a new one
-      if (profileImageFile) {
+      // Determine what needs to be updated
+      const hasProfileChanges = displayName !== (user?.displayName || user?.display_name) || 
+                                githubUsername !== user?.github_username;
+      const hasImageFile = profileImageFile;
+      const hasImageUrl = profileImageUrl && profileImageUrl !== user?.profileImage;
+
+      if (hasImageFile) {
+        // Upload file image
         updatedUser = await api.uploadProfileImage(profileImageFile);
         // Then update other profile fields if needed
-        if (displayName !== (user?.displayName || user?.display_name) || 
-            githubUsername !== user?.github_username) {
+        if (hasProfileChanges) {
           updatedUser = await api.updateCurrentAuthor({
             displayName: displayName,
             github_username: githubUsername,
           });
         }
-      } else {
-        // Update other profile fields
+      } else if (hasImageUrl) {
+        // Update with image URL and other fields
+        updatedUser = await api.updateCurrentAuthor({
+          displayName: displayName,
+          github_username: githubUsername,
+          profileImage: profileImageUrl,
+        });
+      } else if (hasProfileChanges) {
+        // Update other profile fields only
         updatedUser = await api.updateCurrentAuthor({
           displayName: displayName,
           github_username: githubUsername,
         });
+      } else {
+        setSaveMessage({ type: "error", text: "No changes to save" });
+        setIsSaving(false);
+        return;
       }
 
       // Update user context
@@ -225,8 +256,9 @@ export const SettingsPage: React.FC = () => {
         updateUser(updatedUser);
       }
 
-      // Clear the profile image file after successful upload
+      // Clear the profile image file and URL after successful upload
       setProfileImageFile(null);
+      setProfileImageUrl("");
       setProfileImagePreview(null);
 
       setSaveMessage({
@@ -468,7 +500,7 @@ export const SettingsPage: React.FC = () => {
                   <label className="block text-sm font-medium text-text-2 mb-2">
                     Profile Picture
                   </label>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-start space-x-4">
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       className="relative"
@@ -492,9 +524,23 @@ export const SettingsPage: React.FC = () => {
                         className="hidden"
                       />
                     </motion.div>
-                    <div className="text-sm text-text-2">
-                      <p>Upload a new profile picture</p>
-                      <p>JPG, PNG. Max size 5MB</p>
+                    <div className="flex-1 space-y-4">
+                      <div className="text-sm text-text-2">
+                        <p>Upload a new profile picture or enter an image URL</p>
+                        <p>JPG, PNG. Max size 5MB for uploads</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-text-2 mb-2">
+                          Or enter an image URL (e.g., from Imgur, etc.)
+                        </label>
+                        <Input
+                          type="url"
+                          value={profileImageUrl}
+                          onChange={handleProfileImageUrlChange}
+                          placeholder="https://i.imgur.com/example.jpg"
+                          className="w-full"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
