@@ -606,7 +606,7 @@ export const PostDetailPage: React.FC = () => {
                 // Handle different image sources based on content
                 (content && (content.startsWith('http://') || content.startsWith('https://'))) 
                   ? content  // URL-based image
-                  : (post?.image ? post.image : content) // File-based image or fallback to content
+                  : (post?.image ? `${post.image}?v=${post.updated_at}` : content) // File-based image with cache busting
               }
               alt={post?.title || "Post image"}
               className="w-full h-auto max-h-[600px] object-contain bg-glass-low"
