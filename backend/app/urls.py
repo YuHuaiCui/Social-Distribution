@@ -74,11 +74,29 @@ urlpatterns = [
         ),
         name="author-entry-detail",
     ),
+    # Single Author Entry Detail (no trailing slash): /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}
+    path(
+        "authors/<uuid:author_id>/entries/<uuid:entry_id>",
+        EntryViewSet.as_view(
+            {
+                "get": "retrieve_author_entry",
+                "put": "update_author_entry",
+                "delete": "delete_author_entry",
+            }
+        ),
+        name="author-entry-detail-no-slash",
+    ),
     # Entry Image API: /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/image
     path(
         "authors/<uuid:author_id>/entries/<uuid:entry_id>/image/",
         ImageUploadView.as_view(),
         name="author-entry-image",
+    ),
+    # Entry Image API (no trailing slash): /api/authors/{AUTHOR_SERIAL}/entries/{ENTRY_SERIAL}/image
+    path(
+        "authors/<uuid:author_id>/entries/<uuid:entry_id>/image",
+        ImageUploadView.as_view(),
+        name="author-entry-image-no-slash",
     ),
     # Legacy endpoints for backward compatibility - MUST BE BEFORE FQID patterns
     path(
