@@ -274,13 +274,21 @@ class EntrySerializer(serializers.ModelSerializer):
                     content = f"data:{instance.content_type};base64,{content}"
 
             # CMPUT 404 compliant format
+            # For image entries, append /image to id, url, and web
+            entry_id = instance.url
+            entry_url = instance.url
+            entry_web = instance.web or f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}"
+            if instance.content_type and instance.content_type.startswith("image/"):
+                entry_id = f"{instance.url}/image"
+                entry_url = f"{instance.url}/image"
+                entry_web = f"{entry_web}/image"
+            
             result = {
                 # CMPUT 404 required fields
                 "type": "entry",
                 "title": instance.title,
-                "id": instance.url,  # Full URL as ID per spec
-                "web": instance.web
-                or f"{settings.SITE_URL}/authors/{instance.author.id}/entries/{instance.id}",
+                "id": entry_id,  # Full URL as ID per spec, with /image for image entries
+                "web": entry_web,  # Also append /image for image entries
                 "description": instance.description or "",
                 "contentType": instance.content_type,
                 "content": content,
@@ -296,7 +304,7 @@ class EntrySerializer(serializers.ModelSerializer):
                 ),
                 "visibility": instance.visibility,
                 # Additional fields for frontend compatibility (internal use only)
-                "url": instance.url,
+                "url": entry_url,  # Also append /image for image entries
                 "source": instance.source,
                 "origin": instance.origin,
                 "comments_count": self.get_comments_count(instance),

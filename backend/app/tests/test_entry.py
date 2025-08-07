@@ -410,6 +410,10 @@ class EntryAPITest(BaseAPITestCase):
         response = self.user_client.get(reverse("social-distribution:entry-detail", args=[public_entry.id]))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["title"], "Public Test Entry")
+        
+        # Test that non-image entries do NOT have /image appended
+        self.assertFalse(response.data["id"].endswith("/image"))
+        self.assertFalse(response.data["url"].endswith("/image"))
 
     def test_image_entries(self):
         """Test creating and storing entries with image content"""
@@ -427,6 +431,10 @@ class EntryAPITest(BaseAPITestCase):
         # The serializer returns contentType (camelCase) instead of content_type
         self.assertEqual(response.data["contentType"], "image/png")
         self.assertEqual(response.data["title"], "Image Post")
+        
+        # Test that id and url fields have /image appended for image entries
+        self.assertTrue(response.data["id"].endswith("/image"))
+        self.assertTrue(response.data["url"].endswith("/image"))
 
         # Test creating image entry with JPEG content type via API
         data["content_type"] = "image/jpeg"
@@ -435,6 +443,10 @@ class EntryAPITest(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         # The serializer returns contentType (camelCase) instead of content_type
         self.assertEqual(response.data["contentType"], "image/jpeg")
+        
+        # Test that id and url fields have /image appended for JPEG image entries too
+        self.assertTrue(response.data["id"].endswith("/image"))
+        self.assertTrue(response.data["url"].endswith("/image"))
 
         # Test image entry storage with binary data directly in model
         image_entry = Entry.objects.create(
