@@ -94,7 +94,7 @@ export const SearchResultsPage: React.FC = () => {
             ),
           });
           // Handle both paginated and direct array responses
-          searchResults.authors = authorsResponse.results || authorsResponse || [];
+          searchResults.authors = authorsResponse.results || authorsResponse.authors || authorsResponse || [];
         } catch (error) {
           console.error('Error searching authors:', error);
         }

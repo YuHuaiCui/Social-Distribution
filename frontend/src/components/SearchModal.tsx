@@ -54,6 +54,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
 
     // Debounce search
     searchTimeoutRef.current = setTimeout(() => {
+      console.log("Triggering search for query:", query);
       performSearch(query);
     }, 300);
 
@@ -86,7 +87,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
           });
           // Handle both paginated and direct array responses
           searchResults.authors =
-            authorsResponse.results || authorsResponse || [];
+            authorsResponse.results || authorsResponse.authors || authorsResponse || [];
+          console.log("Parsed search results:", searchResults.authors.length, "authors found");
         } catch (error) {
           console.error("Error searching authors:", error);
         }
@@ -95,8 +97,10 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
       // TODO: Search posts when backend entry search is implemented
       // TODO: Search tags when tag system is implemented
 
+      console.log("Setting search results:", searchResults);
       setResults(searchResults);
     } catch (error) {
+      console.error("Search error:", error);
       showError("Search failed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -157,6 +161,8 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
       results.comments.length > 0 ||
       results.tags.length > 0 ||
       results.remoteResults.length > 0);
+
+  console.log("hasResults:", hasResults, "results:", results);
 
   return (
     <AnimatePresence>
@@ -290,6 +296,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
                       {/* Authors */}
                       {results.authors.length > 0 && (
                         <div className="p-4">
+                          {console.log("Rendering authors section with", results.authors.length, "authors")}
                           <h3 className="text-xs font-medium text-[var(--search-results-secondary)] uppercase tracking-wider mb-3">
                             Authors
                           </h3>
