@@ -1,4 +1,4 @@
-# Backend API Documentation (Updated)
+# Social Distribution Backend API Documentation
 
 ## Table of Contents
 1. [API Overview](#api-overview)
@@ -17,33 +17,35 @@
    - [Follow Endpoints](#follow-endpoints)
    - [Inbox Endpoints](#inbox-endpoints)
    - [Image Upload Endpoints](#image-upload-endpoints)
-   - [GitHub Integration Endpoints](#github-integration-endpoints]
+   - [GitHub Integration Endpoints](#github-integration-endpoints)
    - [Node Management Endpoints](#node-management-endpoints)
+   - [Remote Federation Endpoints](#remote-federation-endpoints)
 9. [CORS Configuration](#cors-configuration)
 10. [Database Schema](#database-schema)
 11. [API Versioning](#api-versioning)
 12. [Rate Limiting](#rate-limiting)
 13. [Testing the API](#testing-the-api)
 14. [Deployment Considerations](#deployment-considerations)
+15. [ActivityPub Compliance](#activitypub-compliance)
 
 ## API Overview
 
 The Social Distribution Backend API is a RESTful API built with Django and Django REST Framework. It provides endpoints for a federated social media platform that supports user authentication, posting content, following users, commenting, liking posts, and managing notifications through an inbox system. The API is designed to be compatible with ActivityPub for federation with other social media platforms.
 
 ### Key Features
-- Session-based authentication with CSRF protection
-- RESTful resource endpoints with CMPUT 404 compliance
-- JSON request/response format
-- Pagination support for list endpoints
-- Comprehensive error handling
-- CORS support for frontend integration
-- Image upload capabilities with binary storage
-- Real-time notifications via inbox system
-- GitHub integration for profile validation and activity tracking
-- Federation support for cross-instance communication
-- Node management for remote instance connections
-- FQID (Fully Qualified ID) support for federation
-- Remote entry fetching and caching
+- **Authentication**: Session-based authentication with CSRF protection for local users, HTTP Basic Auth for remote nodes
+- **Federation**: Full support for distributed social networking with push-based content distribution
+- **Content Types**: Support for text/plain, text/markdown, and image posts (PNG/JPEG)
+- **Visibility Levels**: PUBLIC, UNLISTED, FRIENDS_ONLY, and DELETED visibility settings
+- **RESTful Design**: CMPUT 404 compliant RESTful endpoints with proper HTTP methods
+- **FQID Support**: Fully Qualified IDs for cross-node object identification
+- **Pagination**: Consistent pagination across all list endpoints
+- **Real-time Updates**: Inbox system for activity notifications
+- **GitHub Integration**: Profile validation and activity tracking via GitHub API
+- **Node Management**: Remote instance management for federation
+- **Image Storage**: Binary data storage in database with base64 encoding
+- **Categories**: Tag-based categorization system for posts
+- **Friend System**: Mutual follow relationships automatically tracked
 
 ## Tech Stack
 
@@ -1027,139 +1029,227 @@ Checks follow status between two authors.
 
 ### Inbox Endpoints
 
-The inbox system has been refactored to store activities directly as JSON data instead of foreign key references. This improves federation compatibility and simplifies the data model.
+The inbox system implements the CMPUT 404 specification for activity distribution. It stores activities directly as JSON data for better federation compatibility. The inbox is central to the push-based federation model where nodes POST activities to author inboxes.
 
-#### 1. List Inbox Items
-**GET** `/api/inbox/`
+#### 1. Get Author's Inbox (CMPUT 404 Compliant)
+**GET** `/api/authors/{AUTHOR_SERIAL}/inbox/`
 
-Lists inbox items for the authenticated user.
+**Purpose**: Retrieve all activities in an author's inbox. Only the author themselves can access their own inbox.
 
-**Query Parameters:**
-- `activity_type`: Filter by type (entry, follow, like, comment)
-- `is_read`: Filter by read status (true/false)
-- `page`: Page number
-- `page_size`: Items per page (max 100)
+**Why Use**: To fetch notifications, follow requests, likes, comments, and shared posts sent to the author.
+
+**Authentication**: Required (author can only access their own inbox)
 
 **Response (200 OK):**
 ```json
 {
-  "results": [
+  "type": "inbox",
+  "author": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000",
+  "items": [
     {
-      "id": "inbox-item-uuid",
-      "activity_type": "follow",
-      "is_read": false,
-      "delivered_at": "2025-01-15T16:00:00Z",
-      "object_data": {
-        "id": "follow-uuid",
-        "follower": {
-          "id": "follower-uuid",
-          "username": "newfollower",
-          "displayName": "New Follower"
-        },
-        "status": "pending"
+      "type": "follow",
+      "summary": "John wants to follow Jane",
+      "actor": {
+        "type": "author",
+        "id": "http://localhost:8000/api/authors/follower-uuid",
+        "url": "http://localhost:8000/api/authors/follower-uuid",
+        "host": "http://localhost:8000/",
+        "displayName": "John Doe",
+        "github": "johndoe",
+        "profileImage": null
+      },
+      "object": {
+        "type": "author",
+        "id": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000",
+        "displayName": "Jane Smith"
       }
+    },
+    {
+      "type": "entry",
+      "title": "A Public Post",
+      "id": "http://localhost:8000/api/authors/author-uuid/entries/entry-uuid",
+      "source": "http://localhost:8000/",
+      "origin": "http://localhost:8000/",
+      "description": "This is a public post",
+      "contentType": "text/plain",
+      "content": "Hello, this is my post content!",
+      "author": {
+        "type": "author",
+        "id": "http://localhost:8000/api/authors/author-uuid",
+        "displayName": "Post Author"
+      },
+      "categories": ["tech", "coding"],
+      "published": "2025-01-15T10:00:00Z",
+      "visibility": "PUBLIC"
+    },
+    {
+      "type": "like",
+      "summary": "Someone liked your post",
+      "author": {
+        "type": "author",
+        "id": "http://localhost:8000/api/authors/liker-uuid",
+        "displayName": "Liker Name"
+      },
+      "object": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000/entries/liked-entry-uuid"
+    },
+    {
+      "type": "comment",
+      "author": {
+        "type": "author",
+        "id": "http://localhost:8000/api/authors/commenter-uuid",
+        "displayName": "Commenter Name"
+      },
+      "comment": "Great post! I really enjoyed reading this.",
+      "contentType": "text/plain",
+      "published": "2025-01-15T11:00:00Z",
+      "id": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000/commented/comment-uuid"
     }
-  ],
-  "count": 25,
-  "page": 1,
-  "page_size": 20,
-  "has_next": true,
-  "has_previous": false
+  ]
 }
 ```
 
-#### 2. Get Specific Inbox Item
-**GET** `/api/inbox/{id}/`
+**Error Responses:**
+- `403 Forbidden`: Attempting to access another author's inbox
+- `404 Not Found`: Author does not exist
 
-Gets a specific inbox item.
+#### 2. Post to Author's Inbox (CMPUT 404 Compliant)
+**POST** `/api/authors/{AUTHOR_SERIAL}/inbox/`
 
-#### 3. Mark Items as Read
-**POST** `/api/inbox/mark-read/`
+**Purpose**: Send an activity to an author's inbox. This is the primary federation endpoint for cross-node communication.
 
-Marks multiple inbox items as read.
+**Why Use**: Remote nodes use this to send entries, follow requests, likes, and comments to local authors.
 
-**Request Body:**
+**Authentication**: HTTP Basic Auth required for remote nodes
+
+**Request Body Examples:**
+
+##### Sending an Entry:
 ```json
 {
-  "ids": ["inbox-item-uuid-1", "inbox-item-uuid-2"]
+  "type": "entry",
+  "title": "Shared Post from Remote Node",
+  "id": "http://remotenode.com/api/authors/remote-author/entries/entry-uuid",
+  "source": "http://remotenode.com/",
+  "origin": "http://remotenode.com/",
+  "description": "A post being shared",
+  "contentType": "text/markdown",
+  "content": "# Hello\nThis is a post from a remote node",
+  "author": {
+    "type": "author",
+    "id": "http://remotenode.com/api/authors/remote-author",
+    "url": "http://remotenode.com/api/authors/remote-author",
+    "host": "http://remotenode.com/",
+    "displayName": "Remote Author",
+    "github": "remoteauthor",
+    "profileImage": "http://remotenode.com/media/profile.jpg"
+  },
+  "categories": ["remote", "federation"],
+  "published": "2025-01-15T09:00:00Z",
+  "visibility": "PUBLIC"
 }
 ```
 
-**Response (200 OK):**
+##### Sending a Follow Request:
+```json
+{
+  "type": "follow",
+  "summary": "RemoteUser wants to follow LocalUser",
+  "actor": {
+    "type": "author",
+    "id": "http://remotenode.com/api/authors/remote-follower",
+    "url": "http://remotenode.com/api/authors/remote-follower",
+    "host": "http://remotenode.com/",
+    "displayName": "Remote Follower",
+    "github": "remotefollower",
+    "profileImage": null
+  },
+  "object": {
+    "type": "author",
+    "id": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000",
+    "url": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000",
+    "host": "http://localhost:8000/",
+    "displayName": "Local User"
+  }
+}
+```
+
+##### Sending a Like:
+```json
+{
+  "type": "like",
+  "summary": "RemoteUser liked your post",
+  "author": {
+    "type": "author",
+    "id": "http://remotenode.com/api/authors/liker-uuid",
+    "displayName": "Remote Liker",
+    "host": "http://remotenode.com/"
+  },
+  "object": "http://localhost:8000/api/authors/550e8400-e29b-41d4-a716-446655440000/entries/entry-uuid"
+}
+```
+
+##### Sending a Comment:
+```json
+{
+  "type": "comment",
+  "author": {
+    "type": "author",
+    "id": "http://remotenode.com/api/authors/commenter-uuid",
+    "displayName": "Remote Commenter",
+    "host": "http://remotenode.com/"
+  },
+  "comment": "This is a comment from a remote node!",
+  "contentType": "text/plain",
+  "published": "2025-01-15T12:00:00Z",
+  "id": "http://remotenode.com/api/authors/commenter-uuid/commented/comment-uuid"
+}
+```
+
+**Response (201 Created):**
 ```json
 {
   "success": true,
-  "updated": 2
+  "message": "Activity added to inbox"
 }
 ```
 
-#### 4. Mark Single Item as Read
-**POST** `/api/inbox/{id}/read/`
+**Error Responses:**
+- `400 Bad Request`: Invalid activity format or missing required fields
+- `401 Unauthorized`: Missing or invalid authentication for remote node
+- `404 Not Found`: Recipient author does not exist
 
-Marks a single inbox item as read.
+#### 3. Clear Author's Inbox
+**DELETE** `/api/authors/{AUTHOR_SERIAL}/inbox/`
 
-#### 5. Get Inbox Stats
-**GET** `/api/inbox/stats/`
+**Purpose**: Clear all items from an author's inbox.
 
-Gets inbox statistics.
+**Why Use**: To remove all notifications and activities after processing them.
 
-**Response (200 OK):**
-```json
-{
-  "unread_count": 5,
-  "pending_follows": 2,
-  "total_items": 50
-}
-```
+**Authentication**: Required (author can only clear their own inbox)
 
-#### 6. Get Unread Count
-**GET** `/api/inbox/unread-count/`
+**Response (204 No Content):**
+No response body
 
-Gets count of unread notifications.
+**Error Responses:**
+- `403 Forbidden`: Attempting to clear another author's inbox
+- `404 Not Found`: Author does not exist
 
-**Response (200 OK):**
-```json
-{
-  "unread_count": 5
-}
-```
+#### Important Inbox Notes:
 
-#### 7. Accept Follow from Inbox
-**POST** `/api/inbox/{id}/accept-follow/`
+1. **Push-Based Model**: The inbox implements a push-based federation model. When an author creates content, it should be POSTed to the inboxes of all followers.
 
-Accepts a follow request directly from inbox.
+2. **Activity Types**: The inbox accepts four main activity types:
+   - `entry`: Shared posts from other authors
+   - `follow`: Follow requests requiring approval
+   - `like`: Notifications when someone likes your content
+   - `comment`: Notifications when someone comments on your content
 
-**Response (200 OK):**
-```json
-{
-  "message": "Follow request accepted"
-}
-```
+3. **Federation Flow**:
+   - Local activities are automatically added to recipient inboxes
+   - Remote nodes must POST activities to author inboxes using HTTP Basic Auth
+   - Authors pull from their inbox to see new activities
 
-#### 8. Reject Follow from Inbox
-**POST** `/api/inbox/{id}/reject-follow/`
-
-Rejects a follow request directly from inbox.
-
-**Response (200 OK):**
-```json
-{
-  "message": "Follow request rejected"
-}
-```
-
-#### 9. Clear Inbox
-**POST** `/api/inbox/clear/`
-
-Clears all inbox items for the user.
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "deleted": 25
-}
-```
+4. **Object Storage**: Activities are stored as JSON, preserving the full object structure for federation compatibility.
 
 ### Image Upload Endpoints
 
@@ -1345,27 +1435,242 @@ Removes a node from the system.
 }
 ```
 
-#### 5. Get Remote Followees
-**GET** `/api/remote/followee/{local_serial}/{remote_fqid}/`
+#### 5. Refresh Node Connection
+**POST** `/api/nodes/refresh/`
 
-Gets remote followee information for federation.
+**Purpose**: Test and refresh connection to a remote node.
 
-#### 6. Get Remote Authors
-**GET** `/api/remote/authors/`
-
-Gets recommended remote authors from connected nodes.
+**Request Body:**
+```json
+{
+  "id": "node-uuid"
+}
+```
 
 **Response (200 OK):**
 ```json
 {
-  "recommended_authors": [
+  "success": true,
+  "message": "Node connection refreshed",
+  "is_authenticated": true
+}
+```
+
+### Remote Federation Endpoints
+
+These endpoints handle cross-node communication and federation between different Social Distribution instances.
+
+#### 1. Get Remote Followee Status
+**GET** `/api/remote/followee/{local_serial}/{remote_fqid}/`
+
+**Purpose**: Check if a remote author is following a local author.
+
+**Why Use**: To verify follow relationships across different nodes for federation.
+
+**Parameters:**
+- `local_serial`: UUID of the local author
+- `remote_fqid`: Fully qualified ID of the remote author
+
+**Response (200 OK):**
+```json
+{
+  "is_follower": true,
+  "local_author": "http://localhost:8000/api/authors/local-uuid",
+  "remote_author": "http://remotenode.com/api/authors/remote-uuid"
+}
+```
+
+#### 2. Get Remote Authors
+**GET** `/api/remote/authors/`
+
+**Purpose**: Discover authors from connected remote nodes.
+
+**Why Use**: To find and connect with authors on other Social Distribution instances.
+
+**Query Parameters:**
+- `node_id`: Filter by specific node (optional)
+- `page`: Page number for pagination
+- `page_size`: Number of results per page
+
+**Response (200 OK):**
+```json
+{
+  "type": "authors",
+  "items": [
     {
-      "id": "remote-author-uuid",
-      "username": "remote_user",
-      "displayName": "Remote User",
-      "host": "http://remotenode.com/api/"
+      "type": "author",
+      "id": "http://remotenode.com/api/authors/remote-author-uuid",
+      "url": "http://remotenode.com/api/authors/remote-author-uuid",
+      "host": "http://remotenode.com/",
+      "displayName": "Remote Author",
+      "github": "remoteauthor",
+      "profileImage": "http://remotenode.com/media/profile.jpg"
     }
   ]
+}
+```
+
+#### 3. Check Remote Followers (CMPUT 404 Compliant)
+**GET** `/api/authors/{AUTHOR_SERIAL}/followers/{FOREIGN_AUTHOR_FQID}/`
+
+**Purpose**: Check if a specific foreign author is a follower of a local author.
+
+**Why Use**: For verifying follow relationships in federation scenarios.
+
+**Parameters:**
+- `AUTHOR_SERIAL`: UUID of the local author
+- `FOREIGN_AUTHOR_FQID`: Fully qualified ID of the foreign author
+
+**Response (200 OK) - If Following:**
+```json
+{
+  "type": "follower",
+  "follower": {
+    "type": "author",
+    "id": "http://remotenode.com/api/authors/follower-uuid",
+    "displayName": "Remote Follower",
+    "host": "http://remotenode.com/"
+  },
+  "following": {
+    "type": "author",
+    "id": "http://localhost:8000/api/authors/local-author-uuid",
+    "displayName": "Local Author"
+  },
+  "status": "accepted"
+}
+```
+
+**Response (404 Not Found) - If Not Following:**
+```json
+{
+  "detail": "Follower relationship not found"
+}
+```
+
+#### 4. Follow Remote Author
+**POST** `/api/authors/follow-remote/`
+
+**Purpose**: Follow an author on a remote node.
+
+**Why Use**: To establish follow relationships across different Social Distribution instances.
+
+**Request Body:**
+```json
+{
+  "author_id": "remote-author-uuid",
+  "author_url": "http://remotenode.com/api/authors/remote-author-uuid",
+  "node_id": "node-uuid"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Follow request sent to remote author",
+  "follow": {
+    "id": "follow-uuid",
+    "follower": "http://localhost:8000/api/authors/local-uuid",
+    "followed": "http://remotenode.com/api/authors/remote-uuid",
+    "status": "pending"
+  }
+}
+```
+
+#### 5. Fetch Remote Entry
+**GET** `/api/entries/fetch-remote/?url={REMOTE_ENTRY_URL}`
+
+**Purpose**: Fetch and cache an entry from a remote node.
+
+**Why Use**: To view and interact with content from other Social Distribution instances.
+
+**Query Parameters:**
+- `url`: Full URL of the remote entry
+
+**Response (200 OK):**
+```json
+{
+  "type": "entry",
+  "title": "Remote Post Title",
+  "id": "http://remotenode.com/api/authors/author-uuid/entries/entry-uuid",
+  "source": "http://remotenode.com/",
+  "origin": "http://remotenode.com/",
+  "description": "A post from a remote node",
+  "contentType": "text/markdown",
+  "content": "# Remote Content\nThis is content from another node.",
+  "author": {
+    "type": "author",
+    "id": "http://remotenode.com/api/authors/author-uuid",
+    "displayName": "Remote Author",
+    "host": "http://remotenode.com/"
+  },
+  "categories": ["remote", "federated"],
+  "published": "2025-01-15T10:00:00Z",
+  "visibility": "PUBLIC",
+  "unlisted": false
+}
+```
+
+#### 6. Get Local Comments for Remote Entry
+**GET** `/api/entries/local-comments-for-remote/?entry_url={REMOTE_ENTRY_URL}`
+
+**Purpose**: Get comments made by local users on a remote entry.
+
+**Why Use**: To see local engagement on federated content.
+
+**Query Parameters:**
+- `entry_url`: Full URL of the remote entry
+
+**Response (200 OK):**
+```json
+{
+  "type": "comments",
+  "entry": "http://remotenode.com/api/authors/author-uuid/entries/entry-uuid",
+  "comments": [
+    {
+      "type": "comment",
+      "author": {
+        "type": "author",
+        "id": "http://localhost:8000/api/authors/local-commenter",
+        "displayName": "Local Commenter"
+      },
+      "comment": "Great post from the remote node!",
+      "contentType": "text/plain",
+      "published": "2025-01-15T12:00:00Z",
+      "id": "http://localhost:8000/api/authors/local-commenter/commented/comment-uuid"
+    }
+  ]
+}
+```
+
+### Health Check Endpoint
+
+#### System Health Check
+**GET** `/api/health/`
+
+**Purpose**: Check if the API server is running and responsive.
+
+**Why Use**: For monitoring, uptime checks, and load balancer health probes.
+
+**Authentication**: Not required (public endpoint)
+
+**Response (200 OK):**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-15T10:00:00Z",
+  "version": "1.0.0",
+  "database": "connected",
+  "nodes_connected": 3
+}
+```
+
+**Error Response (503 Service Unavailable):**
+```json
+{
+  "status": "unhealthy",
+  "timestamp": "2025-01-15T10:00:00Z",
+  "error": "Database connection failed"
 }
 ```
 
@@ -1565,4 +1870,87 @@ Set these in production:
 - Configure node management for remote instances
 - Set up proper authentication for cross-instance communication
 - Implement ActivityPub compliance for interoperability
-- Monitor federation performance and reliability 
+- Monitor federation performance and reliability
+
+## ActivityPub Compliance
+
+This API follows a simplified ActivityPub model for federation between Social Distribution instances.
+
+### Core Concepts
+
+1. **Actor Model**: Authors are actors who can perform activities
+2. **Activity Types**: Support for Create (entry), Follow, Like, and Add (comment) activities
+3. **Inbox/Outbox Pattern**: Push-based content distribution via inboxes
+4. **Object Types**: Entry (Article/Note), Author (Person), Comment (Note), Like, Follow
+
+### Federation Protocol
+
+#### Content Distribution Flow:
+1. **Local Creation**: Author creates content on their home node
+2. **Follower Discovery**: System identifies all followers (local and remote)
+3. **Inbox Delivery**: Content is POSTed to each follower's inbox
+4. **Remote Processing**: Remote nodes store and display received content
+
+#### Authentication Between Nodes:
+- HTTP Basic Authentication with node-specific credentials
+- Credentials configured in Node Management
+- Global authentication between paired nodes
+
+#### Object Identification:
+- All objects use Fully Qualified IDs (FQIDs)
+- Format: `http://{host}/api/{resource_path}/{uuid}`
+- FQIDs enable cross-node object references
+
+### Supported Activities
+
+#### 1. Create Activity (Entry)
+```json
+{
+  "type": "entry",
+  "id": "http://node.com/api/authors/{author}/entries/{entry}",
+  "author": { /* Author object */ },
+  "published": "2025-01-15T10:00:00Z",
+  "visibility": "PUBLIC"
+}
+```
+
+#### 2. Follow Activity
+```json
+{
+  "type": "follow",
+  "actor": { /* Follower author object */ },
+  "object": { /* Followed author object */ },
+  "summary": "Actor wants to follow Object"
+}
+```
+
+#### 3. Like Activity
+```json
+{
+  "type": "like",
+  "author": { /* Liker author object */ },
+  "object": "http://node.com/api/authors/{author}/entries/{entry}",
+  "summary": "Author liked an entry"
+}
+```
+
+#### 4. Comment Activity
+```json
+{
+  "type": "comment",
+  "author": { /* Commenter author object */ },
+  "comment": "Comment text",
+  "contentType": "text/plain",
+  "id": "http://node.com/api/authors/{author}/commented/{comment}"
+}
+```
+
+### Best Practices for Federation
+
+1. **Always Include Full Author Objects**: Don't just send IDs
+2. **Use Absolute URLs**: All references should be fully qualified
+3. **Handle Missing Objects Gracefully**: Remote content may be deleted
+4. **Respect Visibility Settings**: Don't federate private content
+5. **Implement Retry Logic**: Network failures are common
+6. **Cache Remote Content**: Reduce cross-node requests
+7. **Validate Incoming Activities**: Ensure proper format and authorization 
