@@ -24,7 +24,7 @@ class AuthAPITest(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["isAuthenticated"])
         # The author serializer returns CMPUT 404 format, so check displayName instead
-        self.assertEqual(response.data["user"]["displayName"], "Test User")
+        self.assertEqual(response.data["user"]["displayName"], "TestUser")
 
     def test_signup(self):
         """Test user registration"""
@@ -64,42 +64,47 @@ class AuthAPITest(BaseAPITestCase):
 
     def test_login(self):
         """Test user login"""
+        import base64
         url = reverse("login")  # Note: This is not namespaced
 
         # Test successful login
-        data = {"username": "testuser", "password": "testpass123"}
-        response = self.client.post(url, data)
+        credentials = base64.b64encode(b"testuser:testpass123").decode('utf-8')
+        headers = {"HTTP_AUTHORIZATION": f"Basic {credentials}"}
+        data = {}
+        response = self.client.post(url, data, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["success"])
-        self.assertEqual(response.data["user"]["displayName"], "Test User")
+        self.assertEqual(response.data["user"]["displayName"], "TestUser")
 
         # Test login with remember me
-        data["remember_me"] = True
-        response = self.client.post(url, data)
+        data = {"remember_me": True}
+        response = self.client.post(url, data, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["success"])
 
         # Test invalid credentials
-        data["password"] = "wrongpassword"
-        response = self.client.post(url, data)
+        wrong_credentials = base64.b64encode(b"testuser:wrongpassword").decode('utf-8')
+        wrong_headers = {"HTTP_AUTHORIZATION": f"Basic {wrong_credentials}"}
+        response = self.client.post(url, {}, **wrong_headers)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(response.data["message"], "Invalid username or password")
 
-        # Test missing credentials
-        data.pop("username")
-        response = self.client.post(url, data)
+        # Test missing credentials (no Authorization header)
+        response = self.client.post(url, {})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["message"], "Username and password are required")
+        self.assertEqual(response.data["message"], "Authorization header with Basic authentication is required")
 
         # Test non-existent user
-        data = {"username": "nonexistent", "password": "testpass123"}
-        response = self.client.post(url, data)
+        nonexistent_credentials = base64.b64encode(b"nonexistent:testpass123").decode('utf-8')
+        nonexistent_headers = {"HTTP_AUTHORIZATION": f"Basic {nonexistent_credentials}"}
+        response = self.client.post(url, {}, **nonexistent_headers)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(response.data["message"], "Invalid username or password")
 
     @override_settings(AUTO_APPROVE_NEW_USERS=False)
     def test_user_approval_workflow(self):
         """Test complete user approval"""
+        import base64
         # Create user account
         signup_url = reverse("signup")
         signup_data = {
@@ -108,49 +113,44 @@ class AuthAPITest(BaseAPITestCase):
             "password": "pendingpass123",
             "displayName": "Pending User",
         }
-        
         response = self.client.post(signup_url, signup_data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(response.data["success"])
         self.assertEqual(response.data["user"]["displayName"], "Pending User")
-        
+
         # Verify user was created but not approved
         pending_user = Author.objects.get(username="pendinguser")
         self.assertFalse(pending_user.is_approved)
         self.assertTrue(pending_user.is_active)
-        
+
         # Attempt login - should fail because not approved
         login_url = reverse("login")
-        login_data = {"username": "pendinguser", "password": "pendingpass123"}
-        
-        response = self.client.post(login_url, login_data)
+        credentials = base64.b64encode(b"pendinguser:pendingpass123").decode('utf-8')
+        headers = {"HTTP_AUTHORIZATION": f"Basic {credentials}"}
+        response = self.client.post(login_url, {}, **headers)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.data["message"], "Your account is awaiting admin approval.")
-        
+
         # Admin approves the user (simulate approval by directly updating)
         pending_user.is_approved = True
         pending_user.save()
-        
+
         # Verify approval in a GET request to the author endpoint
         author_url = reverse('social-distribution:authors-detail', args=[pending_user.id])
         response = self.admin_client.get(author_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         pending_user.refresh_from_db()
         self.assertTrue(pending_user.is_approved)
-        
-        # Verify user is now approved in database
-        pending_user.refresh_from_db()
-        self.assertTrue(pending_user.is_approved)
-        
+
         # User can now login successfully
-        response = self.client.post(login_url, login_data)
+        response = self.client.post(login_url, {}, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["success"])
         self.assertEqual(response.data["user"]["displayName"], "Pending User")
-        
+
         # Test with remember_me option as well
-        login_data["remember_me"] = True
-        response = self.client.post(login_url, login_data)
+        data = {"remember_me": True}
+        response = self.client.post(login_url, data, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["success"])
 
@@ -177,7 +177,7 @@ class AuthAPITest(BaseAPITestCase):
         response = self.user_client.post(url, {"code": "valid_code"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["success"])
-        self.assertEqual(response.data["user"]["displayName"], "Test User")
+        self.assertEqual(response.data["user"]["displayName"], "TestUser")
 
     def test_logout(self):
         """Test logout endpoint"""
@@ -199,7 +199,7 @@ class AuthAPITest(BaseAPITestCase):
 
     def test_author_me(self):
         """Test author me endpoint"""
-        url = reverse("author-me")
+        url = reverse("social-distribution:authors-me")
 
         # Test unauthenticated access
         response = self.client.get(url)
@@ -208,7 +208,7 @@ class AuthAPITest(BaseAPITestCase):
         # Test authenticated access
         response = self.user_client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["displayName"], "Test User")
+        self.assertEqual(response.data["displayName"], "TestUser")
 
         # Test profile update
         data = {

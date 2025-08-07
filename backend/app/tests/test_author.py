@@ -93,20 +93,20 @@ class AuthorAPITest(BaseAPITestCase):
 
         # Debug prints
         # print("\nResponse data:", response.data)
-        # print("Number of authors in response:", len(response.data['results']))
+        # print("Number of authors in response:", len(response.data['authors']))
         # print("Authors in database:", Author.objects.count())
-        # print("Author usernames in response:", [author['username'] for author in response.data['results']])
+        # print("Author usernames in response:", [author['username'] for author in response.data['authors']])
         # print("Author usernames in database:", [author.username for author in Author.objects.all()])
 
         expected_authors = Author.objects.count()
-        self.assertEqual(len(response.data["results"]), expected_authors)
+        self.assertEqual(len(response.data["authors"]), expected_authors)
 
         # Verify our test users are in the response
-        display_names = [author["displayName"] for author in response.data["results"]]
+        display_names = [author["displayName"] for author in response.data["authors"]]
         # Admin user was created without displayName, so it will be empty
         self.assertIn("", display_names)  # Admin has empty displayName
-        self.assertIn("Test User", display_names)
-        self.assertIn("Another User", display_names)
+        self.assertIn("TestUser", display_names)
+        self.assertIn("AnotherUser", display_names)
 
     def test_author_list_filtering(self):
         """Test author list filtering"""
@@ -116,7 +116,7 @@ class AuthorAPITest(BaseAPITestCase):
         response = self.user_client.get(url, {"is_approved": "true"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Get the IDs of authors in the response and verify they are approved in the database
-        response_author_ids = [author["id"] for author in response.data["results"]]
+        response_author_ids = [author["id"] for author in response.data["authors"]]
         for author_id in response_author_ids:
             # Extract UUID from the URL if it's a full URL
             if isinstance(author_id, str) and author_id.startswith('http'):
@@ -129,7 +129,7 @@ class AuthorAPITest(BaseAPITestCase):
         # Test filtering by active status
         response = self.user_client.get(url, {"is_active": "true"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        response_author_ids = [author["id"] for author in response.data["results"]]
+        response_author_ids = [author["id"] for author in response.data["authors"]]
         for author_id in response_author_ids:
             # Extract UUID from the URL if it's a full URL
             if isinstance(author_id, str) and author_id.startswith('http'):
@@ -143,7 +143,7 @@ class AuthorAPITest(BaseAPITestCase):
         response = self.user_client.get(url, {"type": "local"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(
-            all(author.get("node") is None for author in response.data["results"])
+            all(author.get("node") is None for author in response.data["authors"])
         )
 
         # Test search functionality
@@ -152,7 +152,7 @@ class AuthorAPITest(BaseAPITestCase):
         self.assertTrue(
             any(
                 "test" in author["displayName"].lower()
-                for author in response.data["results"]
+                for author in response.data["authors"]
             )
         )
 

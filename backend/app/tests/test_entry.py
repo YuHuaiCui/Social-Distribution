@@ -35,7 +35,7 @@ class EntryAPITest(BaseAPITestCase):
             response.data["results"][0]["content"], "This is a private entry"
         )
         # The author serializer returns CMPUT 404 format, so check displayName instead
-        self.assertEqual(response.data["results"][0]["author"]["displayName"], "Test User")
+        self.assertEqual(response.data["results"][0]["author"]["displayName"], "TestUser")
 
         # Public Entry
         self.assertEqual(response.data["results"][1]["title"], "Public Entry")
@@ -44,7 +44,7 @@ class EntryAPITest(BaseAPITestCase):
             response.data["results"][1]["content"], "This is a public entry"
         )
         # The author serializer returns CMPUT 404 format, so check displayName instead
-        self.assertEqual(response.data["results"][1]["author"]["displayName"], "Test User")
+        self.assertEqual(response.data["results"][1]["author"]["displayName"], "TestUser")
 
     def test_entry_detail(self):
         """Test retrieving a single entry"""
@@ -61,7 +61,7 @@ class EntryAPITest(BaseAPITestCase):
         self.assertEqual(response.data["visibility"], "PUBLIC")
         self.assertEqual(response.data["content"], "This is a public entry")
         # The author serializer returns CMPUT 404 format, so check displayName instead
-        self.assertEqual(response.data["author"]["displayName"], "Test User")
+        self.assertEqual(response.data["author"]["displayName"], "TestUser")
 
         # Test access to own entries
         url = reverse("social-distribution:entry-detail", args=[self.private_entry.id])
@@ -71,7 +71,7 @@ class EntryAPITest(BaseAPITestCase):
         self.assertEqual(response.data["visibility"], "FRIENDS")
         self.assertEqual(response.data["content"], "This is a private entry")
         # The author serializer returns CMPUT 404 format, so check displayName instead
-        self.assertEqual(response.data["author"]["displayName"], "Test User")
+        self.assertEqual(response.data["author"]["displayName"], "TestUser")
 
         # Test access to others' entries
         url = reverse(
