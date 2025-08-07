@@ -10,6 +10,16 @@ from .node import Node
 
 
 class AuthorManager(UserManager):
+    def get_queryset(self):
+        """
+        Override to include all users (both active and inactive).
+        This ensures remote authors (is_active=False) are included in queries.
+        """
+        # Use the base Manager's get_queryset instead of UserManager's
+        # to avoid Django's default is_active=True filtering
+        from django.db import models
+        return models.Manager.get_queryset(self)
+
     def local_authors(self):
         """Get all local authors (authors from this instance)"""
         return self.filter(node__isnull=True)
@@ -21,6 +31,10 @@ class AuthorManager(UserManager):
     def approved_authors(self):
         """Get all approved authors (approved by admin)"""
         return self.filter(is_approved=True)
+
+    def active_authors(self):
+        """Get only active authors (can log in)"""
+        return self.filter(is_active=True)
 
     def create_user(self, username, email=None, password=None, **kwargs):
         """Create a user with required password validation"""

@@ -81,6 +81,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
           const authorsResponse = await api.getAuthors({
             search: searchQuery,
             // Don't filter by is_active to include remote authors (they have is_active=False)
+            // Remove type filtering to include both local and remote authors
             ...(isAdmin ? {} : { is_approved: true }),
           });
           // Handle both paginated and direct array responses

@@ -82,17 +82,16 @@ export const SearchResultsPage: React.FC = () => {
       // Search authors if needed
       if ((searchType === 'all' || searchType === 'authors') && searchQuery) {
         try {
-
           const authorsResponse = await api.getAuthors({
-          search: searchQuery,
-          // Don't filter by is_active to include remote authors (they have is_active=False)
-          ...(isAdmin
-            ? showUnapprovedOnly
-              ? { is_approved: false }
-              : {} // show all (default filters may apply)
-            : { is_approved: true } // regular users only see approved
-          ),
-
+            search: searchQuery,
+            // Don't filter by is_active to include remote authors (they have is_active=False)
+            // Remove type filtering to include both local and remote authors
+            ...(isAdmin
+              ? showUnapprovedOnly
+                ? { is_approved: false }
+                : {} // show all (default filters may apply)
+              : { is_approved: true } // regular users only see approved
+            ),
           });
           // Handle both paginated and direct array responses
           searchResults.authors = authorsResponse.results || authorsResponse || [];

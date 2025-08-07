@@ -162,9 +162,13 @@ class AuthorViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_approved=is_approved.lower() == "true")
 
         # Filter by active status
+        # IMPORTANT: Only apply is_active filter if explicitly requested
+        # Remote authors have is_active=False but should still be searchable
         is_active = self.request.query_params.get("is_active", None)
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == "true")
+        # If is_active is not specified, include both active and inactive authors
+        # This ensures remote authors (is_active=False) are included in search results
 
         # Filter local vs remote authors
         author_type = self.request.query_params.get("type", None)
